@@ -1,0 +1,82 @@
+name: Release
+
+# Builds installers for macOS, Windows and Linux and attaches them to a draft
+# GitHub release. Start it by pushing a tag such as v0.0.1, or run it manually.
+#
+# Code signing is optional and driven by repository secrets. Without them the
+# builds are produced unsigned (macOS Gatekeeper and Windows SmartScreen warn).
+#   macOS:   CSC_LINK (base64 .p12), CSC_KEY_PASSWORD,
+#            APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+#   Windows: WIN_CSC_LINK (base64 .pfx), WIN_CSC_KEY_PASSWORD
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: pack:mac
+          - os: windows-latest
+            script: pack:win
+          - os: ubuntu-latest
+            script: pack:linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Build installers
+        run: npm run ${{ matrix.script }} -- --publish never
+        env:
+          CSC_LINK: ${{ matrix.os == 'windows-latest' && secrets.WIN_CSC_LINK || secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ matrix.os == 'windows-latest' && secrets.WIN_CSC_KEY_PASSWORD || secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            dist-electron-builder/*.dmg
+            dist-electron-builder/*.zip
+            dist-electron-builder/*.exe
+            dist-electron-builder/*.AppImage
+            dist-electron-builder/*.deb
+            dist-electron-builder/latest*.yml
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+
+      - name: SHA256SUMS
+        working-directory: release-files
+        run: sha256sum $(ls | grep -v '\.yml$') > SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: release-files/*
