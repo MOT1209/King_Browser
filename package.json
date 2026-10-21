@@ -1,0 +1,216 @@
+{
+  "name": "king-browser",
+  "description": "King Browser — open-source desktop browser with precise human control over an AI agent (OpenCode) driving the web",
+  "author": "King Browser contributors (derived from Nova Browser by unitybtw — see THIRD_PARTY_LICENSES.md)",
+  "license": "MIT",
+  "homepage": "https://github.com/MOT1209/my-video",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
+  "build": {
+    "appId": "com.kingbrowser.app",
+    "productName": "King Browser",
+    "afterPack": "scripts/apply-fuses.cjs",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "MOT1209",
+        "repo": "my-video",
+        "releaseType": "release"
+      }
+    ],
+    "directories": {
+      "output": "dist-electron-builder",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "artifactName": "King-Browser-${version}-${arch}.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "dmg": {
+      "title": "King Browser Installer",
+      "background": "build/dmg-background.png",
+      "iconSize": 128,
+      "window": {
+        "width": 660,
+        "height": 440
+      },
+      "contents": [
+        {
+          "x": 180,
+          "y": 220,
+          "type": "file"
+        },
+        {
+          "x": 480,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "King-Browser-${arch}.${ext}",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "King Browser",
+      "deleteAppDataOnUninstall": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "King-Browser-Setup-${version}-${arch}.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "maintainer": "King Browser contributors",
+      "synopsis": "Open-source sovereign desktop browser",
+      "category": "Network;WebBrowser",
+      "artifactName": "King-Browser-${arch}.${ext}",
+      "icon": "build/icon.png",
+      "extraFiles": [
+        {
+          "from": "build/com.kingbrowser.app.metainfo.xml",
+          "to": "usr/share/metainfo/com.kingbrowser.app.metainfo.xml"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "dev:web": "vite",
+    "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts electron/guest-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs",
+    "build": "tsc && vite build && npm run build:electron",
+    "pretest": "node scripts/ensure-build-artifacts.cjs",
+    "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs --external:electron --define:import.meta.env=\"{}\" && node dist-test/runAll.cjs",
+    "test": "npm run test:e2e",
+    "benchmark": "esbuild tests/benchmark_suite.ts --bundle --platform=node --outfile=dist-test/benchmark_suite.cjs && node dist-test/benchmark_suite.cjs",
+    "benchmark:speedometer": "esbuild scripts/speedometer_runner.ts --bundle --platform=node --outfile=dist-test/speedometer_runner.cjs --external:electron && electron dist-test/speedometer_runner.cjs",
+    "pack:win": "npm run build && electron-builder --win",
+    "pack:mac": "npm run build && electron-builder --mac",
+    "pack:linux": "npm run build && electron-builder --linux",
+    "dev:website": "npm --prefix website run dev",
+    "build:website": "npm --prefix website run build",
+    "video:preview": "remotion preview video/src/index.ts",
+    "video:render": "remotion render video/src/index.ts NovaPromo video/out/nova-promo.mp4",
+    "video:render:shorts": "remotion render video/src/index.ts NovaShorts video/out/nova-shorts.mp4",
+    "video:render:browser": "remotion render video/src/index.ts NovaBrowserAd video/out/nova-browser-ad.mp4",
+    "video:render:browser:shorts": "remotion render video/src/index.ts NovaBrowserAdShorts video/out/nova-browser-ad-shorts.mp4",
+    "scan:vt": "node scripts/scan_virustotal.mjs",
+    "dev": "npm run build:electron && concurrently \"vite\" \"electron .\""
+  },
+  "dependencies": {
+    "@cliqz/adblocker-electron": "^1.34.0",
+    "electron-updater": "^6.8.9",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "jsdom": "^30.0.1"
+  },
+  "devDependencies": {
+    "@assistant-ui/react": "^0.15.21",
+    "@electron/fuses": "^2.1.3",
+    "@huggingface/transformers": "^4.3.0",
+    "@mlc-ai/web-llm": "^0.2.84",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@mozilla/readability": "^0.6.0",
+    "@remotion/cli": "^4.0.518",
+    "@remotion/player": "^4.0.518",
+    "@supabase/supabase-js": "^2.112.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/dompurify": "^3.0.5",
+    "@types/express": "^5.0.6",
+    "@types/jsdom": "^30.0.0",
+    "@types/mozilla-readability": "^0.2.1",
+    "@types/node": "^22.10.2",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "concurrently": "^9.1.0",
+    "cross-fetch": "^4.1.0",
+    "dompurify": "^3.4.16",
+    "electron": "^43.7.7",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "eventsource": "^4.1.0",
+    "framer-motion": "^12.42.2",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.469.0",
+    "motion-dom": "^12.42.2",
+    "motion-utils": "^12.39.0",
+    "qrcode": "^1.5.4",
+    "radix-ui": "^1.6.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "remotion": "^4.0.518",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.3",
+    "terser": "^5.49.0",
+    "tw-animate-css": "^1.4.0",
+    "tw-shimmer": "^0.4.12",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.5"
+  },
+  "overrides": {
+    "sprintf-js": "^1.1.3"
+  }
+}

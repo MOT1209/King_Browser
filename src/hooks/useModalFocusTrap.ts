@@ -1,0 +1,98 @@
+import { useEffect, useRef } from 'react';
+
+export function useModalFocusTrap(
+  isOpen: boolean,
+  onClose: () => void,
+  containerRef: React.RefObject<HTMLElement | null>
+) {
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Store currently focused element before opening modal
+    if (document.activeElement instanceof HTMLElement) {
+      previousActiveElementRef.current = document.activeElement;
+    }
+
+    const focusableQuery =
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    // Focus initial element inside container
+    const container = containerRef.current;
+    if (container) {
+      if (!container.hasAttribute('role')) {
+        container.setAttribute('role', 'dialog');
+      }
+      if (!container.hasAttribute('aria-modal')) {
+        container.setAttribute('aria-modal', 'true');
+      }
+
+      const focusables = Array.from(container.querySelectorAll<HTMLElement>(focusableQuery));
+      if (focusables.length > 0) {
+        // Focus first element, prefer input if available
+        const firstInput = focusables.find(el => el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+        (firstInput || focusables[0]).focus();
+      } else {
+        container.focus();
+      }
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        if (!containerRef.current) return;
+        const focusables = Array.from(
+          containerRef.current.querySelectorAll<HTMLElement>(focusableQuery)
+        ).filter(el => {
+          if (el === document.activeElement) return true;
+          if (typeof el.checkVisibility === 'function') {
+            return el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
+          }
+          return el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0;
+        });
+
+        if (focusables.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        const firstElement = focusables[0];
+        const lastElement = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || !containerRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement || !containerRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      // Restore previous focus when modal closes
+      const prevEl = previousActiveElementRef.current;
+      if (prevEl && typeof prevEl.focus === 'function' && document.body.contains(prevEl)) {
+        requestAnimationFrame(() => {
+          prevEl.focus();
+        });
+      }
+    };
+  }, [isOpen, containerRef]);
+}

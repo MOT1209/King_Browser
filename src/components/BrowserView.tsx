@@ -1,0 +1,1541 @@
+import React, { useRef, useEffect, useState, useCallback, Suspense, lazy } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Moon, Zap, Key } from 'lucide-react';
+import { Tab, HistoryItem, UserSettings } from '../types/browser';
+import type { DownloadItemPage } from './DownloadsPage';
+import { tabThumbnailCache } from '../services/thumbnailCache';
+import {
+  getExtractTextNodesScript,
+  getApplyTranslationScript,
+  getRestoreOriginalScript
+} from '../services/translationService';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
+
+const PasswordPromptModal = lazy(() => import('./PasswordPromptModal').then(m => ({ default: m.PasswordPromptModal })));
+const AILinkPreview = lazy(() => import('./AILinkPreview').then(m => ({ default: m.AILinkPreview })));
+const NewTabPage = lazy(() => import('./NewTabPage').then(m => ({ default: m.NewTabPage })));
+const SettingsPage = lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })));
+const HistoryPage = lazy(() => import('./HistoryPage').then(m => ({ default: m.HistoryPage })));
+const DownloadsPage = lazy(() => import('./DownloadsPage').then(m => ({ default: m.DownloadsPage })));
+const ChangelogPage = lazy(() => import('./ChangelogPage').then(m => ({ default: m.ChangelogPage })));
+
+const NOOP = () => {};
+
+export function areUrlsEquivalent(urlA?: string, urlB?: string): boolean {
+  if (!urlA || !urlB) return false;
+  if (urlA === urlB) return true;
+  if (urlA.replace(/\/$/, '') === urlB.replace(/\/$/, '')) return true;
+  try {
+    const a = new URL(urlA);
+    const b = new URL(urlB);
+    const hostA = a.hostname.toLowerCase().replace(/^www\./, '');
+    const hostB = b.hostname.toLowerCase().replace(/^www\./, '');
+    const pathA = a.pathname.replace(/\/$/, '');
+    const pathB = b.pathname.replace(/\/$/, '');
+    return a.protocol === b.protocol && hostA === hostB && pathA === pathB && a.search === b.search;
+  } catch {
+    return false;
+  }
+}
+
+// Origins already hinted via <link rel="preconnect">. LRU bounded to max 50 entries
+// so document.head does not accumulate unbounded link DOM nodes over long sessions.
+const MAX_PRECONNECT_HINTS = 50;
+const preconnectedOrigins = new Set<string>();
+const preconnectLinkElements: HTMLLinkElement[] = [];
+
+function addPreconnectHint(origin: string) {
+  if (typeof document === 'undefined') return;
+  if (!origin || origin.startsWith('null') || preconnectedOrigins.has(origin)) return;
+  if (preconnectedOrigins.size >= MAX_PRECONNECT_HINTS) {
+    const oldestOrigin = preconnectedOrigins.values().next().value;
+    if (oldestOrigin) {
+      preconnectedOrigins.delete(oldestOrigin);
+      const oldestNode = preconnectLinkElements.shift();
+      oldestNode?.remove();
+    }
+  }
+  preconnectedOrigins.add(origin);
+  const hint = document.createElement('link');
+  hint.rel = 'preconnect';
+  hint.href = origin;
+  hint.crossOrigin = 'anonymous';
+  document.head.appendChild(hint);
+  preconnectLinkElements.push(hint);
+}
+
+export interface BrowserViewProps {
+  tab?: Tab | null;
+  isActive: boolean;
+  onUpdateTab: (id: string, updates: Partial<Tab>) => void;
+  onCloseTab: (id: string) => void;
+  isIncognito: boolean;
+  onExitIncognito?: () => void;
+  onNewTab?: (url?: string, sourceTabId?: string) => void;
+  onNavigate?: (url: string, tabId?: string) => void;
+  onActivate?: (id: string) => void;
+  onFoundInPage?: (activeMatchOrdinal: number, numberOfMatches: number) => void;
+  searchEngine?: UserSettings['searchEngine'];
+  privacyShield: boolean;
+  newTabBackground?: string;
+  disableTasksWidget?: boolean;
+  settings: UserSettings;
+  onUpdateSettings?: (newSettings: Partial<UserSettings>) => void;
+  history?: HistoryItem[];
+  downloads?: DownloadItemPage[];
+  onClearHistory?: (timeframe?: string) => void;
+  onRemoveHistoryItem?: (id: string) => void;
+  onClearDownloads?: () => void;
+  onExportData?: () => void;
+  onImportData?: (file: File) => void;
+  onPurgeMemory?: () => Promise<void> | void;
+  onPerformSync?: (mergedData: any) => Promise<void> | void;
+  isDemo?: boolean;
+}
+
+/** Mirrors the `isSettingsTab` / `isHistoryTab` / `isDownloadsTab` predicates in
+ *  the component body. The memo comparator has to gate on exactly the URL that
+ *  decides which child receives a prop, otherwise it either re-renders every
+ *  tab or lets a tab keep a stale callback. */
+const isSettingsUrl = (url?: string): boolean =>
+  Boolean(url?.startsWith('king://settings') || url?.startsWith('about:settings'));
+const isHistoryUrl = (url?: string): boolean =>
+  url === 'king://history' || url === 'about:history';
+const isDownloadsUrl = (url?: string): boolean =>
+  url === 'king://downloads' || url === 'about:downloads';
+
+/** Webview and always-rendered callbacks. Referentially stable in `App.tsx`
+ *  (`useCallback` over refs and setters only), so comparing them is free and
+ *  closes the same staleness the data-derived callbacks used to suffer from:
+ *  a changed `onUpdateTab` left the tab with listeners bound to the old one. */
+const ALWAYS_COMPARED_CALLBACKS = [
+  'onUpdateTab',
+  'onNewTab',
+  'onNavigate',
+  'onActivate',
+  'onFoundInPage',
+] as const;
+
+/** Callbacks that only `SettingsPage` renders. `onExportData` closes over
+ *  `bookmarkRows`/`history`/`settings` and `onPerformSync` over `bookmarkRows`/
+ *  `folderRows`/`history`/`settings`/`workspaceRows`, so they change identity on
+ *  any data edit and MUST be compared — see {@link browserViewPropsEqual}. */
+const SETTINGS_PAGE_CALLBACKS = [
+  'onUpdateSettings',
+  'onExportData',
+  'onImportData',
+  'onPurgeMemory',
+  'onPerformSync',
+] as const;
+
+/**
+ * The whole `React.memo` contract for `BrowserView`: true when nothing the tab
+ * renders has changed.
+ *
+ * The bug this replaces compared only `isActive` plus a few scalars and never
+ * looked at the callback props at all. Because `onExportData` and
+ * `onPerformSync` close over the app's data rows, a bookmark deleted in another
+ * tab gave them a new identity, App re-rendered, the comparator bailed — and the
+ * Settings tab kept the closures captured before the deletion. Pressing
+ * "Sync Now" then pushed those pre-deletion rows straight back through
+ * `setBookmarks(mergedData.bookmarks)`, resurrecting the bookmark the user had
+ * just deleted and republishing it to every other device; Export produced a
+ * backup missing everything that changed since the tab last rendered.
+ *
+ * Callback props are split in two rather than compared flat:
+ *
+ * - {@link ALWAYS_COMPARED_CALLBACKS} are compared everywhere. They are
+ *   referentially stable, so this costs no extra renders and no extra
+ *   webview-listener churn.
+ * - {@link SETTINGS_PAGE_CALLBACKS} and the history/downloads handlers are
+ *   compared only on the page that actually receives them. `onPurgeMemory`
+ *   closes over `activeTabId`, so comparing it on a web tab would re-render
+ *   every tab on every tab switch — the exact cost the memo exists to avoid.
+ */
+export function browserViewPropsEqual(prev: BrowserViewProps, next: BrowserViewProps): boolean {
+  if (prev.isActive !== next.isActive) return false;
+  if (prev.isIncognito !== next.isIncognito) return false;
+  if (prev.privacyShield !== next.privacyShield) return false;
+  if (prev.searchEngine !== next.searchEngine) return false;
+  if (prev.newTabBackground !== next.newTabBackground) return false;
+  if (prev.disableTasksWidget !== next.disableTasksWidget) return false;
+  if (prev.isDemo !== next.isDemo) return false;
+  if (prev.onExitIncognito !== next.onExitIncognito) return false;
+
+  // Tab properties comparison
+  if (prev.tab?.id !== next.tab?.id) return false;
+  if (prev.tab?.url !== next.tab?.url) return false;
+  if (prev.tab?.title !== next.tab?.title) return false;
+  if (prev.tab?.favicon !== next.tab?.favicon) return false;
+  if (prev.tab?.isLoading !== next.tab?.isLoading) return false;
+  if (prev.tab?.canGoBack !== next.tab?.canGoBack) return false;
+  if (prev.tab?.canGoForward !== next.tab?.canGoForward) return false;
+  if (prev.tab?.isMuted !== next.tab?.isMuted) return false;
+  if (prev.tab?.isPinned !== next.tab?.isPinned) return false;
+  if (prev.tab?.isIncognito !== next.tab?.isIncognito) return false;
+  if (prev.tab?.thumbnail !== next.tab?.thumbnail) return false;
+  if (prev.tab?.zoomFactor !== next.tab?.zoomFactor) return false;
+  if (prev.tab?.isPlayingAudio !== next.tab?.isPlayingAudio) return false;
+  if (prev.tab?.blockedAdsCount !== next.tab?.blockedAdsCount) return false;
+  if (prev.tab?.webContentsId !== next.tab?.webContentsId) return false;
+  if (prev.tab?.isSuspended !== next.tab?.isSuspended) return false;
+  if (prev.tab?.isTranslated !== next.tab?.isTranslated) return false;
+  if (prev.tab?.splitWith !== next.tab?.splitWith) return false;
+
+  // Settings comparison. Whitelisted rather than blacklisted: a web tab reads
+  // `fontSize` (zoom) and, through `latestSettingsRef`,
+  // `passwordManagerEnabled`/`aiLinkPreviewEnabled`/`preloadDnsEnabled`. A new
+  // field read by a web tab has to be added here, which is the point — the
+  // omission is invisible otherwise.
+  if (prev.settings?.passwordManagerEnabled !== next.settings?.passwordManagerEnabled) return false;
+  if (prev.settings?.fontSize !== next.settings?.fontSize) return false;
+  if (prev.settings?.doNotTrack !== next.settings?.doNotTrack) return false;
+  if (prev.settings?.searchEngine !== next.settings?.searchEngine) return false;
+  if (prev.settings?.newTabBackground !== next.settings?.newTabBackground) return false;
+  if (prev.settings?.backgroundCustomUrl !== next.settings?.backgroundCustomUrl) return false;
+  if (prev.settings?.aiLinkPreviewEnabled !== next.settings?.aiLinkPreviewEnabled) return false;
+  if (prev.settings?.privacyShield !== next.settings?.privacyShield) return false;
+  if (prev.settings?.theme !== next.settings?.theme) return false;
+  if (prev.settings?.browserColor !== next.settings?.browserColor) return false;
+  if (prev.settings?.customBrowserColor !== next.settings?.customBrowserColor) return false;
+  if (prev.settings?.accentColor !== next.settings?.accentColor) return false;
+  if (prev.settings?.customAccentColor !== next.settings?.customAccentColor) return false;
+  if (prev.settings?.showTasksWidget !== next.settings?.showTasksWidget) return false;
+  if (prev.settings?.energySaverMode !== next.settings?.energySaverMode) return false;
+  if (prev.settings?.preloadDnsEnabled !== next.settings?.preloadDnsEnabled) return false;
+  if (prev.settings?.smoothScrollingEnabled !== next.settings?.smoothScrollingEnabled) return false;
+
+  for (const key of ALWAYS_COMPARED_CALLBACKS) {
+    if (prev[key] !== next[key]) return false;
+  }
+
+  // Internal pages hand their whole state object straight to a child, so any
+  // new object is a change. Internal covers the new tab too, which renders
+  // seven `settings` fields.
+  const isInternalTab = prev.tab?.url?.startsWith('king://') ||
+                        prev.tab?.url?.startsWith('about:') ||
+                        prev.tab?.url === 'https://newtab';
+  if (isInternalTab && prev.settings !== next.settings) return false;
+
+  // Page-specific props are compared only where they are rendered, so a change
+  // in unrelated app data cannot re-render tabs that do not use it.
+  if (isSettingsUrl(next.tab?.url)) {
+    for (const key of SETTINGS_PAGE_CALLBACKS) {
+      if (prev[key] !== next[key]) return false;
+    }
+  }
+  if (isHistoryUrl(next.tab?.url)) {
+    if (prev.history !== next.history) return false;
+    if (prev.onClearHistory !== next.onClearHistory) return false;
+    if (prev.onRemoveHistoryItem !== next.onRemoveHistoryItem) return false;
+  }
+  if (isDownloadsUrl(next.tab?.url)) {
+    if (prev.downloads !== next.downloads) return false;
+    if (prev.onClearDownloads !== next.onClearDownloads) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Post-await currency check for a credential lookup.
+ *
+ * `secureStoreGet` is a promise. Focus a login field on site A, navigate to site
+ * B before it resolves, and the result belongs to a page that is no longer on
+ * screen: a "Saved Accounts" popup listing site A's usernames floats over site
+ * B. The credential itself is still not leaked — `handleSelectAutofill`
+ * re-checks the host before filling — but the wrong account list is visible.
+ * So the webview must still be the mounted one, still be alive, and still be on
+ * the hostname the query was made for.
+ */
+export function isAutofillLookupCurrent(
+  mountedWebview: unknown,
+  liveWebview: unknown,
+  currentHostname: string,
+  expectedHostname: string
+): boolean {
+  if (!liveWebview || mountedWebview !== liveWebview) return false;
+  const isDestroyed = (liveWebview as { isDestroyed?: () => boolean }).isDestroyed;
+  if (typeof isDestroyed === 'function' && isDestroyed.call(liveWebview)) return false;
+  return Boolean(currentHostname) && currentHostname === expectedHostname;
+}
+
+export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
+  tab,
+  isActive,
+  onUpdateTab,
+  onCloseTab,
+  isIncognito,
+  onExitIncognito,
+  onNewTab,
+  onNavigate,
+  onActivate,
+  onFoundInPage,
+  searchEngine = 'google',
+  privacyShield = true,
+  newTabBackground = 'default',
+  disableTasksWidget = false,
+  settings,
+  onUpdateSettings,
+  history = [],
+  downloads = [],
+  onClearHistory,
+  onRemoveHistoryItem,
+  onClearDownloads,
+  onExportData,
+  onImportData,
+  onPurgeMemory,
+  onPerformSync,
+  isDemo = false
+}) => {
+  const webviewRef = useRef<any>(null);
+
+  const getSafeUrl = (u?: string) => {
+    if (!u || u.startsWith('king://')) return 'about:blank';
+    return isSafeNavigationUrl(u) ? u : 'about:blank';
+  };
+  const lastLoadedUrl = useRef<string>(tab?.url || '');
+  const isWebviewReady = useRef<boolean>(false);
+  if (tab?.isSuspended) {
+    lastLoadedUrl.current = '';
+  }
+
+  const isNewTab = React.useMemo(() => (
+    !tab?.url || tab.url === 'about:blank' || tab.url === 'king://newtab' || tab.url === 'https://newtab'
+  ), [tab?.url]);
+
+  const [passwordPrompt, setPasswordPrompt] = useState<{
+    isOpen: boolean;
+    origin: string;
+    hostname: string;
+    username: string;
+    password: string;
+    isUpdate?: boolean;
+  }>({
+    isOpen: false,
+    origin: '',
+    hostname: '',
+    username: '',
+    password: '',
+    isUpdate: false
+  });
+
+  const [aiPreview, setAiPreview] = useState<{ isOpen: boolean; x: number; y: number; url: string }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    url: ''
+  });
+
+  const [autofillMenu, setAutofillMenu] = useState<{
+    isOpen: boolean;
+    rect: { left: number; top: number; bottom: number; right: number; width: number; height: number };
+    accounts: Array<{ username: string; password: string; origin?: string; hostname?: string }>;
+    origin: string;
+    hostname: string;
+  } | null>(null);
+  const autofillBlurTimerRef = useRef<any>(null);
+
+  const [crashInfo, setCrashInfo] = useState<{ crashed: boolean; reason?: string }>({ crashed: false });
+
+  const handleReloadAfterCrash = useCallback(() => {
+    setCrashInfo({ crashed: false });
+    const wv = webviewRef.current;
+    if (wv && typeof wv.reload === 'function') {
+      try {
+        wv.reload();
+        return;
+      } catch (_) {}
+    }
+    if (tab?.id && tab?.url && onNavigate) {
+      onNavigate(tab.url, tab.id);
+    }
+  }, [tab?.id, tab?.url, onNavigate]);
+
+  const handleSelectAutofill = useCallback((
+    account: { username: string; password: string; origin?: string; hostname?: string },
+    expectedOrigin?: string,
+    expectedHostname?: string
+  ) => {
+    const webview = webviewRef.current;
+    if (webview && !(typeof webview.isDestroyed === 'function' && webview.isDestroyed())) {
+      let currentOrigin = '';
+      let currentHostname = '';
+      try {
+        const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+        const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
+        currentOrigin = parsed.origin;
+        currentHostname = parsed.hostname;
+      } catch (_) {}
+
+      // Security: verify target origin and hostname have not changed since autofill menu was displayed
+      if (expectedOrigin && currentOrigin !== expectedOrigin) {
+        console.warn(`[Security] Autofill aborted: target origin changed from ${expectedOrigin} to ${currentOrigin}`);
+        setAutofillMenu(null);
+        return;
+      }
+      if (expectedHostname && currentHostname !== expectedHostname) {
+        console.warn(`[Security] Autofill aborted: target hostname changed from ${expectedHostname} to ${currentHostname}`);
+        setAutofillMenu(null);
+        return;
+      }
+
+      // Security: strictly forbid HTTP downgrade - never release HTTPS credentials on HTTP
+      if (expectedOrigin?.startsWith('https:') && currentOrigin.startsWith('http:')) {
+        console.warn(`[Security] Autofill aborted: refusing HTTP downgrade`);
+        setAutofillMenu(null);
+        return;
+      }
+
+      try {
+        webview.send('fill-credentials', {
+          username: account.username,
+          password: account.password,
+          expectedOrigin: expectedOrigin || currentOrigin,
+          expectedHostname: expectedHostname || currentHostname
+        });
+      } catch (_) {}
+    }
+    setAutofillMenu(null);
+  }, []);
+
+  const isSettingsTab = React.useMemo(() => (
+    Boolean(tab?.url?.startsWith('king://settings') || tab?.url?.startsWith('about:settings'))
+  ), [tab?.url]);
+
+  const isHistoryTab = React.useMemo(() => (
+    tab?.url === 'king://history' || tab?.url === 'about:history'
+  ), [tab?.url]);
+
+  const isDownloadsTab = React.useMemo(() => (
+    tab?.url === 'king://downloads' || tab?.url === 'about:downloads'
+  ), [tab?.url]);
+
+  const isChangelogTab = React.useMemo(() => (
+    Boolean(
+      tab?.url?.startsWith('king://changelog') ||
+      tab?.url?.startsWith('king://whats-new') ||
+      tab?.url === 'about:changelog' ||
+      tab?.url === 'about:whats-new'
+    )
+  ), [tab?.url]);
+
+  // Whether this tab currently renders a real <webview> element. Internal
+  // pages return a completely different tree, which unmounts the webview; when
+  // the tab navigates back the webview is a *new* DOM element that needs its
+  // event listeners attached again. The webview effects depend on this flag so
+  // a settings/history/downloads/changelog round trip cannot leave the tab with
+  // an inert webview (dead password manager, dead title/crash/find-in-page).
+  const rendersWebview = React.useMemo(
+    () => !(isNewTab || isSettingsTab || isHistoryTab || isDownloadsTab || isChangelogTab),
+    [isNewTab, isSettingsTab, isHistoryTab, isDownloadsTab, isChangelogTab]
+  );
+
+  const latestTabRef = useRef(tab);
+  // Latest-settings ref: the main webview effect intentionally does NOT depend
+  // on `settings` (re-running would re-attach 18 listeners and reset webview
+  // state), so its callbacks read current values through this ref instead of
+  // stale closure captures.
+  const latestSettingsRef = useRef(settings);
+  latestSettingsRef.current = settings;
+  const latestIsActiveRef = useRef(isActive);
+  latestIsActiveRef.current = isActive;
+
+  useEffect(() => {
+    latestTabRef.current = tab;
+  }, [tab]);
+
+  // Security: Harden per-tab incognito partition as soon as incognito tab mounts
+  useEffect(() => {
+    if (isIncognito && tab?.id) {
+      (window as any).electronAPI?.initIncognitoPartition?.(tab.id);
+    }
+  }, [isIncognito, tab?.id]);
+
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (!webview || !tab?.id || tab.isSuspended) return;
+
+    const handleDomReady = async () => {
+      let wcId = undefined;
+      try { wcId = webview.getWebContentsId(); } catch (e) {}
+      onUpdateTab(tab.id, {
+        isLoading: false,
+        canGoBack: webview.canGoBack?.() || false,
+        canGoForward: webview.canGoForward?.() || false,
+        title: webview.getTitle?.() || latestTabRef.current?.url || '',
+        webContentsId: wcId
+      });
+
+      try {
+        const currentTab = latestTabRef.current;
+        if (currentTab?.zoomFactor !== undefined) {
+          webview.setZoomFactor(currentTab.zoomFactor);
+        } else {
+          const zoomMap = { small: 0.85, medium: 1.0, large: 1.25 };
+          webview.setZoomFactor(zoomMap[latestSettingsRef.current.fontSize || 'medium'] || 1.0);
+        }
+      } catch (err) {
+        console.error('Failed to set zoom factor', err);
+      }
+
+      // Mute state must always be applied, regardless of feature gates
+      if (webview.setAudioMuted) webview.setAudioMuted(!!latestTabRef.current?.isMuted);
+
+      // 4. Ensure current URL is synchronized on DOM ready
+      try {
+        const currentUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+        if (currentUrl && currentUrl !== 'about:blank' && tab?.id && !areUrlsEquivalent(currentUrl, latestTabRef.current?.url)) {
+          lastLoadedUrl.current = currentUrl;
+          onUpdateTab(tab.id, {
+            url: currentUrl,
+            canGoBack: webview.canGoBack?.() || false,
+            canGoForward: webview.canGoForward?.() || false
+          });
+        }
+      } catch (_) {}
+    };
+
+    const handleStartNavigation = (e: any) => {
+      if (tab?.id) {
+        const isMain = e?.isMainFrame !== false;
+        if (isMain) {
+          const targetUrl = e?.url || (typeof webview.getURL === 'function' ? webview.getURL() : '');
+          const currentBlockedAds = latestTabRef.current?.blockedAdsCount || 0;
+          const updates: Partial<Tab> = {
+            isLoading: true,
+            isTranslated: false,
+            translatedLang: undefined,
+            isPlayingAudio: false
+          };
+          setCrashInfo({ crashed: false });
+          if (targetUrl && targetUrl !== 'about:blank') {
+            lastLoadedUrl.current = targetUrl;
+            updates.url = targetUrl;
+          }
+          if (currentBlockedAds) {
+            updates.blockedAdsCount = 0;
+          }
+          onUpdateTab(tab.id, updates);
+        }
+      }
+    };
+
+    const isSafeWebviewUrl = (candidate: unknown): candidate is string =>
+      typeof candidate === 'string' && isSafeNavigationUrl(candidate);
+
+    const handleWillNavigate = (e: any) => {
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(e?.url) || !tab?.id) return;
+      lastLoadedUrl.current = e.url;
+      onUpdateTab(tab.id, {
+        url: e.url,
+        isLoading: true
+      });
+    };
+
+    const handleRedirectNavigation = (e: any) => {
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(e?.url) || !tab?.id) return;
+      lastLoadedUrl.current = e.url;
+      onUpdateTab(tab.id, { url: e.url });
+    };
+
+    const handleLoadCommit = (e: any) => {
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(e?.url) || !tab?.id) return;
+      lastLoadedUrl.current = e.url;
+      onUpdateTab(tab.id, { url: e.url });
+    };
+
+    const syncSafeCurrentUrl = (updates: Partial<Tab>) => {
+      let currentUrl = '';
+      try {
+        currentUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+      } catch (_) {}
+      if (isSafeWebviewUrl(currentUrl) && currentUrl !== 'about:blank') {
+        lastLoadedUrl.current = currentUrl;
+        updates.url = currentUrl;
+      }
+      return updates;
+    };
+
+    const handleFinishLoad = (e: any) => {
+      if (tab?.id && e?.isMainFrame !== false) {
+        const updates = syncSafeCurrentUrl({
+          isLoading: false,
+          canGoBack: webview.canGoBack?.() || false,
+          canGoForward: webview.canGoForward?.() || false,
+          title: webview.getTitle?.() || latestTabRef.current?.title || latestTabRef.current?.url || ''
+        });
+        onUpdateTab(tab.id, updates);
+      }
+    };
+
+    const handleStopLoading = () => {
+      if (tab?.id) {
+        const updates = syncSafeCurrentUrl({
+          isLoading: false,
+          canGoBack: webview.canGoBack?.() || false,
+          canGoForward: webview.canGoForward?.() || false,
+          title: webview.getTitle?.() || latestTabRef.current?.title || latestTabRef.current?.url || ''
+        });
+        onUpdateTab(tab.id, updates);
+      }
+    };
+
+    const handleFailLoad = (e: any) => {
+      if (e.errorCode === -3) return;
+      if (e.isMainFrame === false || !tab?.id) return;
+      onUpdateTab(tab.id, { isLoading: false, title: `Error: ${e.errorDescription || 'Failed'}` });
+      console.error('[Webview] Failed to load:', e.errorDescription, 'Code:', e.errorCode);
+    };
+
+    const handleNavigateEvent = (e: any) => {
+      let targetUrl = e?.url;
+      if (!targetUrl && typeof webview.getURL === 'function') {
+        try { targetUrl = webview.getURL(); } catch (_) {}
+      }
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(targetUrl) || !tab?.id) return;
+      lastLoadedUrl.current = targetUrl;
+      onUpdateTab(tab.id, {
+        url: targetUrl,
+        isLoading: false,
+        canGoBack: webview.canGoBack?.() || false,
+        canGoForward: webview.canGoForward?.() || false
+      });
+    };
+
+    const handleNavigateInPage = (e: any) => {
+      let targetUrl = e?.url;
+      if (!targetUrl && typeof webview.getURL === 'function') {
+        try { targetUrl = webview.getURL(); } catch (_) {}
+      }
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(targetUrl) || !tab?.id) return;
+      lastLoadedUrl.current = targetUrl;
+      onUpdateTab(tab.id, {
+        url: targetUrl,
+        isLoading: false,
+        canGoBack: webview.canGoBack?.() || false,
+        canGoForward: webview.canGoForward?.() || false
+      });
+    };
+
+    const handleTitleUpdate = (e: any) => {
+      if (e.title && tab?.id) {
+        onUpdateTab(tab.id, { title: e.title });
+      }
+    };
+
+    const handleFaviconUpdate = (e: any) => {
+      if (e.favicons && e.favicons.length > 0 && tab?.id) {
+        // Security: only allow https:// favicons or safe data:image/ URIs.
+        // Reject javascript:, data:text/, vbscript:, file: and other dangerous sources.
+        const raw = e.favicons[0] as string;
+        // Loopback dev servers (Vite, local APIs) legitimately serve favicons over
+        // http, so localhost/127.0.0.1 stay allowed. `e.favicons` is fully
+        // page-controlled and the value is rendered as <img src> in the tab strip,
+        // so the host MUST be matched exactly: a prefix test accepted
+        // 'http://localhost.evil.com/x.png' and 'http://localhost@evil.com/x.png',
+        // letting any site fire a plaintext third-party beacon from the trusted
+        // app shell. Parsing also rejects credentials, which is the userinfo trick
+        // ('http://localhost@evil.com' parses to hostname 'evil.com' anyway).
+        const isLoopback = (() => {
+          if (typeof raw !== 'string') return false;
+          try {
+            const parsed = new URL(raw);
+            if (parsed.username || parsed.password) return false;
+            // Same intent as the old 'http://localhost' / 'http://127.0.0.1'
+            // prefix tests (https:// already passes via the branch below), just
+            // with a real host boundary instead of a string prefix.
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+            return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+          } catch (_) {
+            return false;
+          }
+        })();
+        const isSafe =
+          (typeof raw === 'string') &&
+          (raw.startsWith('https://') ||
+            isLoopback ||
+            /^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon);base64,/.test(raw));
+        if (isSafe) {
+          onUpdateTab(tab.id, { favicon: raw });
+        }
+      }
+    };
+
+    const handleNewWindow = (e: any) => {
+      if (e && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+      }
+      // When running in Electron, setWindowOpenHandler in main process handles
+      // window opening and routes it to new-tab IPC. Avoid duplicate tab creation.
+      if (typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup) {
+        return;
+      }
+      if (e?.url && typeof e.url === 'string' && isSafeNavigationUrl(e.url)) {
+        if (onNewTab) {
+          onNewTab(e.url, tab?.id);
+        } else if (onNavigate) {
+          onNavigate(e.url, tab?.id);
+        }
+      }
+    };
+
+    const handleCrashed = () => {
+      isWebviewReady.current = false;
+      setCrashInfo({ crashed: true, reason: 'crashed' });
+      if (tab?.id) {
+        onUpdateTab(tab.id, { isLoading: false, title: 'Page Crashed' });
+        console.error('[Webview] Crashed on tab:', tab.id, 'URL:', tab?.url);
+      }
+    };
+
+    const handleRenderProcessGone = (e: any) => {
+      isWebviewReady.current = false;
+      const reason = e?.details?.reason || e?.reason || 'crashed';
+      setCrashInfo({ crashed: true, reason });
+      if (tab?.id) {
+        onUpdateTab(tab.id, { isLoading: false, title: `Page Crashed (${reason})` });
+        console.error('[Webview] Render process gone:', reason, 'Exit code:', e?.details?.exitCode || e?.exitCode);
+      }
+    };
+
+    const handleFoundInPage = (e: any) => {
+      if (e.result && onFoundInPage) {
+        onFoundInPage(e.result.activeMatchOrdinal || 0, e.result.numberOfMatches || 0);
+      }
+    };
+
+    const handleMediaStarted = () => {
+      if (tab?.id) onUpdateTab(tab.id, { isPlayingAudio: true });
+    };
+
+    const handleMediaPaused = () => {
+      if (tab?.id) onUpdateTab(tab.id, { isPlayingAudio: false });
+    };
+
+    const handlePasswordDetected = async (origin: string, hostname: string, username: string, password: string) => {
+      if (!latestSettingsRef.current?.passwordManagerEnabled) return;
+
+      // Derive the origin and hostname at EVENT time from the live webview.
+      let actualHostname = '';
+      let actualOrigin = '';
+      try {
+        const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+        const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
+        actualHostname = parsed.hostname;
+        actualOrigin = parsed.origin;
+      } catch (_) {}
+
+      // Reject invalid origins and non-matching origins/hostnames
+      if (!actualOrigin || actualOrigin === 'null' || !actualHostname || !username || !password) return;
+      if (origin && origin !== actualOrigin) return;
+      if (hostname && hostname !== actualHostname) return;
+
+      const cleanUser = String(username).substring(0, 100);
+      const cleanPass = String(password).substring(0, 500);
+
+      let isUpdate = false;
+      try {
+        const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+        if (raw) {
+          const all = JSON.parse(raw);
+          const existing = all.find((p: any) => {
+            const matchOrigin = p.origin ? p.origin === actualOrigin : (p.hostname === actualHostname && !actualOrigin.startsWith('http://'));
+            return matchOrigin && p.username === cleanUser;
+          });
+          if (existing) {
+            if (existing.password === cleanPass) {
+              return;
+            }
+            isUpdate = true;
+          }
+        }
+      } catch (_) {}
+
+      // Guard against races: while awaiting the secure store, this tab's
+      // webview may have been closed or replaced. Don't surface a save prompt
+      // for a dead context.
+      const stillMounted = webviewRef.current === webview &&
+        !(typeof webview.isDestroyed === 'function' && webview.isDestroyed());
+      if (!stillMounted) return;
+
+      setPasswordPrompt({
+        isOpen: true,
+        origin: actualOrigin,
+        hostname: actualHostname,
+        username: cleanUser,
+        password: cleanPass,
+        isUpdate
+      });
+    };
+
+    const handleIpcMessage = (e: any) => {
+      if (e.channel === 'password-form-submitted' && e.args?.[0]) {
+        const { origin, hostname, username, password } = e.args[0];
+        handlePasswordDetected(origin, hostname, username, password);
+      } else if (e.channel === 'login-field-focused' && e.args?.[0]) {
+        if (!latestSettingsRef.current?.passwordManagerEnabled) return;
+        let actualHostname = '';
+        let actualOrigin = '';
+        try {
+          const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+          const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
+          actualHostname = parsed.hostname;
+          actualOrigin = parsed.origin;
+        } catch (_) {}
+
+        const data = e.args[0];
+        const hostname = data.hostname || '';
+        const origin = data.origin || '';
+        // Security: strictly reject autofill queries where reported origin/hostname does not match active webview
+        if (!actualOrigin || actualOrigin === 'null') return;
+        if (origin && origin !== actualOrigin) return;
+        if (!hostname || !actualHostname || actualHostname !== hostname) return;
+
+        (window as any).electronAPI?.secureStoreGet?.('passwords').then((raw: string) => {
+          let currentHostname = '';
+          let currentOrigin = '';
+          try {
+            const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+            const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
+            currentHostname = parsed.hostname;
+            currentOrigin = parsed.origin;
+          } catch (_) {}
+          if (!isAutofillLookupCurrent(webviewRef.current, webview, currentOrigin, actualOrigin)) return;
+
+          if (!raw) return;
+          try {
+            const all = JSON.parse(raw);
+            const matching = all.filter((p: any) => {
+              if (!p.username || !p.password) return false;
+              // 1. Exact origin match
+              if (p.origin) {
+                return p.origin === actualOrigin;
+              }
+              // 2. Legacy record without origin:
+              // Strictly refuse releasing HTTPS-saved credentials to plain HTTP
+              if (actualOrigin.startsWith('http://')) return false;
+              // Only offer on standard HTTPS (port 443) on that hostname
+              if (actualOrigin.startsWith('https://') && p.hostname === actualHostname) {
+                try {
+                  const parsedOrigin = new URL(actualOrigin);
+                  if (!parsedOrigin.port || parsedOrigin.port === '443') {
+                    return true;
+                  }
+                } catch (_) {}
+              }
+              return false;
+            });
+
+            if (matching.length > 0) {
+              setAutofillMenu({
+                isOpen: true,
+                rect: data.rect,
+                accounts: matching,
+                origin: actualOrigin,
+                hostname: actualHostname
+              });
+            }
+          } catch (_) {}
+        }).catch(() => {});
+      } else if (e.channel === 'login-field-blurred') {
+        if (autofillBlurTimerRef.current) clearTimeout(autofillBlurTimerRef.current);
+        autofillBlurTimerRef.current = setTimeout(() => {
+          setAutofillMenu(prev => (prev?.isOpen ? { ...prev, isOpen: false } : null));
+          autofillBlurTimerRef.current = null;
+        }, 300);
+      } else if (e.channel === 'nova-link-hover' && e.args?.[0]) {
+        if (latestSettingsRef.current?.aiLinkPreviewEnabled === false || !latestIsActiveRef.current) return;
+        const data = e.args[0];
+        if (typeof data.url === 'string' && data.url.startsWith('https://')) {
+          if (latestSettingsRef.current?.preloadDnsEnabled !== false) {
+            try {
+              const origin = new URL(data.url).origin;
+              if (origin && !origin.startsWith('null')) {
+                addPreconnectHint(origin);
+              }
+            } catch (_) {}
+          }
+
+          setAiPreview({
+            isOpen: true,
+            url: data.url,
+            x: Number(data.x) || 0,
+            y: Number(data.y) || 0
+          });
+        }
+      } else if (e.channel === 'nova-link-hover-out') {
+        setAiPreview(prev => (prev.isOpen ? { ...prev, isOpen: false } : prev));
+      }
+    };
+
+    webview.addEventListener('dom-ready', handleDomReady);
+    webview.addEventListener('will-navigate', handleWillNavigate);
+    webview.addEventListener('did-start-navigation', handleStartNavigation);
+    webview.addEventListener('did-redirect-navigation', handleRedirectNavigation);
+    webview.addEventListener('load-commit', handleLoadCommit);
+    webview.addEventListener('did-stop-loading', handleStopLoading);
+    webview.addEventListener('did-finish-load', handleFinishLoad);
+    webview.addEventListener('did-fail-load', handleFailLoad);
+    webview.addEventListener('did-navigate', handleNavigateEvent);
+    webview.addEventListener('did-navigate-in-page', handleNavigateInPage);
+    webview.addEventListener('page-title-updated', handleTitleUpdate);
+    webview.addEventListener('page-favicon-updated', handleFaviconUpdate);
+    webview.addEventListener('new-window', handleNewWindow);
+    const handleFocus = () => {
+      if (tab?.id && onActivate) {
+        onActivate(tab.id);
+      }
+    };
+
+    webview.addEventListener('focus', handleFocus);
+    webview.addEventListener('crashed', handleCrashed);
+    webview.addEventListener('plugin-crashed', handleCrashed);
+    webview.addEventListener('render-process-gone', handleRenderProcessGone);
+    webview.addEventListener('found-in-page', handleFoundInPage);
+    webview.addEventListener('media-started-playing', handleMediaStarted);
+    webview.addEventListener('media-paused', handleMediaPaused);
+    webview.addEventListener('ipc-message', handleIpcMessage);
+
+    // Initial check: if webview is already not loading, ensure isLoading is false
+    const readyCheckTimer = setTimeout(() => {
+      try {
+        if (webview && typeof webview.isLoading === 'function' && !webview.isLoading() && tab?.id) {
+          onUpdateTab(tab.id, { isLoading: false });
+        }
+      } catch (err) {}
+    }, 500);
+
+    return () => {
+      clearTimeout(readyCheckTimer);
+      if (autofillBlurTimerRef.current) {
+        clearTimeout(autofillBlurTimerRef.current);
+        autofillBlurTimerRef.current = null;
+      }
+      if (webviewRef.current !== webview) {
+        isWebviewReady.current = false;
+      }
+      webview.removeEventListener('focus', handleFocus);
+      webview.removeEventListener('dom-ready', handleDomReady);
+      webview.removeEventListener('will-navigate', handleWillNavigate);
+      webview.removeEventListener('did-start-navigation', handleStartNavigation);
+      webview.removeEventListener('did-redirect-navigation', handleRedirectNavigation);
+      webview.removeEventListener('load-commit', handleLoadCommit);
+      webview.removeEventListener('did-stop-loading', handleStopLoading);
+      webview.removeEventListener('did-finish-load', handleFinishLoad);
+      webview.removeEventListener('did-fail-load', handleFailLoad);
+      webview.removeEventListener('did-navigate', handleNavigateEvent);
+      webview.removeEventListener('did-navigate-in-page', handleNavigateInPage);
+      webview.removeEventListener('page-title-updated', handleTitleUpdate);
+      webview.removeEventListener('page-favicon-updated', handleFaviconUpdate);
+      webview.removeEventListener('new-window', handleNewWindow);
+      webview.removeEventListener('crashed', handleCrashed);
+      webview.removeEventListener('plugin-crashed', handleCrashed);
+      webview.removeEventListener('render-process-gone', handleRenderProcessGone);
+      webview.removeEventListener('found-in-page', handleFoundInPage);
+      webview.removeEventListener('media-started-playing', handleMediaStarted);
+      webview.removeEventListener('media-paused', handleMediaPaused);
+      webview.removeEventListener('ipc-message', handleIpcMessage);
+    };
+  }, [tab?.id, tab?.isSuspended, onUpdateTab, onNewTab, onNavigate, onActivate, onFoundInPage, isNewTab, rendersWebview]);
+
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (webview && webview.setAudioMuted) {
+      try {
+        webview.setAudioMuted(!!tab?.isMuted);
+      } catch (err) {
+        // webview might not be dom-ready yet
+      }
+    }
+  }, [tab?.isMuted]);
+
+  // Dynamically update font-size / zoom factor when user toggles fontSize setting
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (webview && tab?.zoomFactor === undefined && typeof (webview as any).setZoomFactor === 'function') {
+      try {
+        const zoomMap: Record<string, number> = { small: 0.85, medium: 1.0, large: 1.25 };
+        (webview as any).setZoomFactor(zoomMap[settings?.fontSize || 'medium'] || 1.0);
+      } catch (_) {}
+    }
+  }, [settings?.fontSize, tab?.zoomFactor]);
+
+  // Capture thumbnail when switching away from this tab (stored in memory cache).
+  const activeSinceRef = useRef(0);
+  const lastThumbnailCaptureAtRef = useRef(0);
+  useEffect(() => {
+    if (isActive) {
+      activeSinceRef.current = Date.now();
+      return;
+    }
+    const MIN_ACTIVE_MS_BEFORE_CAPTURE = 600;
+    const THUMBNAIL_CAPTURE_THROTTLE_MS = 2500;
+    const now = Date.now();
+    const wasContinuouslyActive =
+      activeSinceRef.current > 0 &&
+      now - activeSinceRef.current >= MIN_ACTIVE_MS_BEFORE_CAPTURE;
+    const canCapture = now - lastThumbnailCaptureAtRef.current >= THUMBNAIL_CAPTURE_THROTTLE_MS;
+    if (wasContinuouslyActive && canCapture && webviewRef.current && !isNewTab && tab?.id && (window as any).electronAPI?.captureTabThumbnail) {
+      lastThumbnailCaptureAtRef.current = now;
+      const capture = async () => {
+        try {
+          const wcId = webviewRef.current.getWebContentsId();
+          const thumbnailDataUrl = await (window as any).electronAPI.captureTabThumbnail(wcId);
+          if (thumbnailDataUrl && tab?.id) {
+            tabThumbnailCache.set(tab.id, thumbnailDataUrl);
+          }
+        } catch (err) {}
+      };
+      capture();
+    }
+  }, [isActive, isNewTab, tab?.id]);
+
+  // Immediately clear loading state for internal React pages since they don't use webview
+  useEffect(() => {
+    if ((isSettingsTab || isHistoryTab || isDownloadsTab || isNewTab) && tab?.isLoading && tab?.id) {
+      onUpdateTab(tab.id, { isLoading: false });
+    }
+  }, [isSettingsTab, isHistoryTab, isDownloadsTab, isNewTab, tab?.isLoading, tab?.id, onUpdateTab]);
+
+  // Listen for dom-ready to know when it's safe to call loadURL
+  useEffect(() => {
+    const wv = webviewRef.current;
+    if (!wv) return;
+
+    const onReady = () => {
+      isWebviewReady.current = true;
+    };
+    wv.addEventListener('dom-ready', onReady);
+
+    return () => {
+      wv.removeEventListener('dom-ready', onReady);
+    };
+  }, [tab?.isSuspended, rendersWebview]);
+
+  useEffect(() => {
+    if (!tab?.url || !rendersWebview) return;
+
+    const targetUrl = tab.url;
+    const wv = webviewRef.current as any;
+    if (!wv) return;
+
+    // Prevent duplicate reload if this URL or an equivalent one is already loaded
+    if (areUrlsEquivalent(lastLoadedUrl.current, targetUrl)) {
+      return;
+    }
+
+    // Check if the webview is already at an equivalent URL to prevent duplicate navigation/refresh
+    try {
+      const currentWvUrl = wv.getURL?.();
+      if (currentWvUrl && areUrlsEquivalent(currentWvUrl, targetUrl)) {
+        lastLoadedUrl.current = targetUrl;
+        return;
+      }
+    } catch (e) {}
+
+    lastLoadedUrl.current = targetUrl;
+
+    if (isWebviewReady.current && typeof wv.loadURL === 'function') {
+      wv.loadURL(targetUrl).catch((err: any) => {
+        if (err?.code !== 'ERR_ABORTED') console.error('loadURL failed:', err);
+      });
+    } else {
+      const pendingLoad = () => {
+        wv.removeEventListener('dom-ready', pendingLoad);
+        try {
+          const currentWvUrl = wv.getURL?.();
+          if (currentWvUrl && areUrlsEquivalent(currentWvUrl, targetUrl)) {
+            return;
+          }
+        } catch (e) {}
+        if (typeof wv.loadURL === 'function') {
+          wv.loadURL(targetUrl).catch(() => {});
+        }
+      };
+      wv.addEventListener('dom-ready', pendingLoad);
+      return () => {
+        wv.removeEventListener('dom-ready', pendingLoad);
+      };
+    }
+  }, [tab?.url, rendersWebview]);
+
+  // Handle Page Translation & Restore events
+  useEffect(() => {
+    const handleTranslateTabEvent = async (e: any) => {
+      const detail = e.detail;
+      if (detail?.tabId === tab?.id && webviewRef.current) {
+        const webview = webviewRef.current;
+        if (typeof webview.isDestroyed === 'function' && webview.isDestroyed()) return;
+        try {
+          // 1. Extract text nodes
+          const extractScript = getExtractTextNodesScript();
+          const extractResult = await webview.executeJavaScript(extractScript);
+
+          if (extractResult && extractResult.success && Array.isArray(extractResult.texts) && extractResult.texts.length > 0) {
+            // 2. Translate via IPC batch
+            const targetLang = detail.targetLang || 'en';
+            const sourceLang = detail.sourceLang || 'auto';
+
+            if (typeof (window as any).electronAPI?.translateTextBatch === 'function') {
+              const response = await (window as any).electronAPI.translateTextBatch(extractResult.texts, sourceLang, targetLang);
+
+              if (typeof webview.isDestroyed === 'function' && webview.isDestroyed()) return;
+
+              if (response && Array.isArray(response.translations) && response.translations.length > 0) {
+                // 3. Apply translations
+                const applyScript = getApplyTranslationScript(response.translations, targetLang);
+                await webview.executeJavaScript(applyScript);
+                if (tab?.id) {
+                  onUpdateTab(tab.id, { isTranslated: true, translatedLang: targetLang });
+                }
+                window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: true } }));
+                return;
+              }
+            }
+          }
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false, error: 'Could not extract or translate page content' } }));
+        } catch (err: any) {
+          console.error('[BrowserView] Translation execution failed:', err);
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false, error: err.message || 'Translation failed' } }));
+        }
+      }
+    };
+
+    const handleRestoreTabEvent = async (e: any) => {
+      const detail = e.detail;
+      if (detail?.tabId === tab?.id && webviewRef.current) {
+        const webview = webviewRef.current;
+        if (typeof webview.isDestroyed === 'function' && webview.isDestroyed()) return;
+        try {
+          const restoreScript = getRestoreOriginalScript();
+          await webview.executeJavaScript(restoreScript);
+          if (tab?.id) {
+            onUpdateTab(tab.id, { isTranslated: false, translatedLang: undefined });
+          }
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: true } }));
+        } catch (err) {
+          console.error('[BrowserView] Restore original failed:', err);
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false } }));
+        }
+      }
+    };
+
+    window.addEventListener('nova:translate-tab', handleTranslateTabEvent);
+    window.addEventListener('nova:restore-tab', handleRestoreTabEvent);
+
+    return () => {
+      window.removeEventListener('nova:translate-tab', handleTranslateTabEvent);
+      window.removeEventListener('nova:restore-tab', handleRestoreTabEvent);
+    };
+  }, [tab?.id, onUpdateTab]);
+
+  if (!tab) {
+    return null;
+  }
+
+  if (tab.isSuspended) {
+    return (
+      <div
+        onClick={() => onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() })}
+        className="w-full h-full flex flex-col items-center justify-center p-6 select-none bg-slate-950 text-slate-100 cursor-pointer relative overflow-hidden group"
+      >
+        <div className="absolute inset-0 bg-slate-950/95" />
+        <div className="relative z-10 flex flex-col items-center text-center max-w-md">
+          <div className="w-24 h-24 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl flex items-center justify-center mb-6 backdrop-blur-xl group-hover:scale-105 transition-transform duration-300">
+            {tab.favicon ? (
+              <img src={tab.favicon} alt="" className="w-12 h-12 rounded-xl object-contain" />
+            ) : (
+              <Moon className="w-10 h-10 text-cyan-400" />
+            )}
+          </div>
+          <h2 className="text-2xl font-semibold text-white mb-2 line-clamp-1">{tab.title || tab.url}</h2>
+          <p className="text-sm text-slate-400 mb-8 leading-relaxed">
+            This tab was suspended to save memory. Click to wake it up instantly.
+          </p>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() });
+            }}
+            className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold text-sm transition-all shadow-md shadow-cyan-950/50 flex items-center gap-2 group-hover:scale-[1.02] cursor-pointer"
+          >
+            <Zap className="w-4 h-4" />
+            Reload Tab
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isNewTab) {
+    return (
+      <div
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <Suspense fallback={<div className="w-full h-full bg-slate-900" />}>
+          <NewTabPage
+            isActive={isActive}
+            onNavigate={(url) => {
+              if (onNavigate) {
+                onNavigate(url, tab.id);
+              } else {
+                onUpdateTab(tab.id, { url, isLoading: !(url === 'king://newtab' || url === 'about:blank' || url === 'https://newtab') });
+              }
+            }}
+            onNewTab={(url) => {
+              if (onNewTab) onNewTab(url, tab.id);
+            }}
+            searchEngine={searchEngine}
+            privacyShield={privacyShield}
+            newTabBackground={newTabBackground}
+            backgroundCustomUrl={settings.backgroundCustomUrl}
+            showTasksWidget={disableTasksWidget ? false : settings.showTasksWidget}
+            isIncognito={isIncognito}
+            onExitIncognito={onExitIncognito}
+            isDemo={isDemo}
+            theme={settings.theme}
+            energySaverMode={settings.energySaverMode}
+            browserColor={settings.browserColor}
+            customBrowserColor={settings.customBrowserColor}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  if (isSettingsTab) {
+    return (
+      <div
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
+          <SettingsPage
+            url={tab.url}
+            settings={settings}
+            onUpdateSettings={onUpdateSettings || NOOP}
+            onExportData={onExportData}
+            onImportData={onImportData}
+            onClearHistory={onClearHistory}
+            onPurgeMemory={onPurgeMemory}
+            onPerformSync={onPerformSync}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  if (isHistoryTab) {
+    return (
+      <div
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
+          <HistoryPage
+            history={history}
+            onNavigate={(url) => {
+              if (onNavigate) {
+                onNavigate(url, tab.id);
+              } else {
+                onUpdateTab(tab.id, { url, isLoading: true });
+              }
+            }}
+            onClearHistory={onClearHistory || NOOP}
+            onRemoveHistoryItem={onRemoveHistoryItem || NOOP}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  if (isDownloadsTab) {
+    return (
+      <div
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
+          <DownloadsPage
+            downloads={downloads}
+            onClearDownloads={onClearDownloads || NOOP}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  if (isChangelogTab) {
+    return (
+      <div
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <Suspense fallback={<div className="w-full h-full bg-slate-50 dark:bg-slate-950" />}>
+          <ChangelogPage
+            currentVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.0'}
+            onNavigate={(url) => {
+              if (onNavigate) {
+                onNavigate(url, tab.id);
+              } else {
+                onUpdateTab(tab.id, { url, isLoading: true });
+              }
+            }}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={!isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
+      onMouseDownCapture={() => {
+        if (tab?.id && onActivate) onActivate(tab.id);
+      }}
+      className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col"
+    >
+      {/* Top Progress Bar (GPU Composited scaleX - Ultra Fast Responsive Feedback) */}
+      <AnimatePresence>
+        {tab.isLoading && (
+          <motion.div
+            initial={{ opacity: 1, scaleX: 0.15 }}
+            animate={{
+              scaleX: [0.15, 0.75, 0.94],
+              transition: {
+                duration: 1.0,
+                ease: [0.22, 1, 0.36, 1],
+                times: [0, 0.35, 1]
+              }
+            }}
+            exit={{
+              scaleX: 1,
+              opacity: 0,
+              transition: {
+                scaleX: { duration: 0.12, ease: 'easeOut' },
+                opacity: { duration: 0.15, delay: 0.05 }
+              }
+            }}
+            style={{ willChange: 'transform, opacity', transformOrigin: '0% 50%', boxShadow: '0 0 10px rgba(59, 130, 246, 0.8)' }}
+            className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-500 z-50 shadow-md"
+          />
+        )}
+      </AnimatePresence>
+
+      <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col min-h-0">
+        {crashInfo.crashed && (
+          <div className="absolute inset-x-0 top-0 z-50 bg-red-950/95 border-b border-red-500/40 text-red-200 px-4 py-3 flex items-center justify-between shadow-lg backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-white text-sm">This tab has crashed ({crashInfo.reason || 'render process gone'}).</span>
+            </div>
+            <button
+              onClick={handleReloadAfterCrash}
+              className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded transition-colors shadow-sm cursor-pointer"
+            >
+              Reload
+            </button>
+          </div>
+        )}
+        {/* Electron Webview Tag for Native Browser Experience */}
+        {typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup ? (
+          <webview
+            ref={webviewRef}
+            data-tab-id={tab.id}
+            partition={isIncognito && tab?.id ? `incognito-${tab.id}` : undefined}
+            src={getSafeUrl(tab.url)}
+            className="w-full h-full flex-1 border-none bg-white absolute inset-0"
+            webpreferences="contextIsolation=yes, nodeIntegration=no, webSecurity=yes, sandbox=yes"
+          />
+        ) : isDemo && tab?.url === 'https://github.com/MOT1209/my-video' ? (
+          <div className="w-full h-full bg-[#0d1117] text-[#c9d1d9] flex flex-col overflow-y-auto font-sans p-6 sm:p-8 select-none">
+            <div className="max-w-3xl mx-auto w-full flex flex-col gap-6 my-auto">
+              {/* GitHub Repo Header */}
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#30363d] pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#21262d] border border-[#30363d] flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                    M
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#58a6ff] hover:underline font-semibold text-base cursor-pointer">MOT1209</span>
+                      <span className="text-[#8b949e]">/</span>
+                      <span className="text-[#58a6ff] font-bold text-base cursor-pointer">my-video</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full border border-[#30363d] text-[#8b949e] font-medium">Public</span>
+                    </div>
+                    <p className="text-xs text-[#8b949e] mt-0.5">An open source sovereign browser built with React and Electron</p>
+                  </div>
+                </div>
+                <a
+                  href="https://github.com/MOT1209/my-video"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-1.5 bg-[#238636] hover:bg-[#2ea043] text-white rounded-md text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm"
+                >
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                  Star on GitHub
+                </a>
+              </div>
+
+              {/* Quick Feature Badges */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3 text-center">
+                  <div className="text-[11px] text-[#8b949e]">Language</div>
+                  <div className="text-xs font-semibold text-[#f0f6fc] mt-1">TypeScript / React</div>
+                </div>
+                <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3 text-center">
+                  <div className="text-[11px] text-[#8b949e]">License</div>
+                  <div className="text-xs font-semibold text-[#f0f6fc] mt-1">MIT Open Source</div>
+                </div>
+                <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3 text-center">
+                  <div className="text-[11px] text-[#8b949e]">AI Engine</div>
+                  <div className="text-xs font-semibold text-[#58a6ff] mt-1">WebGPU On-Device</div>
+                </div>
+                <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3 text-center">
+                  <div className="text-[11px] text-[#8b949e]">Platform</div>
+                  <div className="text-xs font-semibold text-[#3fb950] mt-1">macOS / Windows / Linux</div>
+                </div>
+              </div>
+
+              {/* Web Demo Notice Banner */}
+              <div className="bg-gradient-to-r from-blue-950/40 to-indigo-950/30 border border-blue-500/30 rounded-lg p-3.5 text-xs leading-relaxed text-blue-200/90">
+                <span className="font-semibold text-blue-400">Interactive Marketing Demo: </span>
+                Third-party platforms like GitHub enforce <code className="bg-black/40 px-1 py-0.5 rounded text-indigo-300 font-mono text-[11px]">X-Frame-Options: DENY</code> in web browsers. In the desktop King app, all websites render natively with Chromium with no iframe restrictions.
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full h-full relative">
+            <iframe
+              ref={webviewRef as any}
+              data-tab-id={tab.id}
+              src={getSafeUrl(tab?.url)}
+              className="w-full h-full border-none bg-white"
+              title={tab.title}
+              sandbox="allow-scripts allow-forms allow-popups allow-modals"
+              referrerPolicy="no-referrer"
+              onLoad={() => {
+                if (tab.isLoading) {
+                  onUpdateTab(tab.id, { isLoading: false });
+                }
+              }}
+            />
+            {isDemo && tab?.url && tab.url.startsWith('http') && (
+              <div className="absolute bottom-3 right-3 z-30 pointer-events-auto">
+                <a
+                  href={tab.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-xs flex items-center gap-1.5 shadow-xl transition-all backdrop-blur-sm"
+                >
+                  <span>Open in new tab</span>
+                  <span className="text-[10px]">↗</span>
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {autofillMenu?.isOpen && autofillMenu.accounts.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            left: Math.max(16, Math.min(autofillMenu.rect?.left || 20, (typeof window !== 'undefined' ? window.innerWidth : 800) - 280)),
+            top: Math.min((autofillMenu.rect?.bottom || 100) + 6, (typeof window !== 'undefined' ? window.innerHeight : 600) - 200),
+            zIndex: 9999
+          }}
+          className="w-64 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden select-none text-xs"
+        >
+          <div className="px-3 py-2 bg-slate-800/80 border-b border-slate-700/50 flex items-center justify-between text-[11px] font-semibold text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-blue-400" />
+              Saved Accounts ({autofillMenu.accounts.length})
+            </span>
+            <span className="text-[10px] text-slate-500 font-mono truncate max-w-[100px]">{autofillMenu.hostname}</span>
+          </div>
+          <div className="max-h-48 overflow-y-auto divide-y divide-slate-800/60 p-1">
+            {autofillMenu.accounts.map((acc, i) => (
+              <button
+                key={i}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelectAutofill(acc, autofillMenu.origin, autofillMenu.hostname);
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
+              >
+                <span className="font-medium text-slate-100">{acc.username || 'Unnamed Account'}</span>
+                <span className="text-[10px] text-slate-400">Click to fill password</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {passwordPrompt.isOpen && (
+        <Suspense fallback={null}>
+          <PasswordPromptModal
+            isOpen={passwordPrompt.isOpen}
+            hostname={passwordPrompt.hostname}
+            username={passwordPrompt.username}
+            password={passwordPrompt.password}
+            isUpdate={passwordPrompt.isUpdate}
+            onClose={() => setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }))}
+            onSave={async (customUsername?: string, customPassword?: string) => {
+              const finalUsername = customUsername || passwordPrompt.username;
+              const finalPassword = customPassword || passwordPrompt.password;
+              try {
+                const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+                let passwords = raw ? JSON.parse(raw) : [];
+
+                // Remove existing password for this origin (or hostname if legacy) & username if any
+                passwords = passwords.filter((p: any) => {
+                  const match = p.origin
+                    ? (p.origin === passwordPrompt.origin && p.username === finalUsername)
+                    : (p.hostname === passwordPrompt.hostname && p.username === finalUsername);
+                  return !match;
+                });
+
+                passwords.push({
+                  origin: passwordPrompt.origin,
+                  hostname: passwordPrompt.hostname,
+                  username: finalUsername,
+                  password: finalPassword,
+                  timestamp: Date.now()
+                });
+
+                await (window as any).electronAPI?.secureStoreSet?.('passwords', JSON.stringify(passwords));
+              } catch (e) {
+                console.error('Failed to save password', e);
+              }
+              setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }))
+            }}
+          />
+        </Suspense>
+      )}
+
+      {isActive && (settings.aiLinkPreviewEnabled ?? true) && (
+        <Suspense fallback={null}>
+          <AILinkPreview
+            url={aiPreview.url}
+            x={aiPreview.x}
+            y={aiPreview.y}
+            isOpen={aiPreview.isOpen}
+          />
+        </Suspense>
+      )}
+    </div>
+  );
+}, browserViewPropsEqual);

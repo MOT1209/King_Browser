@@ -1,0 +1,435 @@
+import { ipcRenderer, webFrame } from 'electron';
+
+/**
+ * Isolated guest preload script for general webview instances.
+ * Runs in a sandboxed, context-isolated environment.
+ * Zero Electron APIs or node globals are exposed to untrusted web content.
+ * All communication with the host React application occurs strictly via ipcRenderer.sendToHost.
+ */
+
+// Origin validation: only execute for secure HTTP/HTTPS web contexts
+const protocol = window.location.protocol;
+if (protocol === 'https:' || protocol === 'http:') {
+  // Synchronously sanitize main world prototype before any page scripts run:
+  // Purge any Electron branding from navigator and userAgentData to prevent
+  // Google bot detection (CAPTCHA/robot checks) and YouTube blank screens.
+  try {
+    const chromeVer = (typeof process !== 'undefined' && process.versions && process.versions.chrome) || '134.0.0.0';
+    const majorVer = chromeVer.split('.')[0] || '134';
+    const plat = typeof process !== 'undefined' ? process.platform : 'darwin';
+    const arch = typeof process !== 'undefined' ? process.arch : 'x64';
+
+    let platformName = 'macOS';
+    let platformVersion = '15.0.0';
+    let architecture = arch === 'arm64' ? 'arm' : 'x86';
+    let osUserAgent = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+
+    if (plat === 'win32') {
+      platformName = 'Windows';
+      platformVersion = '10.0.0';
+      architecture = 'x86';
+      osUserAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+    } else if (plat === 'linux') {
+      platformName = 'Linux';
+      platformVersion = '6.5.0';
+      architecture = 'x86';
+      osUserAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+    }
+
+    const mainWorldSanitizer = `
+      (() => {
+        try {
+          if ('webdriver' in Navigator.prototype) {
+            delete Navigator.prototype.webdriver;
+          }
+        } catch (_) {}
+
+        try {
+          const dynamicBrands = [
+            { brand: 'Not(A:Brand', version: '99' },
+            { brand: 'Chromium', version: ${JSON.stringify(majorVer)} },
+            { brand: 'Google Chrome', version: ${JSON.stringify(majorVer)} }
+          ];
+
+          Object.defineProperty(Navigator.prototype, 'userAgentData', {
+            get: () => ({
+              brands: dynamicBrands,
+              mobile: false,
+              platform: ${JSON.stringify(platformName)},
+              getHighEntropyValues: async () => ({
+                architecture: ${JSON.stringify(architecture)},
+                bitness: '64',
+                brands: dynamicBrands,
+                mobile: false,
+                model: '',
+                platform: ${JSON.stringify(platformName)},
+                platformVersion: ${JSON.stringify(platformVersion)},
+                uaFullVersion: ${JSON.stringify(chromeVer)}
+              }),
+              toJSON: function() {
+                return { brands: this.brands, mobile: this.mobile, platform: this.platform };
+              }
+            }),
+            configurable: true,
+            enumerable: true
+          });
+        } catch (_) {}
+
+        try {
+          Object.defineProperty(Navigator.prototype, 'userAgent', {
+            get: () => ${JSON.stringify(osUserAgent)},
+            configurable: true,
+            enumerable: true
+          });
+          Object.defineProperty(Navigator.prototype, 'appVersion', {
+            get: () => ${JSON.stringify(osUserAgent.replace(/^Mozilla\//, ''))},
+            configurable: true,
+            enumerable: true
+          });
+          Object.defineProperty(Navigator.prototype, 'vendor', {
+            get: () => 'Google Inc.',
+            configurable: true,
+            enumerable: true
+          });
+        } catch (_) {}
+      })();
+    `;
+
+    webFrame.executeJavaScriptInIsolatedWorld(0, [{ code: mainWorldSanitizer }]);
+  } catch (_) {}
+
+  let lastEnteredUsername = '';
+  let lastSubmitTime = 0;
+  let lastSubmittedPayload = '';
+
+  const isExcludedFromUsername = (input: HTMLInputElement | null | undefined): boolean => {
+    if (!input) return true;
+    const type = (input.type || '').toLowerCase();
+    if (['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'image', 'range', 'color', 'hidden', 'password'].includes(type)) {
+      return true;
+    }
+    const autocomplete = (input.autocomplete || '').toLowerCase();
+    if (autocomplete.startsWith('cc-') || autocomplete === 'one-time-code' || autocomplete === 'transaction-amount' || autocomplete === 'transaction-currency') {
+      return true;
+    }
+
+    const hints = [
+      input.name || '',
+      input.id || '',
+      input.getAttribute('placeholder') || '',
+      input.getAttribute('aria-label') || '',
+      input.className || ''
+    ].join(' ').toLowerCase();
+
+    // Sensitive field heuristic: never treat payment, CVV, OTP, 2FA, PIN, or captcha as a username
+    if (/(?:cvv|cvc|card[-_]?num|credit|debit|expir|security[-_]?code|otp|totp|mfa|2fa|verification|verify|passcode|pin|captcha|csrf)/i.test(hints)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const findUsernameForPassword = (pwdInput: HTMLInputElement, container?: Element | null): string => {
+    const root = container || pwdInput.closest('form') || pwdInput.closest('div') || document;
+
+    const specificSelectors = [
+      'input[autocomplete="username"]',
+      'input[autocomplete="email"]',
+      'input[name*="user" i]',
+      'input[name*="email" i]',
+      'input[name*="login" i]',
+      'input[id*="user" i]',
+      'input[id*="email" i]',
+      'input[id*="login" i]',
+      'input[type="email"]'
+    ];
+
+    for (const sel of specificSelectors) {
+      const el = root.querySelector(sel) as HTMLInputElement;
+      if (el && el !== pwdInput && !isExcludedFromUsername(el) && el.value && el.value.trim()) {
+        return el.value.trim();
+      }
+    }
+
+    const allInputs = Array.from(root.querySelectorAll('input:not([type="hidden"]):not([type="password"])')) as HTMLInputElement[];
+    if (allInputs.length > 0) {
+      for (let i = allInputs.length - 1; i >= 0; i--) {
+        const inp = allInputs[i];
+        if (inp && inp !== pwdInput && !inp.disabled && !isExcludedFromUsername(inp)) {
+          const val = inp.value?.trim();
+          if (val && val.length > 0) {
+            return val;
+          }
+        }
+      }
+    }
+
+    if (lastEnteredUsername) {
+      return lastEnteredUsername;
+    }
+
+    const docInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"]')) as HTMLInputElement[];
+    for (const inp of docInputs) {
+      if (inp && inp !== pwdInput && !inp.disabled && !isExcludedFromUsername(inp)) {
+        const val = inp.value?.trim();
+        if (val && val.length > 0) {
+          return val;
+        }
+      }
+    }
+
+    return '';
+  };
+
+  const checkAndSubmitCredentials = (triggerEl?: Element | null) => {
+    const now = Date.now();
+    const hostname = window.location.hostname;
+    if (!hostname || hostname === 'about:blank') return;
+
+    const passwordInputs = Array.from(document.querySelectorAll('input[type="password"]')) as HTMLInputElement[];
+    if (passwordInputs.length === 0) return;
+
+    let targetPwd: HTMLInputElement | null = null;
+    if (triggerEl) {
+      const container = triggerEl.closest('form') || triggerEl.closest('div') || triggerEl.parentElement;
+      if (container) {
+        targetPwd = container.querySelector('input[type="password"]') as HTMLInputElement;
+      }
+    }
+    if (!targetPwd || !targetPwd.value) {
+      targetPwd = passwordInputs.find(p => p.value && p.value.length > 0) || null;
+    }
+
+    if (!targetPwd || !targetPwd.value) return;
+
+    const password = String(targetPwd.value).substring(0, 500);
+    const username = findUsernameForPassword(targetPwd, targetPwd.closest('form') || targetPwd.closest('div')) || lastEnteredUsername;
+
+    if (!password || !username) return;
+
+    // Origin verification: ensure reported hostname matches window location
+    if (hostname !== window.location.hostname) return;
+
+    const payloadKey = `${hostname}|${username}|${password}`;
+    if (now - lastSubmitTime < 1500 && lastSubmittedPayload === payloadKey) {
+      return;
+    }
+
+    lastSubmitTime = now;
+    lastSubmittedPayload = payloadKey;
+
+    try {
+      ipcRenderer.sendToHost('password-form-submitted', {
+        origin: window.location.origin,
+        hostname,
+        username,
+        password
+      });
+    } catch (_) {}
+  };
+
+  const setupPasswordCapture = () => {
+    document.addEventListener('input', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target && target.tagName === 'INPUT') {
+        const type = (target.type || '').toLowerCase();
+        const name = (target.name || '').toLowerCase();
+        const id = (target.id || '').toLowerCase();
+        const autocomplete = (target.autocomplete || '').toLowerCase();
+
+        const isUserField =
+          type === 'email' ||
+          autocomplete === 'username' ||
+          autocomplete === 'email' ||
+          name.includes('user') ||
+          name.includes('email') ||
+          name.includes('login') ||
+          id.includes('user') ||
+          id.includes('email') ||
+          id.includes('login');
+
+        if (isUserField && !isExcludedFromUsername(target) && target.value && target.value.trim().length > 0) {
+          lastEnteredUsername = target.value.trim();
+        }
+      }
+    }, true);
+
+    document.addEventListener('submit', (e) => {
+      const form = e.target as HTMLFormElement;
+      checkAndSubmitCredentials(form);
+    }, true);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const target = e.target as HTMLElement;
+        if (target && target.tagName === 'INPUT') {
+          checkAndSubmitCredentials(target);
+        }
+      }
+    }, true);
+
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+      const btn = target.closest('button, input[type="submit"], input[type="button"], a[role="button"], div[role="button"]');
+      if (btn) {
+        const text = (btn.textContent || (btn as HTMLInputElement).value || '').toLowerCase();
+        const isSubmitBtn = (btn as HTMLInputElement).type === 'submit' ||
+          /log\s*in|sign\s*in|sign\s*up|register|giris|kayit|devam|next|continue|submit|ileri|tamam|hesap/i.test(text);
+
+        if (isSubmitBtn) {
+          setTimeout(() => checkAndSubmitCredentials(btn), 50);
+        }
+      }
+    }, true);
+  };
+
+  const setupLinkHoverDetection = () => {
+    let hoverTimer: any = null;
+    let currentHoveredLink: HTMLElement | null = null;
+
+    document.addEventListener('mouseover', (e) => {
+      const a = (e.target as HTMLElement)?.closest?.('a');
+      if (a && a.href && (a.href.startsWith('https://') || a.href.startsWith('http://'))) {
+        if (currentHoveredLink === a) return;
+        currentHoveredLink = a;
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => {
+          const rect = a.getBoundingClientRect();
+          try {
+            ipcRenderer.sendToHost('nova-link-hover', {
+              url: a.href,
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2
+            });
+          } catch (_) {}
+        }, 1500);
+      }
+    }, true);
+
+    document.addEventListener('mouseout', (e) => {
+      const a = (e.target as HTMLElement)?.closest?.('a');
+      if (a) {
+        clearTimeout(hoverTimer);
+        if (currentHoveredLink === a) currentHoveredLink = null;
+        try {
+          ipcRenderer.sendToHost('nova-link-hover-out');
+        } catch (_) {}
+      }
+    }, true);
+
+    document.addEventListener('click', () => {
+      clearTimeout(hoverTimer);
+      currentHoveredLink = null;
+      try {
+        ipcRenderer.sendToHost('nova-link-hover-out');
+      } catch (_) {}
+    }, true);
+  };
+
+  // Security: Credential capture, autofill detection and filling run strictly in the top-level frame.
+  const isTopFrame = window === window.top;
+
+  // Secure credential filling listener: received from host when user selects an account in native UI
+  ipcRenderer.on('fill-credentials', (_event, cred: { username?: string; password?: string; expectedOrigin?: string; expectedHostname?: string }) => {
+    if (!isTopFrame) return;
+    if (!cred) return;
+    // Security: fail CLOSED on origin binding.
+    // If expectedOrigin is provided, require exact window.location.origin match.
+    // Prohibit releasing HTTPS credentials to an unencrypted HTTP origin.
+    if (typeof cred.expectedOrigin === 'string' && cred.expectedOrigin.length > 0) {
+      if (window.location.origin !== cred.expectedOrigin) return;
+    } else if (typeof cred.expectedHostname === 'string' && cred.expectedHostname.length > 0) {
+      if (window.location.hostname !== cred.expectedHostname) return;
+      // Refuse releasing credentials to unencrypted HTTP
+      if (window.location.protocol === 'http:') return;
+    } else {
+      return;
+    }
+    try {
+      const activeEl = document.activeElement as HTMLElement | null;
+      const root = activeEl?.closest('form') || activeEl?.closest('fieldset') || activeEl?.parentElement || document;
+      const allPwds = Array.from(root.querySelectorAll('input[type="password"]')) as HTMLInputElement[];
+      const pwdInput = allPwds[0] || (activeEl instanceof HTMLInputElement && activeEl.type === 'password' ? activeEl : null);
+      const allUsers = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]')) as HTMLInputElement[];
+      const userInput = allUsers[0] || (activeEl instanceof HTMLInputElement && activeEl.type !== 'password' ? activeEl : null);
+
+      if (userInput && cred.username) {
+        userInput.value = cred.username;
+        userInput.dispatchEvent(new Event('input', { bubbles: true }));
+        userInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (pwdInput && cred.password) {
+        pwdInput.value = cred.password;
+        pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
+        pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    } catch (_) {}
+  });
+
+  const setupPasswordFocusDetection = () => {
+    document.addEventListener('focusin', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target && target.tagName === 'INPUT') {
+        const type = (target.type || '').toLowerCase();
+        const name = (target.name || '').toLowerCase();
+        const id = (target.id || '').toLowerCase();
+        const autocomplete = (target.autocomplete || '').toLowerCase();
+        const isLoginField =
+          type === 'password' ||
+          type === 'email' ||
+          autocomplete === 'username' ||
+          autocomplete === 'current-password' ||
+          name.includes('user') ||
+          name.includes('login') ||
+          name.includes('email') ||
+          id.includes('user') ||
+          id.includes('login');
+
+        if (isLoginField) {
+          const rect = target.getBoundingClientRect();
+          try {
+            ipcRenderer.sendToHost('login-field-focused', {
+              origin: window.location.origin,
+              hostname: window.location.hostname,
+              rect: {
+                left: rect.left,
+                top: rect.top,
+                bottom: rect.bottom,
+                right: rect.right,
+                width: rect.width,
+                height: rect.height
+              }
+            });
+          } catch (_) {}
+        }
+      }
+    }, true);
+
+    document.addEventListener('focusout', () => {
+      setTimeout(() => {
+        if (document.activeElement?.tagName !== 'INPUT') {
+          try {
+            ipcRenderer.sendToHost('login-field-blurred');
+          } catch (_) {}
+        }
+      }, 150);
+    }, true);
+  };
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', () => {
+      if (isTopFrame) {
+        setupPasswordCapture();
+        setupPasswordFocusDetection();
+      }
+      setupLinkHoverDetection();
+    });
+  } else {
+    if (isTopFrame) {
+      setupPasswordCapture();
+      setupPasswordFocusDetection();
+    }
+    setupLinkHoverDetection();
+  }
+}

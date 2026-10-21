@@ -1,0 +1,1662 @@
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Plus,
+  X,
+  Globe,
+  VolumeX,
+  Volume2,
+  ChevronDown,
+  ChevronRight,
+  Folder as FolderIcon,
+  FolderPlus,
+  Check,
+  Settings,
+  Clock,
+  Download,
+  VenetianMask,
+  Moon,
+  ArrowLeft,
+  ArrowRight,
+  RotateCw,
+  Search,
+  Shield,
+  ShieldCheck,
+  ShieldOff,
+  Puzzle,
+  Package,
+  Orbit,
+  Layers,
+  LayoutGrid,
+  Trash2,
+  PanelLeft,
+  Pin,
+  Columns2,
+  HelpCircle,
+  Compass,
+  Cloud,
+  Sparkles
+} from 'lucide-react';
+import { Tab, Bookmark, Workspace, Folder, UserSettings } from '../types/browser';
+import { useTitlebarInsets } from '../hooks/useTitlebarInsets';
+import { formatSearchUrl } from '../utils/searchEngine';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
+import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
+import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
+import { tabThumbnailCache } from '../services/thumbnailCache';
+import { TabHoverPreview } from './TabHoverPreview';
+import { generateId } from '../utils/idGenerator';
+import { getLocale, getLanguage } from '../services/i18n';
+
+const WORKSPACE_COLORS: Record<string, string> = {
+  slate: '#64748b',
+  blue: '#3b82f6',
+  emerald: '#10b981',
+  purple: '#a855f7',
+  rose: '#f43f5e',
+  amber: '#f59e0b'
+};
+
+/**
+ * True when a `click`/`keydown` reaching a container handler came from a
+ * nested interactive control rather than from the container's own surface.
+ *
+ * A tab row / folder header is a `role="tab"` / `role="button"` container that
+ * wraps real <button> children (the close button). Those children only stopped
+ * propagation on `click`, never on `keydown`, so Enter on a tab's close button ran the
+ * row's own handler and selected the tab, and Enter on a folder's close button ran the
+ * header's handler and collapsed the folder — the button's own action was
+ * never reached. This rejects any event that originated inside a nested form
+ * control, on both paths. It is deliberately not a blanket
+ * `e.currentTarget !== e.target` test: a click on the title span or favicon is
+ * a descendant event too, and it must keep selecting the tab.
+ */
+const isFromNestedControl = (e: React.SyntheticEvent<HTMLElement>): boolean => {
+  const target = e.target as HTMLElement | null;
+  if (!target || target === e.currentTarget) return false;
+  return !!target.closest('button, a, input, select, textarea');
+};
+
+export interface FavoriteApp {
+  id: string;
+  name: string;
+  url: string;
+  iconType: 'youtube' | 'github' | 'x' | 'chatgpt' | 'google' | 'custom';
+  iconBg?: string;
+}
+
+const DEFAULT_FAVORITE_APPS: FavoriteApp[] = [
+  { id: 'fav_yt', name: 'YouTube', url: 'https://youtube.com', iconType: 'youtube', iconBg: '#ef4444' },
+  { id: 'fav_gh', name: 'GitHub', url: 'https://github.com', iconType: 'github', iconBg: '#24292f' },
+  { id: 'fav_x', name: 'X', url: 'https://x.com', iconType: 'x', iconBg: '#0f1419' },
+  { id: 'fav_ai', name: 'ChatGPT', url: 'https://chatgpt.com', iconType: 'chatgpt', iconBg: '#10a37f' },
+];
+
+function renderFavoriteIcon(fav: FavoriteApp) {
+  switch (fav.iconType) {
+    case 'youtube':
+      return (
+        <svg className="w-4 h-4 fill-red-500" viewBox="0 0 24 24">
+          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+        </svg>
+      );
+    case 'github':
+      return (
+        <svg className="w-4 h-4 fill-slate-200" viewBox="0 0 24 24">
+          <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+        </svg>
+      );
+    case 'x':
+      return (
+        <svg className="w-3.5 h-3.5 fill-slate-200" viewBox="0 0 24 24">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+      );
+    case 'chatgpt':
+      return (
+        <svg className="w-4 h-4 fill-emerald-400" viewBox="0 0 24 24">
+          <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.597 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.6669zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813v6.7226zm1.093-2.2243L12 9.116l2.6005 1.5228v3.0455L12 15.207l-2.6005-1.5227v-3.0456z"/>
+        </svg>
+      );
+    default:
+      return <Globe className="w-4 h-4 text-cyan-400" />;
+  }
+}
+
+export interface SidebarTabsProps {
+  tabs: Tab[];
+  folders?: Folder[];
+  activeTabId: string;
+  onSelectTab: (id: string) => void;
+  onCloseTab: (id: string, e?: React.MouseEvent) => void;
+  onNewTab: (url?: string) => void;
+  onNewIncognitoTab?: () => void;
+  onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
+  onDuplicateTab?: (id: string) => void;
+  onTogglePinTab?: (id: string) => void;
+  onCloseOtherTabs?: (id: string) => void;
+  onCloseTabsToRight?: (target: number | string) => void;
+  onNewTabRight?: (target: number | string) => void;
+  onReopenClosedTab?: () => void;
+  canReopenClosedTab?: boolean;
+  onToggleBookmark?: (targetTab?: Tab) => void;
+  workspaces: Workspace[];
+  activeWorkspaceId: string;
+  onSelectWorkspace: (id: string) => void;
+  isIncognito?: boolean;
+  onCreateFolder?: () => void;
+  onToggleFolder?: (id: string) => void;
+  onRenameFolder?: (id: string, name: string) => void;
+  onDeleteFolder?: (id: string) => void;
+  onMoveTabToFolder?: (tabId: string, folderId?: string) => void;
+  onOpenSpotlight?: () => void;
+  onTabDragStart?: () => void;
+  onTabDragEnd?: () => void;
+  onCloseSplit?: (tab1Id?: string, tab2Id?: string) => void;
+  onNavigate?: (url: string) => void;
+  onGoBack?: () => void;
+  onGoForward?: () => void;
+  onReload?: () => void;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
+  isLoading?: boolean;
+  searchEngine?: UserSettings['searchEngine'];
+  privacyShield?: boolean;
+  onOpenDownloads?: () => void;
+  onOpenHistory?: () => void;
+  onOpenSettings?: () => void;
+  onOpenAccount?: () => void;
+  onOpenHelp?: () => void;
+  onOpenExtensions?: () => void;
+  onToggleAIAssistant?: () => void;
+  isAIAssistantOpen?: boolean;
+  bookmarks?: Bookmark[];
+  onToggleCollapse?: () => void;
+  isCollapsed?: boolean;
+  onReorderTabs?: (draggedId: string, targetId: string) => void;
+}
+
+interface SidebarTabItemProps {
+  tab: Tab;
+  splitTab?: Tab | null;
+  activeTabId?: string;
+  isActive: boolean;
+  isDragOver: boolean;
+  isNested: boolean;
+  tabsLength: number;
+  onSelectTab: (id: string) => void;
+  onCloseTab: (id: string, e?: React.MouseEvent) => void;
+  onCloseSplit?: (tab1Id?: string, tab2Id?: string) => void;
+  onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
+  onTabDragStart?: () => void;
+  onTabDragEnd?: () => void;
+  onReorderTabs?: (draggedId: string, targetId: string) => void;
+  onOpenContextMenu: (tab: Tab, e: React.MouseEvent) => void;
+  onMouseEnter: (tab: Tab, e: React.MouseEvent) => void;
+  onMouseLeave: () => void;
+  setDragOverTabId: (id: string | null) => void;
+}
+
+const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
+  tab,
+  splitTab,
+  activeTabId,
+  isActive,
+  isDragOver,
+  isNested,
+  tabsLength,
+  onSelectTab,
+  onCloseTab,
+  onCloseSplit,
+  onToggleMuteTab,
+  onTabDragStart,
+  onTabDragEnd,
+  onReorderTabs,
+  onOpenContextMenu,
+  onMouseEnter,
+  onMouseLeave,
+  setDragOverTabId
+}) => {
+  const isNewTabUrl = !tab.url || tab.url === 'king://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab';
+  const dragCounterRef = useRef(0);
+
+  return (
+    <motion.div
+      draggable
+      onDragStart={(e: any) => {
+        e.dataTransfer.setData('text/plain', tab.id);
+        onTabDragStart?.();
+      }}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        dragCounterRef.current++;
+        if (!isDragOver) {
+          setDragOverTabId(tab.id);
+        }
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        if (!isDragOver) {
+          setDragOverTabId(tab.id);
+        }
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault();
+        dragCounterRef.current--;
+        if (dragCounterRef.current <= 0) {
+          dragCounterRef.current = 0;
+          if (isDragOver) setDragOverTabId(null);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounterRef.current = 0;
+        setDragOverTabId(null);
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (draggedId && draggedId !== tab.id && onReorderTabs) {
+          onReorderTabs(draggedId, tab.id);
+        }
+      }}
+      onDragEnd={() => {
+        dragCounterRef.current = 0;
+        setDragOverTabId(null);
+        onTabDragEnd?.();
+      }}
+      layout="position"
+      initial={false}
+      animate={{ opacity: 1 }}
+      exit={splitTab ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, marginTop: 0 }}
+      transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
+      key={tab.id}
+      onClick={(e) => { if (isFromNestedControl(e)) return; onSelectTab(tab.id); }}
+      onKeyDown={(e) => {
+        if (isFromNestedControl(e)) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelectTab(tab.id);
+        }
+      }}
+      role="tab"
+      tabIndex={0}
+      aria-selected={isActive}
+      aria-label={tab.title || tab.url || 'Untitled tab'}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onOpenContextMenu(tab, e);
+      }}
+      onMouseEnter={(e) => onMouseEnter(tab, e)}
+      onMouseLeave={onMouseLeave}
+      style={isActive ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
+      className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none overflow-hidden ${
+        isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
+      } ${
+        isDragOver
+          ? 'ring-2 ring-cyan-500 bg-cyan-500/15 text-slate-900 dark:text-white shadow-md'
+          : isActive
+            ? 'bg-white text-slate-900 shadow-xs font-semibold border border-slate-200/80 dark:bg-white/12 dark:text-white dark:shadow-sm dark:font-medium dark:border-white/10'
+            : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300/80 dark:hover:bg-white/6 dark:hover:text-white'
+      }`}
+    >
+      {splitTab ? (
+        <div className="flex items-center w-full gap-0.5">
+          {/* Primary Split Subtab */}
+          <div
+            className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer group/split-left relative ${
+              activeTabId === tab.id
+                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold'
+                : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
+            }`}
+            onClick={(e) => { if (isFromNestedControl(e)) return; e.stopPropagation(); onSelectTab(tab.id); }}
+            title={tab.title}
+          >
+            {tab.favicon ? (
+              <img src={tab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" />
+            ) : (
+              <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
+            )}
+            <span className="truncate text-[12px] flex-1">{tab.title || 'New Tab'}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMouseLeave?.();
+                onCloseTab(tab.id);
+              }}
+              onKeyDown={(e) => { e.stopPropagation(); }}
+              className="opacity-0 group-hover/split-left:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
+              title="Close Left Tab"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+
+          {/* Unsplit / Separate Tabs Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMouseLeave?.();
+              onCloseSplit?.(tab.id, splitTab.id);
+            }}
+            onKeyDown={(e) => { e.stopPropagation(); }}
+            className="p-0.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0 group/unsplit cursor-pointer"
+            title="Separate Tabs"
+          >
+            <div className="w-px h-3.5 bg-slate-300 dark:bg-white/20 group-hover/unsplit:hidden" />
+            <Columns2 className="w-3 h-3 hidden group-hover/unsplit:block text-slate-500 dark:text-slate-300" />
+          </button>
+
+          {/* Secondary Split Subtab */}
+          <div
+            className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer group/split-right relative ${
+              activeTabId === splitTab.id
+                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold'
+                : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
+            }`}
+            onClick={(e) => {
+              if (isFromNestedControl(e)) return;
+              e.stopPropagation();
+              onMouseLeave?.();
+              onSelectTab(splitTab.id);
+            }}
+            title={splitTab.title}
+          >
+            {splitTab.favicon ? (
+              <img src={splitTab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" />
+            ) : (
+              <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
+            )}
+            <span className="truncate text-[12px] flex-1">{splitTab.title || 'New Tab'}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMouseLeave?.();
+                onCloseTab(splitTab.id);
+              }}
+              onKeyDown={(e) => { e.stopPropagation(); }}
+              className="opacity-0 group-hover/split-right:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
+              title="Close Right Tab"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className="w-4 h-4 flex items-center justify-center shrink-0">
+              {tab.isLoading ? (
+                <div className="w-3.5 h-3.5 border-2 border-slate-400/40 border-t-slate-800 dark:border-slate-300/40 dark:border-t-white rounded-full animate-spin" />
+              ) : tab.favicon ? (
+                <img src={tab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-xs object-contain" />
+              ) : tab.url === 'king://settings' ? (
+                <Settings className="w-3.5 h-3.5 opacity-70" />
+              ) : tab.url === 'king://history' ? (
+                <Clock className="w-3.5 h-3.5 opacity-70" />
+              ) : tab.url === 'king://downloads' ? (
+                <Download className="w-3.5 h-3.5 opacity-70" />
+              ) : isNewTabUrl ? (
+                tab.isIncognito ? (
+                  <VenetianMask className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
+                ) : (
+                  <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
+                )
+              ) : (
+                <Globe className="w-3.5 h-3.5 opacity-70" />
+              )}
+            </div>
+            <span className="truncate text-[13px] tracking-tight flex-1">
+              {tab.title || (isNewTabUrl ? 'New Tab' : tab.url) || 'New Tab'}
+            </span>
+            {tab.isPinned && (
+              <Pin className="w-2.5 h-2.5 text-cyan-500 shrink-0 opacity-80" />
+            )}
+          </div>
+
+          <div className={`flex items-center gap-1 transition-opacity duration-150 shrink-0 ${
+            isActive || tab.isPlayingAudio || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
+          }`}>
+            {tab.isMuted ? (
+              <button onClick={(e) => onToggleMuteTab(tab.id, e)} onKeyDown={(e) => { e.stopPropagation(); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">
+                <VolumeX className="w-3 h-3" />
+              </button>
+            ) : tab.isPlayingAudio ? (
+              <button onClick={(e) => onToggleMuteTab(tab.id, e)} onKeyDown={(e) => { e.stopPropagation(); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-cyan-600 dark:text-cyan-400">
+                <Volume2 className="w-3 h-3 animate-pulse" />
+              </button>
+            ) : null}
+            {tab.isSuspended && (
+              <span className="p-0.5 text-indigo-500/70 dark:text-indigo-300/70 shrink-0" title="Sleeping Tab">
+                <Moon className="w-3 h-3" />
+              </span>
+            )}
+            {!tab.isPinned && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMouseLeave?.();
+                  onCloseTab(tab.id, e);
+                }}
+                onKeyDown={(e) => { e.stopPropagation(); }}
+                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 hover:text-white transition-colors cursor-pointer"
+                title="Close Tab"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </motion.div>
+  );
+}, (prev: SidebarTabItemProps, next: SidebarTabItemProps): boolean => {
+  return (
+    prev.isActive === next.isActive &&
+    prev.isDragOver === next.isDragOver &&
+    prev.isNested === next.isNested &&
+    // For non-split tabs, activeTabId doesn't affect rendering because isActive captures whether this tab is active.
+    // For split tabs, we only care whether this tab or the split partner is the active one.
+    (
+      !prev.splitTab && !next.splitTab
+        ? true
+        : (prev.activeTabId === prev.tab.id) === (next.activeTabId === next.tab.id) &&
+          (prev.activeTabId === prev.splitTab?.id) === (next.activeTabId === next.splitTab?.id)
+    ) &&
+    prev.tabsLength === next.tabsLength &&
+    prev.tab.id === next.tab.id &&
+    prev.tab.url === next.tab.url &&
+    prev.tab.title === next.tab.title &&
+    prev.tab.favicon === next.tab.favicon &&
+    prev.tab.isLoading === next.tab.isLoading &&
+    prev.tab.isMuted === next.tab.isMuted &&
+    prev.tab.isPlayingAudio === next.tab.isPlayingAudio &&
+    prev.tab.isSuspended === next.tab.isSuspended &&
+    prev.tab.isPinned === next.tab.isPinned &&
+    prev.tab.isIncognito === next.tab.isIncognito &&
+    prev.tab.splitWith === next.tab.splitWith &&
+    prev.splitTab?.id === next.splitTab?.id &&
+    prev.splitTab?.title === next.splitTab?.title &&
+    prev.splitTab?.url === next.splitTab?.url &&
+    prev.splitTab?.favicon === next.splitTab?.favicon &&
+    prev.splitTab?.isLoading === next.splitTab?.isLoading &&
+    prev.splitTab?.isMuted === next.splitTab?.isMuted &&
+    prev.splitTab?.isPlayingAudio === next.splitTab?.isPlayingAudio
+  );
+});
+
+export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
+  tabs,
+  folders,
+  activeTabId,
+  onSelectTab,
+  onCloseTab,
+  onNewTab,
+  onNewIncognitoTab,
+  onToggleMuteTab,
+  onDuplicateTab,
+  onTogglePinTab,
+  onCloseOtherTabs,
+  onCloseTabsToRight,
+  onNewTabRight,
+  onReopenClosedTab,
+  canReopenClosedTab = false,
+  onToggleBookmark,
+  workspaces,
+  activeWorkspaceId,
+  onSelectWorkspace,
+  isIncognito,
+  onCreateFolder,
+  onToggleFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onMoveTabToFolder,
+  onOpenSpotlight,
+  onTabDragStart,
+  onTabDragEnd,
+  onCloseSplit,
+  onNavigate,
+  onGoBack,
+  onGoForward,
+  onReload,
+  canGoBack = false,
+  canGoForward = false,
+  isLoading = false,
+  searchEngine = 'google',
+  privacyShield = true,
+  onOpenDownloads,
+  onOpenHistory,
+  onOpenSettings,
+  onOpenAccount,
+  onOpenHelp,
+  onOpenExtensions,
+  onToggleAIAssistant,
+  isAIAssistantOpen = false,
+  bookmarks = [],
+  onToggleCollapse,
+  isCollapsed = false,
+  onReorderTabs
+}) => {
+  const activeTab = tabs.find(t => t.id === activeTabId);
+  const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
+  const isMac = useMemo(() => {
+    return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+  }, []);
+  const titlebarInsets = useTitlebarInsets();
+
+  const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
+  const [hoverRect, setHoverRect] = useState<{ top: number; left: number; width: number; height: number; right: number; bottom: number } | null>(null);
+  const hoveredTabRef = useRef<Tab | null>(null);
+  const hoverRectRef = useRef<{ top: number; left: number; width: number; height: number; right: number; bottom: number } | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+
+  const [tabContextMenu, setTabContextMenu] = useState<TabContextMenuState>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    tab: null,
+    tabIndex: -1
+  });
+
+  const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
+  const [isLibraryDropdownOpen, setIsLibraryDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const libraryRef = useRef<HTMLDivElement>(null);
+
+  // Omnibox state
+  const [searchValue, setSearchValue] = useState('');
+  const [isOmniboxFocused, setIsOmniboxFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const omniboxInputRef = useRef<HTMLInputElement>(null);
+  const blurTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Top Favorites state
+  const [favorites, setFavorites] = useState<FavoriteApp[]>(() => {
+    try {
+      const saved = localStorage.getItem('nova_top_favorites');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(f => f && typeof f.url === 'string' && isSafeNavigationUrl(f.url));
+        }
+      }
+    } catch (_) {}
+    return DEFAULT_FAVORITE_APPS;
+  });
+
+  const [isAddFavOpen, setIsAddFavOpen] = useState(false);
+  const [newFavName, setNewFavName] = useState('');
+  const [newFavUrl, setNewFavUrl] = useState('');
+
+  const saveFavorites = (newFavs: FavoriteApp[]) => {
+    const safeFavs = newFavs.filter(f => f && typeof f.url === 'string' && isSafeNavigationUrl(f.url));
+    setFavorites(safeFavs);
+    try {
+      localStorage.setItem('nova_top_favorites', JSON.stringify(safeFavs));
+    } catch (_) {}
+  };
+
+  const handleAddFavorite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFavName.trim() || !newFavUrl.trim()) return;
+
+    let finalUrl = newFavUrl.trim();
+    if (!/^https?:\/\//i.test(finalUrl)) {
+      finalUrl = 'https://' + finalUrl;
+    }
+
+    if (!isSafeNavigationUrl(finalUrl)) {
+      return;
+    }
+
+    let host = '';
+    try {
+      const parsed = new URL(finalUrl);
+      if (!parsed.hostname) return;
+      host = parsed.hostname.toLowerCase();
+    } catch (_) {
+      return;
+    }
+
+    let iconType: FavoriteApp['iconType'] = 'custom';
+    if (host === 'youtube.com' || host.endsWith('.youtube.com')) iconType = 'youtube';
+    else if (host === 'github.com' || host.endsWith('.github.com')) iconType = 'github';
+    else if (host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')) iconType = 'x';
+    else if (host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'openai.com' || host.endsWith('.openai.com')) iconType = 'chatgpt';
+    else if (host === 'google.com' || host.endsWith('.google.com')) iconType = 'google';
+
+    const newFav: FavoriteApp = {
+      id: generateId('fav'),
+      name: newFavName.trim(),
+      url: finalUrl,
+      iconType,
+      iconBg: '#1e293b'
+    };
+
+    saveFavorites([...favorites, newFav]);
+    setNewFavName('');
+    setNewFavUrl('');
+    setIsAddFavOpen(false);
+  };
+
+  const handleRemoveFavorite = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    saveFavorites(favorites.filter(f => f.id !== id));
+  };
+
+  const handleFavoriteClick = (favUrl: string) => {
+    try {
+      const targetHost = new URL(favUrl).hostname.toLowerCase().replace(/^www\./, '');
+      const existingTab = tabs.find(t => {
+        try {
+          const tHost = new URL(t.url).hostname.toLowerCase().replace(/^www\./, '');
+          return tHost === targetHost;
+        } catch {
+          return false;
+        }
+      });
+
+      if (existingTab) {
+        onSelectTab(existingTab.id);
+        return;
+      }
+    } catch (_) {}
+
+    // If current tab is an empty new tab, navigate it directly; otherwise create new tab
+    if (activeTab && (activeTab.url === 'king://newtab' || activeTab.url === 'about:blank' || activeTab.url === 'https://newtab')) {
+      if (onNavigate) onNavigate(favUrl);
+      else onNewTab(favUrl);
+    } else {
+      onNewTab(favUrl);
+    }
+  };
+
+  // Sync active tab URL into omnibox when not focused
+  useEffect(() => {
+    if (!isOmniboxFocused) {
+      const url = activeTab?.url || '';
+      if (url === 'king://newtab' || url === 'about:blank' || url === 'https://newtab') {
+        setSearchValue('');
+      } else {
+        setSearchValue(url);
+      }
+    }
+  }, [activeTab?.url, isOmniboxFocused]);
+
+  // Fetch suggestions (AbortController guards against out-of-order/stale responses,
+  // same pattern as TopBar.tsx)
+  // Re-render on language change so suggestions refetch in the new locale.
+  const clientLanguage = getLanguage();
+
+  useEffect(() => {
+    const trimmed = searchValue.trim();
+    if (!isOmniboxFocused || !trimmed || trimmed.includes('://')) {
+      setSuggestions([]);
+      return;
+    }
+
+    // 1. Instant 0ms cache lookup
+    const clientLocale = getLocale();
+    const cacheKey = `${trimmed}_${searchEngine}`;
+    const cached = getClientCachedSuggestions(cacheKey, clientLocale);
+    if (cached) {
+      setSuggestions(cached.slice(0, 5));
+    }
+
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    const fetchSuggestions = async () => {
+      try {
+        if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
+          const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
+          if (!abortController.signal.aborted) {
+            if (Array.isArray(results)) {
+              setClientCachedSuggestions(cacheKey, results, clientLocale);
+              setSuggestions(results.slice(0, 5));
+            } else {
+              setSuggestions([]);
+            }
+          }
+          return;
+        }
+
+        // Without electron IPC, do not leak user typing to external domains from renderer
+        setSuggestions([]);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          // ignore network errors
+        }
+      }
+    };
+
+    const timer = setTimeout(fetchSuggestions, 120);
+    return () => {
+      clearTimeout(timer);
+      abortController.abort();
+    };
+  }, [searchValue, isOmniboxFocused, searchEngine, clientLanguage]);
+
+  const handleOmniboxSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!searchValue.trim()) return;
+
+    let targetValue = searchValue;
+    if (selectedIndex > -1 && selectedIndex < suggestions.length) {
+      targetValue = suggestions[selectedIndex];
+    }
+
+    const url = formatSearchUrl(targetValue, searchEngine || 'google', getLanguage());
+    if (onNavigate) {
+      onNavigate(url);
+    } else if (onNewTab) {
+      onNewTab(url);
+    }
+    if (targetValue !== searchValue) {
+      setSearchValue(targetValue);
+    }
+    setShowSuggestions(false);
+    setIsOmniboxFocused(false);
+    omniboxInputRef.current?.blur();
+  };
+
+  // Stable handlers so the memoized SidebarTabItem children don't re-render on
+  // every parent render (and hover position updates bail out when unchanged).
+  const handleMouseEnter = useCallback((tab: Tab, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const newRect = {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      right: rect.right,
+      bottom: rect.bottom
+    };
+    hoverRectRef.current = newRect;
+    setHoverRect(newRect);
+
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      hoveredTabRef.current = tab;
+      setHoveredTab(tab);
+    }, 200);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    hoveredTabRef.current = null;
+    hoverRectRef.current = null;
+    setHoveredTab(null);
+    setHoverRect(null);
+  }, []);
+
+  // Auto-dismiss preview immediately if the hovered tab was closed or removed
+  useEffect(() => {
+    if (hoveredTab && !tabs.some(t => t.id === hoveredTab.id)) {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      hoveredTabRef.current = null;
+      hoverRectRef.current = null;
+      setHoveredTab(null);
+      setHoverRect(null);
+    }
+  }, [tabs, hoveredTab]);
+
+  // Global dismiss listeners on scroll, click, or window blur
+  useEffect(() => {
+    const dismiss = () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      // PERF: Only dispatch state updates if a preview is currently active/open
+      if (hoveredTabRef.current !== null || hoverRectRef.current !== null) {
+        hoveredTabRef.current = null;
+        hoverRectRef.current = null;
+        setHoveredTab(null);
+        setHoverRect(null);
+      }
+    };
+
+    window.addEventListener('pointerdown', dismiss);
+    window.addEventListener('wheel', dismiss, { passive: true });
+    window.addEventListener('blur', dismiss);
+    window.addEventListener('keydown', dismiss);
+
+    return () => {
+      window.removeEventListener('pointerdown', dismiss);
+      window.removeEventListener('wheel', dismiss);
+      window.removeEventListener('blur', dismiss);
+      window.removeEventListener('keydown', dismiss);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsWorkspaceDropdownOpen(false);
+      }
+      if (libraryRef.current && !libraryRef.current.contains(event.target as Node)) {
+        setIsLibraryDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleOpenContextMenu = useCallback((tab: Tab, e: React.MouseEvent) => {
+    const wsId = tab.workspaceId || activeWorkspaceId || 'default';
+    const wsTabs = tabs.filter(t => (t.workspaceId || 'default') === wsId);
+    const wsIdx = wsTabs.findIndex(t => t.id === tab.id);
+    setTabContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      tab,
+      tabIndex: wsIdx !== -1 ? wsIdx : tabs.findIndex(t => t.id === tab.id)
+    });
+  }, [tabs, activeWorkspaceId]);
+
+  const isCurrentNewTab = !activeTab?.url || activeTab.url === 'king://newtab' || activeTab.url === 'about:blank' || activeTab.url === 'https://newtab';
+
+  return (
+    <>
+      {/* PERF: solid surface instead of backdrop-blur — a persistent blur over
+          live page content forces a recomposite on every page repaint. */}
+      <div
+        style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
+        className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-slate-900 border-r border-slate-200/80 dark:border-white/[0.06] font-sans"
+      >
+
+        {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
+        <div
+          className="h-10 pt-1 px-3 flex items-center justify-between drag-region shrink-0 select-none"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        >
+          <div className="flex items-center gap-1">
+            {titlebarInsets.active ? (
+              titlebarInsets.left > 0 && (
+                <div
+                  className="h-full shrink-0 select-none drag-region"
+                  style={{ width: Math.max(0, titlebarInsets.left - 12), WebkitAppRegion: 'drag' } as React.CSSProperties}
+                />
+              )
+            ) : isMac && (
+              <div
+                className="w-[72px] h-full shrink-0 select-none drag-region"
+                style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+              />
+            )}
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors no-drag cursor-pointer flex items-center justify-center"
+                title={isCollapsed ? (isMac ? "Pin Sidebar (⌘S)" : "Pin Sidebar (Ctrl+S)") : (isMac ? "Hide Sidebar (⌘S)" : "Hide Sidebar (Ctrl+S)")}
+              >
+                {isCollapsed ? (
+                  <Pin className="w-3.5 h-3.5 rotate-45 text-cyan-500 dark:text-cyan-400" />
+                ) : (
+                  <PanelLeft className="w-3.5 h-3.5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Navigation Controls in Arc style */}
+          <div
+            className="flex items-center gap-0.5 no-drag"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            <button
+              onClick={onGoBack}
+              disabled={!canGoBack}
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              className={`p-1.5 rounded-lg transition-colors no-drag cursor-pointer ${
+                canGoBack ? 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' : 'text-slate-400 dark:text-slate-600 cursor-default'
+              }`}
+              title="Back"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onGoForward}
+              disabled={!canGoForward}
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              className={`p-1.5 rounded-lg transition-colors no-drag cursor-pointer ${
+                canGoForward ? 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' : 'text-slate-400 dark:text-slate-600 cursor-default'
+              }`}
+              title="Forward"
+            >
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onReload}
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors no-drag cursor-pointer"
+              title="Reload"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
+            {onToggleAIAssistant && (
+              <button
+                onClick={onToggleAIAssistant}
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                className={`p-1.5 rounded-lg transition-all no-drag cursor-pointer flex items-center justify-center ${
+                  isAIAssistantOpen
+                    ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-semibold ring-1 ring-cyan-500/30'
+                    : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                }`}
+                title={isMac ? "King AI Assistant (⌘I)" : "King AI Assistant (Ctrl+I)"}
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${isAIAssistantOpen ? 'text-accent' : 'text-cyan-600 dark:text-cyan-400'}`} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 2. INTEGRATED OMNIBOX / URL SEARCH PILL */}
+        <div
+          className="px-3 pt-1 pb-2.5 no-drag relative"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          <form onSubmit={handleOmniboxSubmit}>
+            <div className={`relative flex items-center h-8 px-2.5 rounded-xl transition-colors duration-200 border ${
+              isOmniboxFocused
+                ? 'bg-white border-cyan-500/50 shadow-md ring-1 ring-cyan-500/20 dark:bg-white/12 dark:border-white/20 dark:shadow-lg dark:ring-white/10'
+                : 'bg-white/80 hover:bg-white border-slate-300/80 dark:bg-white/6 dark:hover:bg-white/8 dark:border-white/[0.08]'
+            }`}>
+              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0 mr-2 opacity-70" />
+
+              <input
+                ref={omniboxInputRef}
+                type="text"
+                // Same stable hook as the horizontal TopBar omnibox, so the
+                // ⌘L / focus-url shortcut sites resolve to *this* input in the
+                // vertical-tabs layout too. See OmniboxBar.tsx.
+                data-omnibox-input="true"
+                value={searchValue}
+                onChange={(e) => {
+                  setSearchValue(e.target.value);
+                  setShowSuggestions(true);
+                  setSelectedIndex(-1);
+                }}
+                onFocus={() => {
+                  setIsOmniboxFocused(true);
+                  setShowSuggestions(true);
+                  if (activeTab?.url && activeTab.url !== 'king://newtab') {
+                    setSearchValue(activeTab.url);
+                  }
+                }}
+                onBlur={() => {
+                  if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+                  blurTimerRef.current = setTimeout(() => {
+                    setIsOmniboxFocused(false);
+                    setShowSuggestions(false);
+                  }, 200);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Tab' && selectedIndex >= 0 && selectedIndex < suggestions.length) {
+                    e.preventDefault();
+                    setSearchValue(suggestions[selectedIndex]);
+                    setSelectedIndex(-1);
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setSelectedIndex(prev => Math.min(prev + 1, suggestions.length - 1));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setSelectedIndex(prev => Math.max(prev - 1, -1));
+                  } else if (e.key === 'Escape') {
+                    setShowSuggestions(false);
+                    setSelectedIndex(-1);
+                    if (activeTab?.url && activeTab.url !== 'king://newtab') {
+                      setSearchValue(activeTab.url);
+                    }
+                    omniboxInputRef.current?.blur();
+                  }
+                }}
+                placeholder="Search or Enter URL..."
+                className="w-full bg-transparent text-[12px] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400/60 focus:outline-none tracking-tight"
+                spellCheck={false}
+                autoCapitalize="off"
+                autoComplete="off"
+              />
+
+              <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                {privacyShield ? (
+                  <span title="Privacy Shield Active" className="text-emerald-500 dark:text-emerald-400/90">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  </span>
+                ) : (
+                  <span title="Privacy Shield Disabled" className="text-slate-400 dark:text-slate-500">
+                    <Shield className="w-3.5 h-3.5" />
+                  </span>
+                )}
+                {onOpenExtensions && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onOpenExtensions(); }}
+                    className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+                    title="Extensions (Beta)"
+                  >
+                    <Puzzle className="w-3.5 h-3.5 opacity-70" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </form>
+
+          {/* Suggestions Dropdown */}
+          <AnimatePresence>
+            {showSuggestions && suggestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-11 left-3 right-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+              >
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={s}
+                    onMouseDown={() => {
+                      const formatted = formatSearchUrl(s, searchEngine, getLanguage());
+                      if (onNavigate) onNavigate(formatted);
+                      else onNewTab(formatted);
+                      setShowSuggestions(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
+                      idx === selectedIndex ? 'bg-slate-100 text-slate-900 font-medium dark:bg-white/15 dark:text-white' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/8'
+                    }`}
+                  >
+                    <Search className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="truncate">{s}</span>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* 3. CUSTOMIZABLE TOP FAVORITES GRID (Arc 2-column or 4-column glass tiles) */}
+        <div
+          className="px-3 pb-2.5 no-drag"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          <div className="grid grid-cols-2 gap-1.5">
+            {favorites.slice(0, 4).map((fav) => (
+              <div key={fav.id} className="relative group/fav">
+                <button
+                  onClick={() => handleFavoriteClick(fav.url)}
+                  className="w-full flex items-center justify-center h-9 rounded-xl bg-white/80 hover:bg-white border border-slate-200/90 hover:border-slate-300 dark:bg-white/6 dark:hover:bg-white/10 dark:border-white/[0.08] dark:hover:border-white/15 transition-colors duration-150 shadow-xs cursor-pointer"
+                  title={`${fav.name} (${fav.url})`}
+                >
+                  <div className="w-4 h-4 flex items-center justify-center transition-transform duration-150 group-hover/fav:scale-110">
+                    {renderFavoriteIcon(fav)}
+                  </div>
+                </button>
+
+                {/* Delete Shortcut */}
+                <button
+                  onClick={(e) => handleRemoveFavorite(fav.id, e)}
+                  className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10 cursor-pointer"
+                >
+                  <X className="w-2 h-2" />
+                </button>
+              </div>
+            ))}
+
+            {/* Add Favorite Tile */}
+            {favorites.length < 4 && (
+              <button
+                onClick={() => setIsAddFavOpen(true)}
+                className="flex items-center justify-center h-9 rounded-xl bg-slate-200/40 hover:bg-slate-200/80 border border-dashed border-slate-300 dark:bg-white/3 dark:hover:bg-white/8 dark:border-white/15 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                title="Add Favorite"
+              >
+                <Plus className="w-3.5 h-3.5 opacity-60" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Add Favorite Inline Form */}
+        <AnimatePresence>
+          {isAddFavOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="px-3 pb-2.5 no-drag"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            >
+              <form onSubmit={handleAddFavorite} className="p-2 rounded-xl bg-white dark:bg-[#1e1930] border border-slate-200 dark:border-white/15 shadow-xl flex flex-col gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Name (e.g. Reddit)"
+                  value={newFavName}
+                  onChange={(e) => setNewFavName(e.target.value)}
+                  className="w-full h-6 px-2 bg-slate-100 dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                  autoFocus
+                />
+                <input
+                  type="text"
+                  placeholder="URL (e.g. reddit.com)"
+                  value={newFavUrl}
+                  onChange={(e) => setNewFavUrl(e.target.value)}
+                  className="w-full h-6 px-2 bg-slate-100 dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                />
+                <div className="flex items-center justify-end gap-1 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddFavOpen(false)}
+                    className="px-2 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-2 py-0.5 text-[10px] bg-cyan-600 rounded-md text-white font-medium hover:bg-cyan-500 cursor-pointer"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 4. ACTIVE SPACE / PROFILE HEADER (Zero Emoji, Clean Lucide Orbit) */}
+        <div
+          className="px-3 pb-2 no-drag relative"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          ref={dropdownRef}
+        >
+          <button
+            onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/6 transition-colors text-left group cursor-pointer"
+          >
+            <Orbit className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
+            <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate flex-1 tracking-tight">
+              {activeWorkspace?.name || 'Personal'}
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 opacity-60 group-hover:opacity-100 ${
+              isWorkspaceDropdownOpen ? 'rotate-180' : ''
+            }`} />
+          </button>
+
+          {/* Workspace Dropdown */}
+          <AnimatePresence>
+            {isWorkspaceDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-9 left-3 right-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+              >
+                <div className="max-h-48 overflow-y-auto no-scrollbar py-1">
+                  {workspaces.map(w => (
+                    <button
+                      key={w.id}
+                      onClick={() => {
+                        onSelectWorkspace(w.id);
+                        setIsWorkspaceDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                    >
+                      <div className="w-4 h-4 rounded-md flex items-center justify-center text-[10px] text-white font-bold"
+                           style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }}>
+                        {w.name.charAt(0)}
+                      </div>
+                      <span className={`text-xs flex-1 truncate ${w.id === activeWorkspaceId ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
+                        {w.name}
+                      </span>
+                      {w.id === activeWorkspaceId && <Check className="w-3 h-3 text-cyan-500 dark:text-cyan-400" />}
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-slate-100 dark:border-white/10 mt-1 pt-1">
+                  <button
+                    onClick={() => {
+                      setIsWorkspaceDropdownOpen(false);
+                      window.dispatchEvent(new CustomEvent('open-workspace-manager'));
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    Manage Spaces
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* 5. TABS SECTION HEADER */}
+        <div
+          className="px-3.5 pt-1 pb-1 flex items-center justify-between text-[11px] font-semibold tracking-wider text-slate-400/80 dark:text-slate-500 uppercase no-drag select-none"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          <div className="flex items-center gap-1.5">
+            <span>Tabs</span>
+            {isIncognito && (
+              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold tracking-wider uppercase bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                Private
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {onNewIncognitoTab && (
+              <button
+                onClick={onNewIncognitoTab}
+                className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                title={isMac ? "New Private Tab (⇧⌘N)" : "New Private Tab (Ctrl+Shift+N)"}
+              >
+                <ShieldOff className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              onClick={() => onNewTab()}
+              className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+              title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* 6. TAB & FOLDER LIST (Only renders visited/open web pages, NO duplicate '+ New Tab'!) */}
+        <div
+          className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-1 no-scrollbar flex flex-col gap-0.5 no-drag"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const tabId = e.dataTransfer.getData('text/plain');
+            if (tabId) onMoveTabToFolder?.(tabId, undefined);
+          }}
+        >
+          <AnimatePresence>
+            {/* Folders */}
+            {folders?.filter(f => f.workspaceId === activeWorkspaceId).map(folder => {
+              const folderTabs = tabs.filter(t => t.folderId === folder.id);
+              return (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.15 }}
+                  key={folder.id}
+                  className="flex flex-col gap-0.5"
+                >
+                  <div
+                    onClick={(e) => { if (isFromNestedControl(e)) return; onToggleFolder?.(folder.id); }}
+                    onKeyDown={(e) => {
+                      if (isFromNestedControl(e)) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onToggleFolder?.(folder.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={folder.isExpanded}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragOverFolderId(folder.id);
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        setDragOverFolderId(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragOverFolderId(null);
+                      const tabId = e.dataTransfer.getData('text/plain');
+                      if (tabId) onMoveTabToFolder?.(tabId, folder.id);
+                    }}
+                    className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-colors group/folder ${dragOverFolderId === folder.id ? 'bg-slate-200/80 dark:bg-white/15 ring-2 ring-cyan-500/50' : ''}`}
+                  >
+                    <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
+                      {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    </div>
+                    <FolderIcon className="w-3.5 h-3.5 opacity-70 group-hover/folder:opacity-100 transition-opacity" />
+                    <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
+                      onKeyDown={(e) => { e.stopPropagation(); }}
+                      className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-500"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <AnimatePresence>
+                    {folder.isExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="relative"
+                      >
+                        <div className="flex flex-col gap-0.5 pb-1">
+                          {(() => {
+                            const renderedSplitIds = new Set<string>();
+                            return folderTabs.filter(tab => {
+                              if (tab.splitWith) {
+                                const other = tabs.find(t => t.id === tab.splitWith);
+                                if (!other || other.folderId !== folder.id) return true;
+                                if (renderedSplitIds.has(tab.id)) return false;
+                                renderedSplitIds.add(other.id);
+                                return true;
+                              }
+                              return true;
+                            }).map(tab => {
+                              const splitTab = tab.splitWith
+                                ? tabs.find(t => t.id === tab.splitWith && t.folderId === folder.id)
+                                : null;
+                              const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
+                              return (
+                                <SidebarTabItem
+                                  key={tab.id}
+                                  tab={tab}
+                                  splitTab={splitTab}
+                                  activeTabId={activeTabId}
+                                  isActive={isActive}
+                                  isDragOver={dragOverTabId === tab.id}
+                                  isNested={true}
+                                  tabsLength={tabs.length}
+                                  onSelectTab={onSelectTab}
+                                  onCloseTab={onCloseTab}
+                                  onCloseSplit={onCloseSplit}
+                                  onToggleMuteTab={onToggleMuteTab}
+                                  onTabDragStart={onTabDragStart}
+                                  onTabDragEnd={onTabDragEnd}
+                                  onReorderTabs={onReorderTabs}
+                                  onOpenContextMenu={handleOpenContextMenu}
+                                  onMouseEnter={handleMouseEnter}
+                                  onMouseLeave={handleMouseLeave}
+                                  setDragOverTabId={setDragOverTabId}
+                                />
+                              );
+                            });
+                          })()}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
+
+            {/* Root Tabs */}
+            {(() => {
+              const renderedSplitIds = new Set<string>();
+              return tabs.filter(t => !t.folderId).filter(tab => {
+                if (tab.splitWith) {
+                  const other = tabs.find(t => t.id === tab.splitWith);
+                  if (!other || other.folderId) return true;
+                  if (renderedSplitIds.has(tab.id)) return false;
+                  renderedSplitIds.add(other.id);
+                  return true;
+                }
+                return true;
+              }).map(tab => {
+                const splitTab = tab.splitWith
+                  ? tabs.find(t => t.id === tab.splitWith && !t.folderId)
+                  : null;
+                const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
+                return (
+                  <SidebarTabItem
+                    key={tab.id}
+                    tab={tab}
+                    splitTab={splitTab}
+                    activeTabId={activeTabId}
+                    isActive={isActive}
+                    isDragOver={dragOverTabId === tab.id}
+                    isNested={false}
+                    tabsLength={tabs.length}
+                    onSelectTab={onSelectTab}
+                    onCloseTab={onCloseTab}
+                    onCloseSplit={onCloseSplit}
+                    onToggleMuteTab={onToggleMuteTab}
+                    onTabDragStart={onTabDragStart}
+                    onTabDragEnd={onTabDragEnd}
+                    onReorderTabs={onReorderTabs}
+                    onOpenContextMenu={handleOpenContextMenu}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                    setDragOverTabId={setDragOverTabId}
+                  />
+                );
+              });
+            })()}
+          </AnimatePresence>
+        </div>
+
+        {/* 7. BOTTOM DOCK FOOTER */}
+        <div
+          className="h-11 px-3.5 pb-2 border-t border-slate-200/80 dark:border-white/[0.06] flex items-center justify-between no-drag mt-auto relative"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          ref={libraryRef}
+        >
+          <button
+            onClick={() => setIsLibraryDropdownOpen(!isLibraryDropdownOpen)}
+            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+            title="Library"
+          >
+            <Package className="w-4 h-4" />
+          </button>
+
+          {/* Library Dropdown */}
+          <AnimatePresence>
+            {isLibraryDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.96 }}
+                transition={{ duration: 0.15 }}
+                className="absolute bottom-12 left-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
+              >
+                {onToggleAIAssistant && (
+                  <button
+                    onClick={() => { onToggleAIAssistant(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer font-medium"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
+                    {isMac ? 'King AI Assistant (⌘I)' : 'King AI Assistant (Ctrl+I)'}
+                  </button>
+                )}
+                {onOpenDownloads && (
+                  <button
+                    onClick={() => { onOpenDownloads(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+                    {isMac ? 'Downloads (⌘J)' : 'Downloads (Ctrl+J)'}
+                  </button>
+                )}
+                {onOpenHistory && (
+                  <button
+                    onClick={() => { onOpenHistory(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                    History
+                  </button>
+                )}
+                {onOpenAccount && (
+                  <button
+                    onClick={() => { onOpenAccount(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                  >
+                    <Cloud className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
+                    King Sync
+                  </button>
+                )}
+                {onOpenSettings && (
+                  <button
+                    onClick={() => { onOpenSettings(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
+                    Settings
+                  </button>
+                )}
+                {onOpenHelp && (
+                  <button
+                    onClick={() => { onOpenHelp(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
+                    Help & Support
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex items-center gap-1">
+            {onCreateFolder && (
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                onClick={onCreateFolder}
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+                title="New Folder"
+              >
+                <FolderPlus className="w-4 h-4" />
+              </motion.button>
+            )}
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={() => onNewTab()}
+              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+              title="New Tab"
+            >
+              <Plus className="w-4 h-4" />
+            </motion.button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Tab Hover Preview */}
+      <TabHoverPreview
+        tab={hoveredTab}
+        rect={hoverRect}
+        position="right"
+        visible={Boolean(hoveredTab && hoverRect && !tabContextMenu.isOpen)}
+      />
+
+      {/* Chrome-Style Tab Context Menu */}
+      <TabContextMenu
+        menuState={tabContextMenu}
+        onClose={() => setTabContextMenu(prev => ({ ...prev, isOpen: false, tab: null }))}
+        onNewTabRight={(idx) => {
+          if (onNewTabRight) onNewTabRight(idx);
+          else onNewTab();
+        }}
+        onReloadTab={(tabId) => {
+          if (tabId === activeTabId && onReload) onReload();
+        }}
+        onDuplicateTab={(tabId) => {
+          if (onDuplicateTab) onDuplicateTab(tabId);
+        }}
+        onTogglePinTab={(tabId) => {
+          if (onTogglePinTab) onTogglePinTab(tabId);
+        }}
+        onToggleMuteTab={(tabId) => {
+          onToggleMuteTab(tabId, { stopPropagation: () => {} } as any);
+        }}
+        onBookmarkTab={(targetTab) => {
+          if (onToggleBookmark) onToggleBookmark(targetTab);
+        }}
+        onCloseTab={(tabId) => onCloseTab(tabId)}
+        onCloseOtherTabs={(tabId) => {
+          if (onCloseOtherTabs) onCloseOtherTabs(tabId);
+        }}
+        onCloseTabsToRight={(target) => {
+          if (onCloseTabsToRight) onCloseTabsToRight(target);
+        }}
+        onReopenClosedTab={() => {
+          if (onReopenClosedTab) onReopenClosedTab();
+        }}
+        canReopenClosedTab={canReopenClosedTab}
+        isBookmarked={tabContextMenu.tab && bookmarks ? bookmarks.some((b: Bookmark) => b.url === tabContextMenu.tab?.url) : false}
+        totalTabs={tabs.filter(t => (t.workspaceId || 'default') === (tabContextMenu.tab?.workspaceId || activeWorkspaceId || 'default')).length}
+      />
+    </>
+  );
+}, (prevProps, nextProps) => {
+  // Compare only rendered fields; callback props are stable useCallback refs.
+
+  if (prevProps.activeTabId !== nextProps.activeTabId) return false;
+  if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
+  if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
+  if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
+  if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;
+  if (prevProps.canGoBack !== nextProps.canGoBack) return false;
+  if (prevProps.canGoForward !== nextProps.canGoForward) return false;
+  if (prevProps.isLoading !== nextProps.isLoading) return false;
+  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
+  if (prevProps.privacyShield !== nextProps.privacyShield) return false;
+  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
+  if (prevProps.onNewIncognitoTab !== nextProps.onNewIncognitoTab) return false;
+
+  // Array-valued props compared by reference (state arrays from App)
+  if (prevProps.folders !== nextProps.folders) return false;
+  if (prevProps.workspaces !== nextProps.workspaces) return false;
+  if (prevProps.bookmarks !== nextProps.bookmarks) return false;
+
+  // Tabs: length + order-sensitive comparison of every rendered field
+  // (incl. folderId, used by the root-list filter).
+  const prevTabs = prevProps.tabs;
+  const nextTabs = nextProps.tabs;
+  if (prevTabs === nextTabs) return true;
+  if (!prevTabs || !nextTabs || prevTabs.length !== nextTabs.length) return false;
+  for (let i = 0; i < prevTabs.length; i++) {
+    const a = prevTabs[i];
+    const b = nextTabs[i];
+    if (a === b) continue;
+    if (
+      a.id !== b.id ||
+      a.url !== b.url ||
+      a.title !== b.title ||
+      a.favicon !== b.favicon ||
+      a.isLoading !== b.isLoading ||
+      a.isPinned !== b.isPinned ||
+      a.isIncognito !== b.isIncognito ||
+      a.isPlayingAudio !== b.isPlayingAudio ||
+      a.isMuted !== b.isMuted ||
+      a.isSuspended !== b.isSuspended ||
+      a.splitWith !== b.splitWith ||
+      a.folderId !== b.folderId
+    ) {
+      return false;
+    }
+  }
+  return true;
+});

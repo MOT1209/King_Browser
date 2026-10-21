@@ -1,0 +1,299 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Loader2, Globe, Clock, ExternalLink } from 'lucide-react';
+import { Readability } from '@mozilla/readability';
+import DOMPurify from 'dompurify';
+import { aiAgent } from '../services/aiAgent';
+
+interface AILinkPreviewProps {
+  url: string;
+  x: number;
+  y: number;
+  isOpen: boolean;
+}
+
+export interface PreviewData {
+  title: string;
+  domain: string;
+  summary: string;
+  readingTimeMinutes: number;
+  isAiGenerated: boolean;
+}
+
+// In-memory LRU cache for instant previews. Keep the bound small enough to
+// avoid retaining page summaries and OG image URLs for every URL visited.
+export const PREVIEW_CACHE_MAX_ENTRIES = 100;
+export const previewCache = new Map<string, PreviewData>();
+
+export function getCachedPreview(url: string): PreviewData | undefined {
+  const cached = previewCache.get(url);
+  if (!cached) return undefined;
+
+  // Map preserves insertion order, so reinsert the entry to mark it as used.
+  previewCache.delete(url);
+  previewCache.set(url, cached);
+  return cached;
+}
+
+export function setCachedPreview(url: string, preview: PreviewData): void {
+  previewCache.delete(url);
+  previewCache.set(url, preview);
+  while (previewCache.size > PREVIEW_CACHE_MAX_ENTRIES) {
+    const oldestKey = previewCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    previewCache.delete(oldestKey);
+  }
+}
+
+export function extractPreviewFallbackSummary(cleanText: string, ogDesc?: string | null, metaDesc?: string | null): string {
+  const descriptionCandidate = (ogDesc || metaDesc || '').trim();
+  if (descriptionCandidate.length > 30) {
+    return descriptionCandidate;
+  }
+  if (cleanText.length > 40) {
+    const sentences = cleanText.match(/[^.!?]+[.!?]+/g) || [];
+    if (sentences.length > 0) {
+      return sentences.slice(0, 2).join(' ').trim();
+    }
+    return cleanText.substring(0, 180).trim() + '...';
+  }
+  return 'Preview available. Click to visit this page.';
+}
+
+export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x, y, isOpen }) => {
+  const [data, setData] = useState<PreviewData | null>(null);
+  const [loadingText, setLoadingText] = useState<string>('');
+  const [displayedSummary, setDisplayedSummary] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Whether `data` came from the LRU cache. Cached previews skip the typewriter;
+  // freshly fetched ones type out. This has to be tracked explicitly: the cache
+  // is written as soon as a fetch succeeds, so the typewriter effect could never
+  // tell the two apart by asking getCachedPreview().
+  const [isFromCache, setIsFromCache] = useState(false);
+
+  // Typewriter effect for clean reading
+  useEffect(() => {
+    if (!data?.summary || !isOpen) {
+      setDisplayedSummary('');
+      return;
+    }
+
+    // If loaded from cache, show immediately without waiting for typewriter
+    if (isFromCache) {
+      setDisplayedSummary(data.summary);
+      return;
+    }
+
+    let currentIdx = 0;
+    const targetText = data.summary;
+    const step = Math.max(1, Math.ceil(targetText.length / 40)); // Dynamic speed based on length
+
+    const interval = setInterval(() => {
+      currentIdx += step;
+      if (currentIdx <= targetText.length) {
+        setDisplayedSummary(targetText.substring(0, currentIdx));
+      } else {
+        setDisplayedSummary(targetText);
+        clearInterval(interval);
+      }
+    }, 15);
+
+    return () => clearInterval(interval);
+  }, [data?.summary, isOpen, isFromCache]);
+
+  useEffect(() => {
+    if (!isOpen || !url) return;
+
+    // Check cache first
+    const cached = getCachedPreview(url);
+    if (cached) {
+      setData(cached);
+      setDisplayedSummary(cached.summary);
+      setIsFromCache(true);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const fetchAndSummarize = async () => {
+      setIsLoading(true);
+      setError(null);
+      setData(null);
+      setDisplayedSummary('');
+      setIsFromCache(false);
+      setLoadingText('Fetching page content...');
+
+      try {
+        let domain = '';
+        try {
+          domain = new URL(url).hostname.replace(/^www\./, '');
+        } catch {
+          domain = url;
+        }
+        const api = (window as any).electronAPI;
+        if (!api?.fetchPageHtml) throw new Error("API not available");
+
+        const result = await api.fetchPageHtml(url);
+        if (isCancelled) return;
+
+        if (!result.success || !result.html) {
+          throw new Error(result.error || "Failed to load content");
+        }
+
+        setLoadingText('Analyzing content...');
+
+        const sanitizedHtml = DOMPurify.sanitize(result.html, { WHOLE_DOCUMENT: true });
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(sanitizedHtml, 'text/html');
+
+        const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
+        const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content');
+        const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content');
+
+        let pageTitle = ogTitle || doc.title || domain;
+        let cleanText = '';
+        try {
+          const reader = new Readability(doc);
+          const article = reader.parse();
+          if (article?.title) pageTitle = article.title;
+          cleanText = article?.textContent || '';
+        } catch (e) {
+          cleanText = doc.body.textContent || '';
+        }
+
+        cleanText = cleanText.replace(/\s+/g, ' ').trim();
+        const wordCount = cleanText.split(/\s+/).filter(Boolean).length;
+        const readingTimeMinutes = Math.max(1, Math.round(wordCount / 200));
+
+        let finalSummary = '';
+        let isAiGenerated = false;
+
+        if (aiAgent.isReady() && cleanText.length > 80) {
+          setLoadingText('AI is summarizing...');
+          try {
+            const aiSummary = await aiAgent.summarize(cleanText.substring(0, 3000), pageTitle);
+            if (aiSummary && aiSummary.length > 25) {
+              finalSummary = aiSummary;
+              isAiGenerated = true;
+            }
+          } catch (e) {
+            console.warn('AI summary failed, using smart extraction:', e);
+          }
+        }
+
+        if (!finalSummary) {
+          finalSummary = extractPreviewFallbackSummary(cleanText, ogDesc, metaDesc);
+        }
+
+        if (isCancelled) return;
+
+        const previewResult: PreviewData = {
+          title: pageTitle,
+          domain,
+          summary: finalSummary,
+          readingTimeMinutes,
+          isAiGenerated
+        };
+        // setData BEFORE the cache write: the typewriter effect keys off
+        // isFromCache, and the commit that renders the summary happens after
+        // this task, so the fresh (non-cached) summary is what animates in.
+        setData(previewResult);
+        setCachedPreview(url, previewResult);
+      } catch (err: any) {
+        if (!isCancelled) {
+          console.error('Failed to preview link:', err);
+          setError('Preview unavailable for this page');
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchAndSummarize();
+    return () => { isCancelled = true; };
+  }, [url, isOpen]);
+
+  let domainName = '';
+  try {
+    domainName = new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    domainName = url;
+  }
+
+  const topPos = typeof window !== 'undefined' ? Math.min(window.innerHeight - 260, Math.max(10, y + 16)) : y;
+  const leftPos = typeof window !== 'undefined' ? Math.min(window.innerWidth - 340, Math.max(10, x + 16)) : x;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 6 }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
+          style={{ top: topPos, left: leftPos, position: 'fixed', zIndex: 999999 }}
+          className="w-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3.5 shadow-2xl pointer-events-none"
+        >
+          <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Globe className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                {domainName}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {data && (
+                <span className="flex items-center gap-1 text-[10.5px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                  <Clock className="w-3 h-3" />
+                  ~{data.readingTimeMinutes} min
+                </span>
+              )}
+              <span className="p-1 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded-lg">
+                <Sparkles className="w-3 h-3" />
+              </span>
+            </div>
+          </div>
+
+          {data?.title && (
+            <h4 className="text-[13px] font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2 mb-2">
+              {data.title}
+            </h4>
+          )}
+
+          <div className="text-[12px] text-slate-600 dark:text-slate-300 leading-relaxed min-h-[46px]">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-4 text-slate-500 dark:text-slate-400 gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
+                <span className="text-[11px] font-medium">{loadingText}</span>
+              </div>
+            ) : error ? (
+              <div className="text-red-500 text-xs text-center py-3 font-medium bg-red-500/5 rounded-xl border border-red-500/10">
+                {error}
+              </div>
+            ) : (
+              <p>{displayedSummary}</p>
+            )}
+          </div>
+
+          {data && !isLoading && (
+            <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10.5px] text-slate-400 dark:text-slate-500">
+              <span className="flex items-center gap-1 font-medium text-cyan-600 dark:text-cyan-400">
+                <Sparkles className="w-2.5 h-2.5" />
+                {data.isAiGenerated ? 'AI Summary' : 'Smart Page Preview'}
+              </span>
+              <span className="flex items-center gap-1 opacity-80">
+                Click to open <ExternalLink className="w-2.5 h-2.5" />
+              </span>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+});

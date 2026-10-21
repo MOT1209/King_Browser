@@ -1,0 +1,6862 @@
+import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu, MenuItem, clipboard, systemPreferences } from 'electron';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fetch from 'cross-fetch';
+import dns from 'dns';
+import http from 'http';
+import https from 'https';
+import { promisify } from 'util';
+import { once } from 'events';
+import fs from 'fs';
+import createDOMPurify from 'dompurify';
+import { checkPhishingDomain, matchesExtensionHostPermission } from '../src/utils/securityUtils.js';
+import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity';
+export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt };
+
+console.log('Main process starting...');
+
+const MAX_CRASH_LOG_BYTES = 1024 * 1024; // 1 MB cap to prevent disk exhaustion
+// Registered once at module scope on purpose: createWindow runs again on every
+// macOS activate, so an app-level listener added there would accumulate.
+// NOTE: render-process-gone fires on `app`, not on webContents.
+app.on('render-process-gone', (_event, contents, details) => {
+  // render-process-gone fires on `app`, and it fires for an ORDINARY window
+  // teardown too, not just a crash. The update path destroys every window and
+  // then quits, so a `clean-exit` arrives moments before the process is meant to
+  // die; reloading there resurrected a window while the updater script was
+  // replacing the bundle underneath it, which is how a finished update could
+  // come back on the error screen. Only a genuine crash is recoverable, and
+  // never while the app is on its way out.
+  if (contents !== mainWindow?.webContents) return;
+  if (!shouldReloadAfterRendererGone(details?.reason)) return;
+  console.error(`[App] Main renderer gone (${details.reason}); reloading.`);
+  try {
+    if (!contents.isDestroyed()) contents.reload();
+  } catch (err) {
+    console.error('[App] Reload after renderer crash failed:', err);
+  }
+});
+
+function appendCrashLog(entry: string): void {
+  try {
+    // Avoid shared os.tmpdir() to prevent insecure temporary file / symlink attacks.
+    let crashDir: string;
+    try {
+      crashDir = app.isReady() ? app.getPath('userData') : path.join(require('os').homedir(), '.king-browser');
+    } catch {
+      crashDir = path.join(require('os').homedir(), '.king-browser');
+    }
+    try {
+      fs.mkdirSync(crashDir, { recursive: true, mode: 0o700 });
+    } catch {}
+    const logPath = path.join(crashDir, 'crash.log');
+    let fd: number | null = null;
+    try {
+      fd = fs.openSync(logPath, 'a+', 0o600);
+      const stats = fs.fstatSync(fd);
+      if (stats.size > MAX_CRASH_LOG_BYTES) {
+        const readLen = Math.min(100 * 1024, stats.size);
+        const buf = Buffer.alloc(readLen);
+        fs.readSync(fd, buf, 0, readLen, stats.size - readLen);
+        fs.ftruncateSync(fd, 0);
+        fs.writeSync(fd, buf, 0, readLen, 0);
+      }
+      fs.writeSync(fd, Buffer.from(entry, 'utf8'));
+    } finally {
+      if (fd !== null) {
+        try { fs.closeSync(fd); } catch {}
+      }
+    }
+  } catch {}
+}
+
+// Process-level crash guards: log errors safely to prevent full browser shutdown DoS
+process.on('uncaughtException', (err) => {
+  console.error('[Main Process] Uncaught Exception caught safely:', err);
+  const errorLog = `[${new Date().toISOString()}] Uncaught Exception: ${err?.stack || err}\n`;
+  appendCrashLog(errorLog);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Main Process] Unhandled Rejection:', reason);
+  const errorLog = `[${new Date().toISOString()}] Unhandled Rejection: ${reason instanceof Error ? reason.stack : String(reason)}\n`;
+  appendCrashLog(errorLog);
+});
+
+// Suppress known upstream third-party deprecation warnings (punycode, @cliqz/adblocker-electron session.getPreloads/setPreloads, etc.)
+process.on('warning', (warning) => {
+  if (warning.name === 'DeprecationWarning') {
+    const msg = warning.message || '';
+    if (
+      msg.includes('punycode') ||
+      msg.includes('url.parse') ||
+      msg.includes('getPreloads') ||
+      msg.includes('setPreloads')
+    ) {
+      return;
+    }
+  }
+  console.warn(`[Node Warning] ${warning.name}: ${warning.message}`);
+});
+
+let cachedDOMPurify: any = null;
+function getMainDOMPurify(): any {
+  if (cachedDOMPurify) return cachedDOMPurify;
+  try {
+    const { JSDOM } = require('jsdom');
+    const jsdomWindow = new JSDOM('').window;
+    cachedDOMPurify = createDOMPurify(jsdomWindow as any);
+  } catch (err) {
+    console.error('[Main] Failed to initialize JSDOM/DOMPurify, using fail-closed entity encoding fallback:', err);
+    cachedDOMPurify = {
+      sanitize: (html: string) => {
+        return (html || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+    };
+  }
+  return cachedDOMPurify;
+}
+
+// Security: Enforce single-instance lock to prevent duplicate process conflicts,
+// database/LevelDB corruption, and hostile command-line flag injection.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  console.warn('[Security] Another instance of King Browser is already running. Quitting duplicate process.');
+  app.quit();
+}
+import child_process from 'child_process';
+import crypto from 'crypto';
+import os from 'os';
+import { isIP } from 'net';
+import {
+  initAdBlocker as initAdBlockerEngine,
+  updateAdblockWhitelist,
+  applyAdBlockerToSession,
+  applyAdBlockerToAllSessions,
+  getBlocker
+} from './main/adblockManager.js';
+import { BrowserMCPServer } from './mcpServer.js';
+import { registerEngineIpc } from './main/engineIpc.js';
+import { initMcpBridge } from './main/mcpBridge.js';
+import { canOpenInSystemBrowser, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
+import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
+import { initSuggestions } from './main/suggestions.js';
+import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
+import { autoUpdater } from 'electron-updater';
+import { isPrivateIP } from './main/ipAddress.js';
+import { enforceModelCacheBudget, MAX_MODEL_CACHE_FILE_BYTES } from './main/modelCacheQuota.js';
+import { isAgentNavigationHostPublic } from './main/agentNavigationGuard.js';
+import { shouldReloadAfterRendererGone, markQuitting } from './main/rendererRecovery.js';
+
+/**
+ * Validates URLs for context-menu media saving and address copying.
+ * Verifies that blob: URLs have valid http(s) origins and that data: URLs
+ * strictly contain safe raster/vector media MIME types without scriptable vectors.
+ */
+function isSafeMediaDownloadUrl(urlStr: string, allowedTypes: ('image' | 'video' | 'audio')[]): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return !parsed.username && !parsed.password;
+    }
+    if (parsed.protocol === 'blob:') {
+      try {
+        const inner = new URL(parsed.pathname);
+        return ['http:', 'https:'].includes(inner.protocol) && !inner.username && !inner.password;
+      } catch {
+        return false;
+      }
+    }
+    if (parsed.protocol === 'data:') {
+      const mime = parsed.pathname.split(';')[0].split(',')[0].toLowerCase().trim();
+      return allowedTypes.some(type => mime.startsWith(`${type}/`)) &&
+        !mime.includes('svg') && !mime.includes('html') && !mime.includes('javascript');
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// Reusable helper: check if hostname belongs to localhost, intranet, or private networks
+export function isLocalOrIntranetHost(hostname: string): boolean {
+  if (!hostname) return false;
+  const host = hostname.toLowerCase().replace(/\.+$/, '');
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan')) {
+    return true;
+  }
+  if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1' || host === '[::1]') {
+    return true;
+  }
+  // K-1: isPrivateIP fails closed for unknown values (isIP === 0). If host is a domain
+  // (e.g. google.com), isIP is 0, so calling isPrivateIP returned true, breaking HTTPS upgrade!
+  const bareV6 = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  if (isIP(bareV6) !== 0) {
+    return isPrivateIP(bareV6);
+  }
+  return false;
+}
+
+
+
+// Standard clean Chromium User-Agent matching host OS and exact runtime version
+export function getStandardUserAgent(): string {
+  const chromeVer = process.versions.chrome || '150.0.0.0';
+  if (process.platform === 'win32') {
+    return `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+  }
+  if (process.platform === 'linux') {
+    return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+  }
+  return `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+}
+
+try {
+  app.userAgentFallback = getStandardUserAgent();
+} catch (_) {}
+
+// Portable Mode: If running as a portable executable on Windows, isolate user data
+// into a local directory on the portable device instead of host %APPDATA%
+if (process.env.PORTABLE_EXECUTABLE_DIR) {
+  const portableUserData = path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'KingBrowserData');
+  try {
+    app.setPath('userData', portableUserData);
+  } catch (_) {}
+}
+
+// Hardware acceleration config: check settings safely before ready without race
+try {
+  const targetDir = process.env.PORTABLE_EXECUTABLE_DIR
+    ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'KingBrowserData')
+    : path.join(app.getPath('appData'), 'king-browser');
+  const userSettingsPath = path.join(targetDir, 'store_user_settings.json');
+  const legacySettingsPath = path.join(targetDir, 'store_settings.json');
+  const settingsFile = fs.existsSync(userSettingsPath) ? userSettingsPath : (fs.existsSync(legacySettingsPath) ? legacySettingsPath : null);
+  if (settingsFile) {
+    const rawContent = fs.readFileSync(settingsFile, 'utf-8');
+    const parsed = JSON.parse(rawContent);
+    const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+    if (settings && settings.hardwareAcceleration === false) {
+      app.disableHardwareAcceleration();
+    }
+  }
+} catch (e) {}
+
+// Advanced GPU Acceleration, Fast Network & Smooth Compositing flags
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-webgl');
+app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+app.commandLine.appendSwitch('enable-accelerated-video-decode');
+app.commandLine.appendSwitch('enable-quic');
+app.commandLine.appendSwitch('enable-tcp-fast-open');
+app.commandLine.appendSwitch('enable-fast-unload');
+app.commandLine.appendSwitch('num-raster-threads', '4');
+
+// Platform-tailored high-performance graphics optimizations
+if (process.platform === 'darwin') {
+  // Apple Silicon & macOS Metal API for ultra-smooth 120Hz ProMotion compositing
+  app.commandLine.appendSwitch('use-metal');
+  app.commandLine.appendSwitch('enable-features', [
+    'CanvasOopRasterization',
+    'SmoothScrolling',
+    'ParallelDownloading',
+    'BackForwardCache',
+    'CSSSubgrid',
+    'WebAssemblySimd',
+    'OverlayScrollbar',
+    'BlinkSchedulerYield'
+  ].join(','));
+} else {
+  // Windows / Linux GPU flags
+  app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  app.commandLine.appendSwitch('enable-zero-copy');
+  // Windows-only fluidity fix: Chromium's native window occlusion calculation
+  // has known frame-pacing bugs under Electron — a visible window can be
+  // reported occluded while overlapped, stalling the compositor and causing
+  // micro-stutter during scrolling/animations. Electron windows must always
+  // be treated as visible.
+  if (process.platform === 'win32') {
+    app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+  }
+  app.commandLine.appendSwitch('enable-features', [
+    'CanvasOopRasterization',
+    'SmoothScrolling',
+    'ParallelDownloading',
+    'BackForwardCache',
+    'CSSSubgrid',
+    'WebAssemblySimd',
+    'OverlayScrollbar',
+    'BlinkSchedulerYield'
+  ].join(','));
+}
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.kingbrowser.app');
+}
+
+if (process.platform === 'linux') {
+  // Prevent blurry fonts and rendering under Wayland (GNOME / KDE)
+  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+  if (typeof process.getuid === 'function' && process.getuid() === 0) {
+    console.warn('[Security] Running as root. Linux sandboxing disabled. User will be notified after window ready.');
+    app.commandLine.appendSwitch('no-sandbox');
+    app.commandLine.appendSwitch('disable-setuid-sandbox');
+    (global as any).__sandboxDisabledWarning = true;
+  }
+  // Safe sandbox fallback: If unprivileged user namespaces are disabled in kernel
+  try {
+    if (fs.existsSync('/proc/sys/kernel/unprivileged_userns_clone')) {
+      const userns = fs.readFileSync('/proc/sys/kernel/unprivileged_userns_clone', 'utf-8').trim();
+      if (userns === '0') {
+        console.warn('[Security] Linux unprivileged user namespaces disabled in kernel. Falling back to un-sandboxed mode. User will be notified after window ready.');
+        app.commandLine.appendSwitch('no-sandbox');
+        app.commandLine.appendSwitch('disable-setuid-sandbox');
+        // Flag sandbox warning to be shown after the main window is fully ready.
+        // dialog cannot be used before app.whenReady() resolves.
+        (global as any).__sandboxDisabledWarning = true;
+      }
+    }
+  } catch (_) {}
+}
+
+// Increase v8 memory limit if doing heavy Local AI tasks in WebWorkers
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+
+// Prevent Network Service crash on macOS if user cancels Keychain prompt during dev
+if (!app.isPackaged) {
+  app.commandLine.appendSwitch('password-store', 'basic');
+  app.commandLine.appendSwitch('use-mock-keychain');
+}
+
+let mainWindow: BrowserWindow | null = null;
+let applyStrictSecurityToSession: (targetSession: Electron.Session) => void = () => {};
+let applyPrivacyHeadersToSession: (targetSession: Electron.Session) => void = () => {};
+const sessionsWithPrivacyHeaders = new WeakSet<Electron.Session>();
+
+// Sync Windows native titlebar buttons with theme updates. Registered once at
+// module scope: nativeTheme outlives any window, and re-registering inside
+// createWindow() stacked one listener per window recreation (macOS re-enters
+// createWindow via app.on('activate')).
+nativeTheme.on('updated', () => {
+  if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.setTitleBarOverlay({
+        color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+        symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+        height: 44
+      });
+    } catch (_) {}
+  }
+});
+
+
+function getAcceptLanguagesForLocale(_localeOrLang?: string): string {
+  return 'en-US,en;q=0.9';
+}
+
+let currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
+
+// Safely send IPC to the main window; accessing .webContents on a destroyed window throws.
+function sendToMainWindow(channel: string, payload?: unknown) {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+  } catch (e) { /* window gone */ }
+}
+
+// Security: Validate that IPC messages originate strictly from our trusted main UI window and main frame
+function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): boolean {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  if (event.sender.id !== mainWindow.webContents.id) return false;
+  // Electron supplies senderFrame for renderer IPC. Treat a missing frame as
+  // untrusted instead of accepting an ambiguous sender context.
+  if (!event.senderFrame || !mainWindow.webContents.mainFrame || event.senderFrame !== mainWindow.webContents.mainFrame) {
+    return false;
+  }
+  const frameUrl = event.senderFrame.url;
+  if (!frameUrl || !isTrustedAppOrigin(frameUrl)) {
+    return false;
+  }
+  return true;
+}
+
+// Security: MCP browser_* tools are forwarded to the renderer over an
+// 'mcp-action-request' IPC and awaited on a channel gated by isTrustedSender()
+// below — never executed as injected JS in the privileged UI context.
+initMcpBridge(isTrustedSender);
+
+// Security: Validate dev server and app internal page origins strictly
+function isTrustedAppOrigin(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  try {
+    const parsed = new URL(urlStr);
+    // Internal tab URLs are rendered by the trusted React shell, not loaded by
+    // the privileged main window. Never treat arbitrary king:/devtools: URLs as
+    // an app origin; doing so would let a crafted URL inherit app privileges.
+    if (parsed.protocol === 'king:') {
+      const allowedHost = ['newtab', 'settings', 'history', 'downloads', 'changelog', 'whats-new'].includes(parsed.hostname);
+      const allowedSettingsHash = parsed.hostname === 'settings' &&
+        (!parsed.hash || ['#extensions', '#mcp'].includes(parsed.hash));
+      return allowedHost && !parsed.pathname && !parsed.search &&
+        !parsed.username && !parsed.password &&
+        (parsed.hostname !== 'settings' ? !parsed.hash : allowedSettingsHash);
+    }
+    if (parsed.protocol === 'devtools:') return false;
+    // Security: The Vite dev server is only trusted in unpackaged dev builds.
+    if (!app.isPackaged && parsed.origin === 'http://localhost:5173') return true;
+    if (parsed.protocol === 'file:') {
+      const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
+      try {
+        const navPath = fileURLToPath(urlStr);
+        const resolvedNav = path.resolve(navPath);
+        return process.platform === 'win32'
+          ? resolvedNav.toLowerCase() === allowedPath.toLowerCase()
+          : resolvedNav === allowedPath;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+
+let isPrivacyShieldEnabled = true;
+let isDoNotTrackEnabled = true;
+let mcpServer: BrowserMCPServer | null = null;
+
+// Reusable getter for all active electron sessions (default + incognito partitions)
+function getAllActiveSessions(): Electron.Session[] {
+  const sessions = [session.defaultSession, session.fromPartition('incognito')];
+  for (const partName of hardenedIncognitoPartitions) {
+    try {
+      sessions.push(session.fromPartition(partName, { cache: false }));
+    } catch (_) {}
+  }
+  return sessions;
+}
+
+export { updateAdblockWhitelist };
+
+// Tracks which per-tab incognito partitions have already been hardened to avoid stacking listeners.
+const hardenedIncognitoPartitions = new Set<string>();
+
+// Active Chromium proxy rules applied across default and all per-tab incognito sessions
+let activeChromiumProxyRules = 'direct://';
+
+function applyProxyToSession(targetSession: Electron.Session, rules: string) {
+  try {
+    targetSession.setProxy({ proxyRules: rules }).catch((e) => {
+      console.warn('[VPN] setProxy failed on session:', e);
+    });
+  } catch (e) {
+    console.warn('[VPN] setProxy exception on session:', e);
+  }
+}
+
+let proxyMutex = Promise.resolve();
+async function applyProxyToAllSessions(rules: string): Promise<void> {
+  const op = async () => {
+    activeChromiumProxyRules = rules;
+    const promises: Promise<void>[] = [
+      session.defaultSession.setProxy({ proxyRules: rules }).catch((e) => console.warn('[VPN] defaultSession setProxy failed:', e)),
+      session.fromPartition('incognito', { cache: false }).setProxy({ proxyRules: rules }).catch((e) => console.warn('[VPN] incognito setProxy failed:', e)),
+    ];
+    for (const partName of Array.from(hardenedIncognitoPartitions)) {
+      try {
+        promises.push(session.fromPartition(partName, { cache: false }).setProxy({ proxyRules: rules }).catch((e) => console.warn(`[VPN] ${partName} setProxy failed:`, e)));
+      } catch (_) {}
+    }
+    await Promise.all(promises);
+  };
+  proxyMutex = proxyMutex.then(op, op);
+  return proxyMutex;
+}
+
+function hardenIncognitoPartition(partitionName: string): boolean {
+  if (hardenedIncognitoPartitions.has(partitionName)) return true;
+  try {
+    const partSess = session.fromPartition(partitionName, { cache: false });
+    // Apply full security hardening (permissions handlers)
+    applyStrictSecurityToSession(partSess);
+    // Apply privacy headers (DNT, GPC, user-agent)
+    applyPrivacyHeadersToSession(partSess);
+    // Register download handler for this partition
+    registerDownloadsManager(partSess);
+    // Apply active proxy if VPN is enabled
+    if (activeChromiumProxyRules && activeChromiumProxyRules !== 'direct://') {
+      applyProxyToSession(partSess, activeChromiumProxyRules);
+    }
+    // Apply ad blocker if enabled
+    if (isPrivacyShieldEnabled && getBlocker()) {
+      applyAdBlockerToSession(partSess, true);
+    }
+    hardenedIncognitoPartitions.add(partitionName);
+    console.log(`[Security] Hardened incognito partition: ${partitionName}`);
+    return true;
+  } catch (err) {
+    console.error(`[Security] Failed to harden incognito partition ${partitionName}:`, err);
+    return false;
+  }
+}
+
+// Initialize AdBlocker in a dedicated function called after app.whenReady()
+// to prevent race conditions and invalid path resolution from top-level app.getPath('userData').
+function initAdBlocker() {
+  initAdBlockerEngine({
+    userDataPath: app.getPath('userData'),
+    isPrivacyShieldEnabled: () => isPrivacyShieldEnabled,
+    getAllSessions: getAllActiveSessions,
+    onAdBlockedFlush: (pendingAdBlocks: Map<number, number>) => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        pendingAdBlocks.clear();
+        return;
+      }
+      const batch = Object.fromEntries(pendingAdBlocks);
+      mainWindow.webContents.send('ad-blocked-batch', batch);
+      pendingAdBlocks.clear();
+    }
+  }).then(() => {
+    try {
+      const settingsPath = path.join(app.getPath('userData'), 'store_adblocker_whitelist.json');
+      let wl: string[] = [];
+      if (fs.existsSync(settingsPath)) {
+        const parsed = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        if (Array.isArray(parsed)) wl = parsed;
+      }
+      updateAdblockWhitelist(wl);
+    } catch(e) {
+      updateAdblockWhitelist([]);
+    }
+  }).catch((e: unknown) => console.error('Failed to initialize adblocker:', e));
+}
+
+// Window/app icon: the crown PNG lives in public/ (dev) and dist/ (packaged).
+const APP_ICON_PATH = (() => {
+  for (const candidate of [
+    path.join(__dirname, '../dist/logo.png'),
+    path.join(__dirname, '../public/logo.png'),
+  ]) {
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch { /* ignore */ }
+  }
+  return undefined;
+})();
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    ...(APP_ICON_PATH ? { icon: APP_ICON_PATH } : {}),
+    width: 1400,
+    height: 900,
+    minWidth: 1000,
+    minHeight: 650,
+    ...(process.platform === 'linux' ? {
+      frame: true,
+      autoHideMenuBar: true,
+    } : {
+      titleBarStyle: 'hidden' as const,
+      ...(process.platform === 'win32' ? {
+        titleBarOverlay: {
+          color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+          symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+          height: 44
+        }
+      } : {}),
+      trafficLightPosition: { x: 14, y: 14 }
+    }),
+    show: false,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webviewTag: true,
+      sandbox: true
+    }
+  });
+
+  // Performance: don't paint a blank window while content loads — show once the
+  // renderer is ready to paint, with a safety timeout in case 'ready-to-show'
+  // never fires (e.g. dev-server retry loop failing for a while).
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+    // Show sandbox-disabled security warning if it was flagged during early startup.
+    if ((global as any).__sandboxDisabledWarning && mainWindow && !mainWindow.isDestroyed()) {
+      (global as any).__sandboxDisabledWarning = false;
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'Security Warning — Sandbox Disabled',
+        message: 'Chromium renderer sandbox is disabled on this system.',
+        detail:
+          'Your Linux kernel has unprivileged user namespaces disabled ' +
+          '(/proc/sys/kernel/unprivileged_userns_clone = 0). ' +
+          'King Browser is running without the Chromium sandbox, which means a compromised ' +
+          'renderer process could access the host operating system directly.\n\n' +
+          'To re-enable sandbox protection, set the sysctl value to 1:\n' +
+          '  sudo sysctl -w kernel.unprivileged_userns_clone=1',
+        buttons: ['Understand and Continue'],
+        defaultId: 0,
+      }).catch(() => {});
+    }
+  });
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+  }, 3000);
+
+  // Guest tabs have their own render-process-gone handler with a Reload button
+  // (BrowserView.tsx). The app's OWN renderer had none, so when it died the
+  // window stayed alive and blank: no message, no Reload, and React's
+  // ErrorBoundary could not help because a crashed renderer never runs. The
+  // user could only force-quit.
+  mainWindow.webContents.on('unresponsive', () => {
+    console.error('[App] Main renderer unresponsive.');
+  });
+
+  // Every webview, the view-source window and the extension popup get a
+  // setWindowOpenHandler; the privileged main window did not. A popup there
+  // inherits the parent's webPreferences, so it is created with this preload
+  // attached - its IPC is then rejected by isTrustedSender because the
+  // webContents id differs, but the window still loads a remote URL with no
+  // scheme check. Deny at the source rather than trusting each call site.
+  // Deny the POPUP, but do not silently swallow the action: a blanket deny
+  // broke the "open Chrome Web Store" buttons and the extension options page,
+  // which are the only ways to reach those screens. http(s) is routed into a
+  // normal tab - the same thing the guest handler already does - and anything
+  // else (file:, javascript:, custom schemes) is refused outright.
+  mainWindow.webContents.setWindowOpenHandler((details) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(details.url);
+    } catch {
+      return { action: 'deny' };
+    }
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      if (!parsed.hostname) return { action: 'deny' };
+      sendToMainWindow('new-tab', details.url);
+      return { action: 'deny' };
+    }
+    console.warn(`[Security] Blocked window.open for scheme: ${parsed.protocol}`);
+    return { action: 'deny' };
+  });
+
+  // Closing the last window does not quit on macOS, and React's tab-cleanup
+  // effects never run, so anything the renderer owned must be reclaimed here.
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    // Incognito tabs are never persisted, so their partition names can never be
+    // reused. Without this sweep every close/reopen cycle orphans a live
+    // Electron.Session (own cache dir + permission/webRequest handlers), and
+    // each later privacy/VPN/language/purge call walks all of them.
+    for (const partName of Array.from(hardenedIncognitoPartitions)) {
+      hardenedIncognitoPartitions.delete(partName);
+      try {
+        session.fromPartition(partName, { cache: false }).clearStorageData();
+      } catch (_) {}
+    }
+  });
+
+  // Security: Prevent Drag and Drop navigation on the main UI window
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // Only allow navigation to localhost dev server origin or the specific dist/index.html in prod
+    if (isTrustedAppOrigin(url)) {
+      return;
+    }
+    event.preventDefault();
+    console.warn('Blocked main window navigation to non-app path:', url);
+  });
+
+  // Security: Block redirects to non-app paths on the main UI window
+  mainWindow.webContents.on('will-redirect', (event, url) => {
+    if (isTrustedAppOrigin(url)) {
+      return;
+    }
+    event.preventDefault();
+    console.warn('Blocked main window redirect to non-app path:', url);
+  });
+
+  // Webviews do not receive a global preload. The narrowly-scoped Web Store
+  // preload is assigned during attachment after the destination is validated.
+
+  // Apply AdBlocker to sessions (default and incognito)
+  const blocker = getBlocker();
+  if (isPrivacyShieldEnabled && blocker) {
+    applyAdBlockerToSession(session.defaultSession, true);
+    applyAdBlockerToSession(session.fromPartition('incognito'), true);
+    try { if (!blocker.isBlockingEnabled(session.fromPartition('incognito'))) blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
+  } else if (blocker) {
+    applyAdBlockerToSession(session.defaultSession, false);
+    applyAdBlockerToSession(session.fromPartition('incognito'), false);
+  }
+
+  currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
+
+  // Privacy Shield: Reusable helper to attach privacy and security headers to a session
+  applyPrivacyHeadersToSession = function(targetSession: Electron.Session) {
+    if (sessionsWithPrivacyHeaders.has(targetSession)) return;
+    sessionsWithPrivacyHeaders.add(targetSession);
+    try {
+      // Keep Electron/Chromium's native UA and Client Hints in sync with standard Chrome
+      targetSession.setUserAgent(getStandardUserAgent(), currentAcceptLanguages);
+    } catch (_) {}
+
+    // Apply user-selected language, standard browser headers, and privacy signals
+    targetSession.webRequest.onBeforeSendHeaders((details, callback) => {
+      const requestHeaders = { ...details.requestHeaders };
+
+      let isHttp = false;
+      try {
+        const parsedUrl = new URL(details.url);
+        isHttp = parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'http:';
+      } catch (_) {}
+
+      if (isHttp) {
+        requestHeaders['Accept-Language'] = currentAcceptLanguages;
+
+        // Strip any residual Electron / KingBrowser branding from User-Agent
+        if (requestHeaders['User-Agent']) {
+          requestHeaders['User-Agent'] = requestHeaders['User-Agent']
+            .replace(/\s*Electron\/[0-9.]+/gi, '')
+            .replace(/\s*KingBrowser\/[0-9.]+/gi, '')
+            .trim();
+        }
+        // Clean sec-ch-ua brand header to remove "Electron"
+        if (requestHeaders['sec-ch-ua']) {
+          requestHeaders['sec-ch-ua'] = requestHeaders['sec-ch-ua']
+            .replace(/,\s*"Electron";v="[^"]*"/gi, '')
+            .replace(/"Electron";v="[^"]*",?\s*/gi, '')
+            .trim();
+        }
+      }
+
+      if (isPrivacyShieldEnabled || isDoNotTrackEnabled) {
+        requestHeaders['DNT'] = '1';
+        requestHeaders['Sec-GPC'] = '1';
+      }
+      callback({ requestHeaders });
+    });
+
+    // Handle headers for WebGPU / WASM SharedArrayBuffer + CSP for internal app pages only
+    targetSession.webRequest.onHeadersReceived((details, callback) => {
+      let isDevLocalhost = false;
+      let isAppFile = false;
+      try {
+        const parsed = new URL(details.url);
+        // Security: dev-server COOP/COEP headers and dev CSP only apply in
+        // unpackaged dev builds; a packaged app must never trust localhost:5173.
+        if (!app.isPackaged && parsed.origin === 'http://localhost:5173') {
+          isDevLocalhost = true;
+        }
+        if (parsed.protocol === 'file:') {
+          isAppFile = true;
+        }
+      } catch {}
+
+      // Never modify response headers for external sites (YouTube, Google, streaming, etc.)
+      if (!isDevLocalhost && !isAppFile) {
+        callback({});
+        return;
+      }
+
+      const responseHeaders: Record<string, string[]> = {};
+      if (details.responseHeaders) {
+        for (const [key, value] of Object.entries(details.responseHeaders)) {
+          if (value) {
+            responseHeaders[key] = Array.isArray(value) ? value : [value];
+          }
+        }
+      }
+
+      if (isDevLocalhost) {
+        responseHeaders['Cross-Origin-Opener-Policy'] = ['same-origin'];
+        responseHeaders['Cross-Origin-Embedder-Policy'] = ['credentialless'];
+      }
+
+      // VULN-16: Add Content Security Policy for the app's own pages
+      if (isAppFile || isDevLocalhost) {
+        const isDev = isDevLocalhost || !app.isPackaged;
+
+        // VULN-16 / CSP parity: this PROD header and the <meta> policy that
+        // vite.config.ts bakes into dist/index.html (HARDENED_PROD_CSP) are
+        // INTENTIONALLY BYTE-IDENTICAL. A page's enforced CSP is the
+        // intersection of every policy delivered to it, so a value present in
+        // only one copy contributes nothing — and it has never been verified
+        // which copy actually binds for a file:// load. Identical copies make
+        // the question moot. Editing one without the other silently changes the
+        // intersection.
+        //
+        // PROD directives that are easy to "tidy" back into an asymmetric state:
+        //  - style-src keeps 'unsafe-inline' ON PURPOSE. src/ has 136
+        //    `style={{...}}` attributes — 46 of them `-webkit-app-region: drag |
+        //    no-drag` on the frameless title bar, so dropping it makes the title
+        //    bar undraggable and its buttons drag regions — plus a runtime
+        //    <style> element in ReaderMode. That is a functional break, not
+        //    cosmetics, so it belongs in BOTH prod copies.
+        //  - No frame-src: it falls back to default-src 'self', i.e. the
+        //    stricter header-bound behaviour we already ship. The
+        //    `https://*.supabase.co` frame-src that lived only in the prod meta
+        //    never took effect and must not come back — a framed Supabase origin
+        //    sits inside this privileged UI.
+        //  - font-src carries no bare `https:`; under intersection it was
+        //    already the narrower value below.
+        //  - script-src carries no `blob:`: the one Worker (services/aiAgent) is
+        //    covered by worker-src, and every createObjectURL use is an <img> or
+        //    a download (img-src).
+        //  - form-action is inherited from the prod meta so both copies express
+        //    it; every <form> in src/ is JS-submitted (onSubmit +
+        //    preventDefault, no action/method attribute), so nothing regresses.
+        //  - frame-ancestors is ignored by browsers in a <meta> policy; it is
+        //    kept here only so the two prod copies stay byte-identical.
+        responseHeaders['Content-Security-Policy'] = [
+          isDev
+            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
+        ];
+        responseHeaders['X-Content-Type-Options'] = ['nosniff'];
+      }
+
+      callback({ responseHeaders });
+    });
+  }
+
+  // Apply privacy and security headers across both standard and incognito sessions
+  applyPrivacyHeadersToSession(session.defaultSession);
+  applyPrivacyHeadersToSession(session.fromPartition('incognito'));
+
+  // Downloads Manager: Handle file downloads via Electron IPC
+  registerDownloadsManager(session.defaultSession);
+  registerDownloadsManager(session.fromPartition('incognito'));
+
+  const devUrl = 'http://localhost:5173';
+  const distHtmlPath = path.join(__dirname, '../dist/index.html');
+
+  if (app.isPackaged) {
+    mainWindow.loadFile(distHtmlPath);
+  } else {
+    let attempts = 0;
+    // `npm run dev` starts Vite and Electron together and Vite can take well
+    // over 10s to be ready. Falling back to dist/ after two quick attempts
+    // loaded a stale build instead of the dev server, so under `npm run dev`
+    // wait up to ~60s (200 x 300ms). Plain `electron .` keeps the fast fallback.
+    const startedByNpmDev = process.env.npm_lifecycle_event === 'dev';
+    const maxAttempts = startedByNpmDev ? 200 : (fs.existsSync(distHtmlPath) ? 2 : 20);
+    const loadDev = () => {
+      attempts++;
+      mainWindow?.loadURL(devUrl).catch(() => {
+        if (attempts >= maxAttempts) {
+          // Fix: terminate the retry loop after maxAttempts REGARDLESS of dist existence,
+          // otherwise a missing dist/index.html causes infinite retries.
+          if (fs.existsSync(distHtmlPath)) {
+            console.log('[Main] Loading local dist/index.html build...');
+            mainWindow?.loadFile(distHtmlPath);
+          } else {
+            console.error(`[Main] Dev server unreachable at ${devUrl} after ${maxAttempts} attempts and no dist/index.html build found. Giving up.`);
+          }
+        } else {
+          setTimeout(loadDev, 300);
+        }
+      });
+    };
+    loadDev();
+  }
+
+
+
+
+  // Listen for console messages from the renderer process and log them safely to the terminal.
+  // Performance: dev-only value — skip regex-sanitizing/printing every renderer
+  // console line entirely in packaged builds.
+  if (!app.isPackaged) {
+    mainWindow?.webContents.on('console-message', (details) => {
+      const level = details.level;
+      const message = details.message;
+      const line = details.lineNumber;
+      const sourceId = details.sourceId;
+
+      // Chromium uses ERR_ABORTED for expected navigation replacement and
+      // redirects (including search-provider verification redirects). Avoid
+      // logging it as an app failure or printing provider-generated tokens.
+      if (message.includes('ERR_ABORTED')) return;
+
+      // Sanitize any sensitive tokens, passwords or credential payloads from terminal logs
+      if (message && (message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message))) {
+        console.log(`[Renderer] [${level}] [REDACTED_SENSITIVE_LOG] (${sourceId}:${line})`);
+        return;
+      }
+      if (message) {
+        console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
+      }
+    });
+  }
+
+  // App-local keyboard shortcuts via before-input-event.
+  // Replaces the old system-wide globalShortcut hooks which intercepted Cmd+K/Cmd+F
+  // even when OTHER apps were focused and shadowed the menu accelerators.
+  // Cmd+F is intentionally NOT handled here: the Edit menu accelerator ("Find in Page...",
+  // CmdOrCtrl+F) already covers it app-locally and emits the 'find' shortcut the renderer handles.
+  mainWindow?.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.isAutoRepeat) return;
+    const cmdOrCtrl = process.platform === 'darwin' ? input.meta : input.control;
+    if (!cmdOrCtrl || input.alt || input.shift) return;
+    if (input.key?.toLowerCase() === 'k') {
+      event.preventDefault();
+      sendToMainWindow('shortcut', 'toggle-omnibox');
+    }
+  });
+
+  // Keep the MCP server pointed at the current window (macOS close/reopen creates a new BrowserWindow)
+  if (mcpServer && mainWindow && !mainWindow.isDestroyed()) {
+    try { mcpServer.setMainWindow(mainWindow); } catch (e) {}
+  }
+}
+
+// Track URLs that failed HTTPS upgrade to prevent infinite loops with eviction cap (max 1000 items)
+const MAX_UPGRADED_URLS = 1000;
+const UPGRADED_URL_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const upgradedUrls = new Map<string, number>(); // url -> last upgrade attempt timestamp
+
+function addUpgradedUrl(url: string): void {
+  // Delete-then-set so Map insertion order tracks recency, which makes the
+  // eviction below drop the least-recently-seen entry (same LRU trick as
+  // addKnownDownloadPath() in main/downloads.ts).
+  upgradedUrls.delete(url);
+  if (upgradedUrls.size >= MAX_UPGRADED_URLS) {
+    const oldest = upgradedUrls.keys().next().value;
+    if (oldest !== undefined) {
+      upgradedUrls.delete(oldest);
+    }
+  }
+  upgradedUrls.set(url, Date.now());
+}
+
+/**
+ * True when an HTTPS upgrade was already attempted for this exact URL recently.
+ *
+ * Entries expire after UPGRADED_URL_TTL_MS. Without expiry a single failed
+ * upgrade (a transient TLS error, or an active MITM deliberately causing one)
+ * pinned that exact URL to plaintext for the rest of the app's lifetime: every
+ * later visit was waved through over http:// with no upgrade attempt and no
+ * warning. Expiry is lazy — stale entries are dropped on read — so the map
+ * stays bounded by MAX_UPGRADED_URLS without needing a timer.
+ */
+function hasUpgradedUrl(url: string): boolean {
+  const lastAttempt = upgradedUrls.get(url);
+  if (lastAttempt === undefined) return false;
+  if (Date.now() - lastAttempt >= UPGRADED_URL_TTL_MS) {
+    upgradedUrls.delete(url);
+    return false;
+  }
+  return true;
+}
+
+function setupApplicationMenu() {
+  const isMac = process.platform === 'darwin';
+
+  if (isMac) {
+    try {
+      app.setAboutPanelOptions({
+        applicationName: 'King Browser',
+        applicationVersion: app.getVersion(),
+        version: app.getVersion(),
+        copyright: 'Copyright © 2026 King Browser. All rights reserved.',
+        credits: 'Built with Electron, React, TypeScript, Web-LLM, and Model Context Protocol.',
+        website: 'https://github.com/MOT1209/my-video'
+      });
+    } catch {}
+  }
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // App Menu (macOS only)
+    ...(isMac ? [{
+      label: app.name || 'King Browser',
+      submenu: [
+        {
+          label: 'About King Browser',
+          click: () => {
+            if (isMac) {
+              app.showAboutPanel();
+            } else {
+              sendToMainWindow('shortcut', 'open-help');
+            }
+          }
+        },
+        {
+          label: 'Check for Updates...',
+          click: () => {
+            autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+            sendToMainWindow('shortcut', 'check-updates');
+          }
+        },
+        {
+          label: "What's New in King Browser",
+          click: () => {
+            sendToMainWindow('shortcut', 'whats-new');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Preferences...',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => {
+            sendToMainWindow('shortcut', 'settings');
+          }
+        },
+        { type: 'separator' as const },
+        { role: 'services' as const },
+        { type: 'separator' as const },
+        { role: 'hide' as const },
+        { role: 'hideOthers' as const },
+        { role: 'unhide' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const }
+      ]
+    }] : []),
+    // File Menu
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New Tab',
+          accelerator: 'CmdOrCtrl+T',
+          click: () => {
+            sendToMainWindow('shortcut', 'new-tab');
+          }
+        },
+        {
+          label: 'New Window',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => {
+            sendToMainWindow('shortcut', 'new-tab');
+          }
+        },
+        {
+          label: 'New Incognito Tab',
+          accelerator: 'Shift+CmdOrCtrl+N',
+          click: () => {
+            sendToMainWindow('shortcut', 'new-incognito');
+          }
+        },
+        {
+          label: 'Open Location / Search...',
+          accelerator: 'CmdOrCtrl+L',
+          click: () => {
+            sendToMainWindow('shortcut', 'focus-url');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Close Tab',
+          accelerator: 'CmdOrCtrl+W',
+          click: () => {
+            sendToMainWindow('shortcut', 'close-tab');
+          }
+        },
+        {
+          label: 'Reopen Closed Tab',
+          accelerator: 'Shift+CmdOrCtrl+T',
+          click: () => {
+            sendToMainWindow('shortcut', 'reopen-tab');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Print...',
+          accelerator: 'CmdOrCtrl+P',
+          click: () => {
+            sendToMainWindow('shortcut', 'print');
+          }
+        },
+        ...(!isMac ? [{ type: 'separator' as const }, { role: 'quit' as const }] : [])
+      ]
+    },
+    // Edit Menu
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' as const },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const },
+        { role: 'pasteAndMatchStyle' as const },
+        { role: 'delete' as const },
+        { role: 'selectAll' as const },
+        { type: 'separator' as const },
+        {
+          label: 'Find in Page...',
+          accelerator: 'CmdOrCtrl+F',
+          click: () => {
+            sendToMainWindow('shortcut', 'find');
+          }
+        }
+      ]
+    },
+    // View Menu
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Reload This Page',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => {
+            sendToMainWindow('shortcut', 'reload');
+          }
+        },
+        {
+          label: 'Force Reload',
+          accelerator: 'Shift+CmdOrCtrl+R',
+          click: () => {
+            sendToMainWindow('shortcut', 'force-reload');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Actual Size (100%)',
+          accelerator: 'CmdOrCtrl+0',
+          click: () => {
+            sendToMainWindow('shortcut', 'zoom-reset');
+          }
+        },
+        {
+          label: 'Zoom In',
+          accelerator: 'CmdOrCtrl+Plus',
+          click: () => {
+            sendToMainWindow('shortcut', 'zoom-in');
+          }
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CmdOrCtrl+-',
+          click: () => {
+            sendToMainWindow('shortcut', 'zoom-out');
+          }
+        },
+        { type: 'separator' as const },
+        { role: 'togglefullscreen' as const },
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: isMac ? 'Alt+Command+I' : 'Ctrl+Shift+I',
+          click: () => {
+            sendToMainWindow('shortcut', 'devtools');
+          }
+        }
+      ]
+    },
+    // History Menu
+    {
+      label: 'History',
+      submenu: [
+        {
+          label: 'Back',
+          accelerator: 'CmdOrCtrl+[',
+          click: () => {
+            sendToMainWindow('shortcut', 'go-back');
+          }
+        },
+        {
+          label: 'Forward',
+          accelerator: 'CmdOrCtrl+]',
+          click: () => {
+            sendToMainWindow('shortcut', 'go-forward');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Show Full History',
+          accelerator: 'CmdOrCtrl+Y',
+          click: () => {
+            sendToMainWindow('shortcut', 'history');
+          }
+        },
+        {
+          label: 'Show Downloads',
+          accelerator: 'Shift+CmdOrCtrl+J',
+          click: () => {
+            sendToMainWindow('shortcut', 'downloads');
+          }
+        }
+      ]
+    },
+    // Bookmarks Menu
+    {
+      label: 'Bookmarks',
+      submenu: [
+        {
+          label: 'Bookmark This Tab...',
+          accelerator: 'CmdOrCtrl+D',
+          click: () => {
+            sendToMainWindow('shortcut', 'bookmark');
+          }
+        },
+        {
+          label: 'Show Bookmarks Bar',
+          accelerator: 'Shift+CmdOrCtrl+B',
+          click: () => {
+            sendToMainWindow('shortcut', 'toggle-bookmarks-bar');
+          }
+        }
+      ]
+    },
+    // Window Menu
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' as const },
+        { role: 'zoom' as const },
+        ...(isMac ? [
+          { type: 'separator' as const },
+          { role: 'front' as const },
+          { type: 'separator' as const },
+          { role: 'window' as const }
+        ] : [
+          { role: 'close' as const }
+        ])
+      ]
+    },
+    // macOS Native Help Menu (with Help search role & items)
+    {
+      role: 'help' as const,
+      label: 'Help',
+      submenu: [
+        {
+          label: 'King Browser Help Center',
+          accelerator: 'F1',
+          click: () => {
+            sendToMainWindow('shortcut', 'open-help');
+          }
+        },
+        {
+          label: 'Keyboard Shortcuts Guide',
+          accelerator: 'CmdOrCtrl+/',
+          click: () => {
+            sendToMainWindow('shortcut', 'shortcuts-help');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'King AI Copilot Guide',
+          click: () => {
+            sendToMainWindow('shortcut', 'ai-help');
+          }
+        },
+        {
+          label: 'Privacy Shield & Security Info',
+          click: () => {
+            sendToMainWindow('shortcut', 'privacy-help');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Report an Issue / Feedback',
+          click: async () => {
+            await shell.openExternal('https://github.com/MOT1209/my-video/issues');
+          }
+        },
+        {
+          label: 'Visit King Browser GitHub',
+          click: async () => {
+            await shell.openExternal('https://github.com/MOT1209/my-video');
+          }
+        },
+        {
+          label: "What's New in This Version (Changelog)",
+          click: () => {
+            sendToMainWindow('shortcut', 'whats-new');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Check for Updates...',
+          click: () => {
+            autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+            sendToMainWindow('shortcut', 'check-updates');
+          }
+        },
+        {
+          label: 'About King Browser',
+          click: () => {
+            if (isMac) {
+              app.showAboutPanel();
+            } else {
+              sendToMainWindow('shortcut', 'about-help');
+            }
+          }
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
+if (!app.isDefaultProtocolClient('king')) {
+  try {
+    app.setAsDefaultProtocolClient('king');
+  } catch (_) {}
+}
+
+function isValidDeepLinkUrl(targetUrl: unknown): boolean {
+  if (typeof targetUrl !== 'string' || !targetUrl.trim() || targetUrl.length > 2048) return false;
+  try {
+    const u = new URL(targetUrl.trim());
+    if (u.username || u.password) return false;
+    if (u.protocol === 'http:' || u.protocol === 'https:') return true;
+    if (u.protocol === 'king:') {
+      const allowedPages = new Set(['newtab', 'settings', 'history', 'downloads', 'changelog', 'whats-new', 'extensions']);
+      const page = (u.hostname || u.pathname.replace(/^\/+/, '')).toLowerCase().split(/[/?#]/)[0];
+      return allowedPages.has(page);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// macOS deep-link handler for king: and web URLs
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    if (isValidDeepLinkUrl(url)) {
+      sendToMainWindow('new-tab', url.trim());
+    }
+  }
+});
+
+// Security: When a second instance is launched, focus the existing window and safely route any valid URL
+app.on('second-instance', (_event, commandLine) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+
+    const possibleUrl = commandLine.find(arg => isValidDeepLinkUrl(arg));
+    if (possibleUrl) {
+      sendToMainWindow('new-tab', possibleUrl.trim());
+    }
+  }
+});
+
+function cleanStaleUpdateArtifacts(): void {
+  try {
+    // 1. Clean stale in-flight downloads or old installers in userData/updates
+    const updatesDir = path.join(app.getPath('userData'), 'updates');
+    if (fs.existsSync(updatesDir)) {
+      const files = fs.readdirSync(updatesDir);
+      for (const f of files) {
+        const fullPath = path.join(updatesDir, f);
+        try {
+          // Immediately purge aborted or incomplete download chunks
+          if (f.includes('.download_') || f.endsWith('.download')) {
+            fs.unlinkSync(fullPath);
+            continue;
+          }
+          // In Linux, never delete the currently running AppImage
+          if (process.env.APPIMAGE && path.resolve(fullPath) === path.resolve(process.env.APPIMAGE)) {
+            continue;
+          }
+          // Remove old installers older than 24 hours
+          const stat = fs.statSync(fullPath);
+          const ageHours = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60);
+          if (ageHours > 24) {
+            fs.unlinkSync(fullPath);
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Clean temporary CRX files in userData/temp_extensions
+    const tempExtDir = path.join(app.getPath('userData'), 'temp_extensions');
+    if (fs.existsSync(tempExtDir)) {
+      const crxFiles = fs.readdirSync(tempExtDir);
+      for (const f of crxFiles) {
+        try {
+          fs.unlinkSync(path.join(tempExtDir, f));
+        } catch (_) {}
+      }
+    }
+
+    // 3. Clean abandoned update staging directories in OS temp directory
+    const osTemp = app.getPath('temp');
+    if (fs.existsSync(osTemp)) {
+      const tempEntries = fs.readdirSync(osTemp);
+      for (const entry of tempEntries) {
+        if (entry.startsWith('king_update_')) {
+          const entryPath = path.join(osTemp, entry);
+          try {
+            const stat = fs.statSync(entryPath);
+            // If older than 30 minutes, it is an abandoned update directory
+            if ((Date.now() - stat.mtimeMs) > 30 * 60 * 1000) {
+              fs.rmSync(entryPath, { recursive: true, force: true });
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    // 4. Clean any orphaned updater staging or backup artifacts in app parent directory (e.g. /Applications)
+    if (process.platform === 'darwin') {
+      try {
+        const exePath = app.getPath('exe');
+        const appBundlePath = path.dirname(path.dirname(path.dirname(exePath)));
+        const searchDirs = new Set<string>();
+        searchDirs.add('/Applications');
+        if (appBundlePath.endsWith('.app')) {
+          searchDirs.add(path.dirname(appBundlePath));
+        }
+
+        const lsregisterPath = '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
+        let foundOrphans = false;
+
+        for (const dir of searchDirs) {
+          if (!fs.existsSync(dir)) continue;
+          let entries: string[] = [];
+          try {
+            entries = fs.readdirSync(dir);
+          } catch (_) {
+            continue;
+          }
+
+          for (const entry of entries) {
+            if (
+              entry.startsWith('.king_staging_') ||
+              entry.startsWith('.king_backup_') ||
+              entry.startsWith('King Browser.app.staging_') ||
+              entry.startsWith('King Browser.app.backup_')
+            ) {
+              const orphanPath = path.resolve(dir, entry);
+              if (!orphanPath.startsWith(dir + path.sep)) continue;
+              try {
+                if (fs.existsSync(lsregisterPath)) {
+                  try {
+                    // No timeout: a wedged lsregister blocks the main thread forever.
+                    child_process.execFileSync(lsregisterPath, ['-u', orphanPath], { stdio: 'ignore', timeout: 15000 });
+                  } catch (_) {}
+                }
+                fs.rmSync(orphanPath, { recursive: true, force: true });
+                foundOrphans = true;
+                console.log(`[Cleanup] Removed orphaned update artifact: ${orphanPath}`);
+              } catch (_) {}
+            }
+          }
+        }
+
+        if (foundOrphans && fs.existsSync(lsregisterPath)) {
+          try {
+            // -gc rebuilds the entire system LaunchServices database and is routinely
+  // multi-second. Synchronous, it freezes every window, and it runs on a 5s
+  // timer - exactly when the user starts interacting. Bounded and non-blocking.
+  child_process.execFile(lsregisterPath, ['-gc'], { encoding: 'utf8', timeout: 15000 }, () => {});
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
+    // 5. Clean any orphaned updater artifacts on Linux and Windows
+    if (process.platform === 'linux') {
+      try {
+        const appImagePath = process.env.APPIMAGE;
+        if (appImagePath && fs.existsSync(appImagePath)) {
+          const backupFile = `${appImagePath}.old`;
+          if (fs.existsSync(backupFile)) {
+            const stat = fs.statSync(backupFile);
+            if ((Date.now() - stat.mtimeMs) > 10 * 60 * 1000) {
+              fs.unlinkSync(backupFile);
+            }
+          }
+        }
+      } catch (_) {}
+    } else if (process.platform === 'win32') {
+      try {
+        const osTemp = app.getPath('temp');
+        if (fs.existsSync(osTemp)) {
+          const entries = fs.readdirSync(osTemp);
+          for (const entry of entries) {
+            if (entry.startsWith('update_') && entry.endsWith('.bat')) {
+              const p = path.join(osTemp, entry);
+              try {
+                const stat = fs.statSync(p);
+                if ((Date.now() - stat.mtimeMs) > 30 * 60 * 1000) {
+                  fs.unlinkSync(p);
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 6. Clean orphaned store and secure-store temporary write files in userData
+    try {
+      const userDataDir = app.getPath('userData');
+      if (fs.existsSync(userDataDir)) {
+        const uEntries = fs.readdirSync(userDataDir);
+        for (const entry of uEntries) {
+          if ((entry.startsWith('store_') || entry.startsWith('secure_')) && entry.endsWith('.tmp')) {
+            const tmpFile = path.join(userDataDir, entry);
+            try {
+              const stat = fs.statSync(tmpFile);
+              // If older than 15 minutes, it is an abandoned crash leftover
+              if ((Date.now() - stat.mtimeMs) > 15 * 60 * 1000) {
+                fs.unlinkSync(tmpFile);
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+  } catch (e) {
+    console.warn('[Cleanup] Non-fatal error cleaning stale update artifacts:', e);
+  }
+}
+
+app.whenReady().then(async () => {
+  console.log('App is ready, creating window...');
+  loadExtensionDiagnostics();
+  await loadPersistentExtensions();
+  createWindow();
+  setupApplicationMenu();
+  initAdBlocker();
+
+  // Background idle garbage collection for updater artifacts after 5s
+  setTimeout(() => {
+    cleanStaleUpdateArtifacts();
+  }, 5000);
+
+  // Y-1: Restore persistent VPN proxy on startup if previously configured
+  try {
+    const vpnConfigPath = path.join(app.getPath('userData'), 'vpn_proxy.json');
+    if (fs.existsSync(vpnConfigPath)) {
+      if (process.platform !== 'win32') {
+        try { fs.chmodSync(vpnConfigPath, 0o600); } catch (_) {}
+      }
+      const raw = fs.readFileSync(vpnConfigPath);
+      let savedVpn: any = null;
+      try {
+        const decrypted = decryptDataWithFallback(raw, app.getPath('userData'), safeStorage);
+        if (decrypted) {
+          savedVpn = JSON.parse(decrypted);
+        }
+      } catch (_) {}
+
+      if (savedVpn?.enabled && isValidSecureProxy(savedVpn?.proxyRules)) {
+        const rules = normalizeProxyForChromium(savedVpn.proxyRules);
+        applyProxyToAllSessions(rules);
+      } else {
+        // Cleartext, pac-script, malformed, or tampered proxy: purge corrupt/plaintext file
+        try { fs.unlinkSync(vpnConfigPath); } catch (_) {}
+      }
+    }
+  } catch (_) {}
+
+  // --- CHROME-STYLE PERMISSION SYSTEM (SECURITY) ---
+  interface PendingPermission {
+    requestId: string;
+    permission: string;
+    url: string;
+    origin: string;
+    permissionName: string;
+    mediaTypes?: string[];
+    callback: (allow: boolean) => void;
+    timeoutId: NodeJS.Timeout;
+    permissionKeys: string[];
+    decisions: Map<string, Map<string, { allow: boolean; ts: number }>>;
+    persistent: boolean;
+  }
+
+  const MAX_PENDING_PERMISSIONS = 20;
+  const pendingPermissions = new Map<string, PendingPermission>();
+  // Origin -> (Permission -> { allow, ts }) — TTL: 30 days
+  const PERMISSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+  const rememberedPermissions = new Map<string, Map<string, { allow: boolean; ts: number }>>();
+  // Origin -> Rate limit record (max 5 requests per 10s)
+  const permissionRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+  const PERMISSIONS_FILE = path.join(app.getPath('userData'), 'remembered_permissions.json');
+
+  // Camera and microphone are separate capabilities. Old `media` records do
+  // not identify what was approved and deliberately require a fresh prompt.
+  function permissionKeys(permission: string, mediaTypes?: unknown): string[] | null {
+    if (permission !== 'media') return [permission];
+    if (!Array.isArray(mediaTypes) || mediaTypes.length === 0 ||
+        mediaTypes.some(type => type !== 'audio' && type !== 'video')) return null;
+    return [...new Set(mediaTypes as string[])].map(type => `media:${type}`);
+  }
+
+  function permissionOrigin(url: string): string {
+    if (isTrustedAppOrigin(url)) return 'app';
+    try {
+      const parsed = new URL(url);
+      if (parsed.username || parsed.password) return '';
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.origin;
+      // WHATWG URL.origin serializes every extension as "null". Keep each
+      // installed extension's identity separate; opaque origins get no grants.
+      if (parsed.protocol === 'chrome-extension:' && /^[a-p]{32}$/.test(parsed.hostname)) {
+        return `chrome-extension://${parsed.hostname}`;
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  function rememberedDecision(
+    decisions: typeof rememberedPermissions, origin: string, keys: string[]
+  ): boolean | undefined {
+    const entries = decisions.get(origin);
+    if (!entries) return undefined;
+    const now = Date.now();
+    const values = keys.map(key => {
+      const entry = entries.get(key);
+      if (!entry) return undefined;
+      if (!Number.isFinite(entry.ts) || entry.ts > now || now - entry.ts >= PERMISSION_TTL_MS) {
+        entries.delete(key);
+        return undefined;
+      }
+      return entry.allow;
+    });
+    if (entries.size === 0) decisions.delete(origin);
+    if (values.some(value => value === false)) return false;
+    return values.every(value => value === true) ? true : undefined;
+  }
+
+  function loadRememberedPermissionsFromDisk(): void {
+    try {
+      if (fs.existsSync(PERMISSIONS_FILE)) {
+        const raw = fs.readFileSync(PERMISSIONS_FILE, 'utf8');
+        const data = JSON.parse(raw);
+        if (data && typeof data === 'object') {
+          const cutoff = Date.now() - PERMISSION_TTL_MS;
+          for (const [origin, perms] of Object.entries(data)) {
+            if (typeof origin === 'string' && perms && typeof perms === 'object') {
+              const permMap = new Map<string, { allow: boolean; ts: number }>();
+              for (const [perm, entry] of Object.entries(perms as Record<string, any>)) {
+                if (entry && typeof entry.allow === 'boolean' && typeof entry.ts === 'number' && entry.ts >= cutoff) {
+                  permMap.set(perm, { allow: entry.allow, ts: entry.ts });
+                }
+              }
+              if (permMap.size > 0) {
+                rememberedPermissions.set(origin, permMap);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Permissions] Failed to load permissions from disk:', err);
+    }
+  }
+
+  function saveRememberedPermissionsToDisk(): void {
+    try {
+      const obj: Record<string, Record<string, { allow: boolean; ts: number }>> = {};
+      for (const [origin, perms] of rememberedPermissions.entries()) {
+        obj[origin] = {};
+        for (const [perm, entry] of perms.entries()) {
+          obj[origin][perm] = entry;
+        }
+      }
+      // Write to a sibling temp file, then rename. A crash or ENOSPC mid-write
+      // used to leave a truncated PERMISSIONS_FILE: the next JSON.parse throws,
+      // the load catch swallows it, and every remembered permission decision is
+      // silently forgotten (users get re-prompted for mic/camera/geolocation).
+      // rename is atomic on the same volume, so the file holds either the old
+      // contents or the new ones, never a half-written prefix. The mode is forced
+      // because writeFileSync's `mode` only applies when it CREATES the file — and
+      // this file enumerates which origins were granted camera/microphone/
+      // geolocation, so it must never be left world-readable.
+      const tmpFile = PERMISSIONS_FILE + '.tmp';
+      try {
+        fs.writeFileSync(tmpFile, JSON.stringify(obj, null, 2), { encoding: 'utf8', mode: 0o600 });
+        try { fs.chmodSync(tmpFile, 0o600); } catch (_) {}
+        fs.renameSync(tmpFile, PERMISSIONS_FILE);
+      } catch (writeErr) {
+        try { fs.unlinkSync(tmpFile); } catch (_) {}
+        throw writeErr;
+      }
+    } catch (err) {
+      console.warn('[Permissions] Failed to save permissions to disk:', err);
+    }
+  }
+
+  loadRememberedPermissionsFromDisk();
+
+  /** Purge all remembered permission entries older than PERMISSION_TTL_MS. */
+  function purgeExpiredRememberedPermissions(): void {
+    const cutoff = Date.now() - PERMISSION_TTL_MS;
+    for (const [origin, perms] of rememberedPermissions) {
+      for (const [perm, entry] of perms) {
+        if (entry.ts < cutoff) perms.delete(perm);
+      }
+      if (perms.size === 0) rememberedPermissions.delete(origin);
+    }
+  }
+
+  ipcMain.handle('permission-response', async (_event, payload: unknown) => {
+    // Security: only the trusted main window may resolve permission requests
+    if (!isTrustedSender(_event)) return { success: false, error: 'Unauthorized' };
+    if (!payload || typeof payload !== 'object') return { success: false, error: 'Invalid payload' };
+    const { requestId, allow, remember } = payload as Record<string, unknown>;
+    if (typeof requestId !== 'string' || requestId.length < 1 || requestId.length > 128 ||
+        typeof allow !== 'boolean' || (remember !== undefined && typeof remember !== 'boolean')) {
+      return { success: false, error: 'Invalid permission response' };
+    }
+    const pending = pendingPermissions.get(requestId);
+    if (pending) {
+      clearTimeout(pending.timeoutId);
+      pendingPermissions.delete(requestId);
+      if (remember && pending.origin) {
+        // Purge stale entries periodically (piggyback on writes for efficiency)
+        purgeExpiredRememberedPermissions();
+        const decisions = pending.decisions;
+        if (!decisions.has(pending.origin)) {
+          // Cap remembered origins to 200 to prevent unbounded memory growth in long sessions
+          if (decisions.size >= 200) {
+            const oldest = decisions.keys().next().value;
+            if (oldest) decisions.delete(oldest);
+          }
+          decisions.set(pending.origin, new Map());
+        }
+        for (const key of pending.permissionKeys) {
+          decisions.get(pending.origin)!.set(key, { allow, ts: Date.now() });
+        }
+        if (pending.persistent) saveRememberedPermissionsToDisk();
+      }
+      try {
+        pending.callback(allow);
+      } catch (err) {
+        console.error('[Permission] Error in callback:', err);
+      }
+      return { success: true };
+    }
+    return { success: false, error: 'Request not found or timed out' };
+  });
+
+  const sessionsWithStrictSecurity = new WeakSet<Electron.Session>();
+  applyStrictSecurityToSession = (targetSession: Electron.Session) => {
+    if (sessionsWithStrictSecurity.has(targetSession)) return;
+    sessionsWithStrictSecurity.add(targetSession);
+    // Each private partition owns an in-memory permission store. Never import
+    // normal grants or write private browsing origins to the shared disk file.
+    const persistent = targetSession === session.defaultSession;
+    const decisions: typeof rememberedPermissions = persistent ? rememberedPermissions : new Map();
+    targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+      const url = details.requestingUrl || webContents.getURL() || '';
+      const keys = permissionKeys(permission, (details as any)?.mediaTypes);
+      if (!keys) return callback(false);
+
+      // Internal app pages: Allow microphone (audio) only with explicit user confirmation/remember.
+      // Other permissions (camera, location, clipboard, openExternal, etc.) remain strictly denied.
+      if (isTrustedAppOrigin(url)) {
+        if (permission === 'media') {
+          const mediaTypes = (details as any)?.mediaTypes as string[] | undefined;
+          // `mediaTypes` is optional in Electron's request details. When it is
+          // absent the request cannot be classified, and defaulting it to
+          // audio-only ALLOWED it — including a camera capture that must stay
+          // denied. Fail closed, matching setPermissionCheckHandler below.
+          if (!Array.isArray(mediaTypes)) {
+            return callback(false);
+          }
+          const requestsVideo = mediaTypes.includes('video');
+          const requestsAudio = mediaTypes.includes('audio');
+          if (requestsAudio && !requestsVideo) {
+            if (process.platform === 'darwin') {
+              try {
+                const status = systemPreferences.getMediaAccessStatus('microphone');
+                if (status === 'denied' || status === 'restricted') {
+                  return callback(false);
+                }
+                if (status === 'granted') {
+                  return callback(true);
+                }
+              } catch (e) {
+                console.warn('[Permissions] macOS systemPreferences check failed:', e);
+                return callback(false);
+              }
+            }
+            // Check if app-level microphone permission was already remembered and allowed
+            const appPerm = decisions.get('app')?.get('media:audio') ||
+                            decisions.get(url)?.get('media:audio');
+            if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
+              return callback(appPerm.allow);
+            }
+            // Fall through to standard user prompt queue so the user is asked explicitly
+          } else {
+            return callback(false);
+          }
+        } else {
+          return callback(false);
+        }
+      }
+
+      // Security: Block openExternal unconditionally for all web content.
+      // Web pages must never be allowed to invoke OS-level URI schemes or external applications.
+      if (permission === 'openExternal') {
+        console.warn(`[Security] Blocked openExternal request from ${url}`);
+        return callback(false);
+      }
+
+      const origin = permissionOrigin(url);
+      if (!origin) return callback(false);
+
+      // Security: Rate-limiting to prevent permission request flooding attacks (max 5 per 10s per origin)
+      const now = Date.now();
+      const originKey = origin || 'unknown';
+      let rateRecord = permissionRateLimitMap.get(originKey);
+      if (!rateRecord || now > rateRecord.resetAt) {
+        rateRecord = { count: 0, resetAt: now + 10000 };
+        permissionRateLimitMap.set(originKey, rateRecord);
+      }
+      rateRecord.count++;
+      if (rateRecord.count > 5) {
+        console.warn(`[Security] Rate limit exceeded for permission requests from ${originKey}`);
+        return callback(false);
+      }
+
+      // Security: Cap maximum concurrent pending permissions in main to prevent memory exhaustion
+      if (pendingPermissions.size >= MAX_PENDING_PERMISSIONS) {
+        console.warn(`[Security] Pending permissions cap (${MAX_PENDING_PERMISSIONS}) reached, denying request`);
+        return callback(false);
+      }
+
+      if (permissionRateLimitMap.size > 500) {
+        for (const [k, v] of permissionRateLimitMap.entries()) {
+          if (now > v.resetAt) permissionRateLimitMap.delete(k);
+        }
+      }
+
+      const decision = rememberedDecision(decisions, origin, keys);
+      if (decision !== undefined) return callback(decision);
+
+      // Map permission names for Chrome-style UI
+      const permissionNames: Record<string, string> = {
+        'media': 'Camera and Microphone',
+        'geolocation': 'Location (GPS)',
+        'notifications': 'Notifications',
+        'midi': 'MIDI Devices',
+        'midiSysex': 'MIDI Devices (SysEx)',
+        'pointerLock': 'Pointer Lock',
+        'fullscreen': 'Fullscreen',
+        'clipboard-read': 'Read Clipboard',
+        'clipboard-sanitized-write': 'Write Clipboard',
+        'display-capture': 'Screen Sharing',
+        'window-management': 'Window Management'
+      };
+
+      let permissionName = permissionNames[permission] || permission;
+      if (permission === 'media') {
+        const mediaTypes = (details as any)?.mediaTypes as string[] | undefined;
+        if (mediaTypes && mediaTypes.includes('audio') && !mediaTypes.includes('video')) {
+          permissionName = 'Microphone';
+        } else if (mediaTypes && mediaTypes.includes('video') && !mediaTypes.includes('audio')) {
+          permissionName = 'Camera';
+        }
+      }
+
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return callback(false);
+      }
+
+      const requestId = `perm_${crypto.randomUUID()}`;
+
+      const timeoutId = setTimeout(() => {
+        const req = pendingPermissions.get(requestId);
+        if (req) {
+          pendingPermissions.delete(requestId);
+          try { req.callback(false); } catch {}
+        }
+      }, 30000); // 30 seconds timeout
+
+      const mediaTypes = (details as any)?.mediaTypes;
+
+      pendingPermissions.set(requestId, {
+        requestId,
+        permission,
+        url,
+        origin,
+        permissionName,
+        mediaTypes,
+        callback,
+        timeoutId,
+        permissionKeys: keys,
+        decisions,
+        persistent
+      });
+
+      // Send sleek event to renderer TopBar
+      mainWindow.webContents.send('permission-request', {
+        requestId,
+        permission,
+        url,
+        origin,
+        permissionName,
+        mediaTypes,
+        webContentsId: webContents.id,
+        timestamp: Date.now()
+      });
+    });
+
+    targetSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+      // Security: Deny openExternal checks immediately
+      if (permission === 'openExternal') return false;
+      const keys = permissionKeys(permission, [(details as any)?.mediaType]);
+      if (!keys) return false;
+
+      // Fail-closed permission checking:
+      // Internal pages: Permit microphone (audio) checks only if remembered/granted.
+      // All other app-origin permission checks remain strictly denied.
+      if (isTrustedAppOrigin(requestingOrigin)) {
+        if (permission === 'media') {
+          const mediaType = (details as any)?.mediaType as string | undefined;
+          if (mediaType === 'audio') {
+            if (process.platform === 'darwin') {
+              try {
+                if (systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
+                  return false;
+                }
+              } catch {
+                return false; // Fail closed!
+              }
+            }
+            const appPerm = decisions.get('app')?.get('media:audio') ||
+                            (requestingOrigin ? decisions.get(requestingOrigin)?.get('media:audio') : undefined);
+            if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
+              return appPerm.allow;
+            }
+            return false; // Fail closed if not granted
+          }
+        }
+        return false;
+      }
+
+      const origin = permissionOrigin(requestingOrigin);
+      return origin ? rememberedDecision(decisions, origin, keys) ?? false : false;
+    });
+  };
+
+  // IPC: reset all remembered site permissions (used from Settings → Privacy)
+  ipcMain.handle('reset-remembered-permissions', (event) => {
+    if (!isTrustedSender(event)) return false;
+    rememberedPermissions.clear();
+    saveRememberedPermissionsToDisk();
+    return true;
+  });
+
+  // IPC: get remembered permission origins count (used by Settings to show badge)
+  ipcMain.handle('get-remembered-permissions-count', (event) => {
+    if (!isTrustedSender(event)) return 0;
+    purgeExpiredRememberedPermissions();
+    return rememberedPermissions.size;
+  });
+
+  // IPC: get remembered permissions for a specific site origin (used by SiteInfoPopover)
+  ipcMain.handle('get-site-permissions', (event, origin: unknown) => {
+    if (!isTrustedSender(event)) return {};
+    if (typeof origin !== 'string') return {};
+    purgeExpiredRememberedPermissions();
+    const sitePerms = rememberedPermissions.get(origin);
+    if (!sitePerms) return {};
+    const result: Record<string, { allow: boolean; ts: number }> = {};
+    for (const [k, v] of sitePerms.entries()) {
+      result[k] = v;
+    }
+    return result;
+  });
+
+  // IPC: check microphone permission status cross-platform
+  ipcMain.handle('check-microphone-permission', async (event) => {
+    if (!isTrustedSender(event)) return { status: 'denied', canAsk: false, platform: process.platform };
+    if (process.platform === 'darwin') {
+      try {
+        const status = systemPreferences.getMediaAccessStatus('microphone');
+        return { status, canAsk: status === 'not-determined', platform: 'darwin' };
+      } catch {
+        return { status: 'denied', canAsk: false, platform: 'darwin' };
+      }
+    }
+    const appPerm = rememberedPermissions.get('app')?.get('media');
+    if (appPerm && appPerm.allow) {
+      return { status: 'granted', canAsk: false, platform: process.platform };
+    }
+    return { status: 'not-determined', canAsk: true, platform: process.platform };
+  });
+
+  // IPC: request microphone permission cross-platform
+  ipcMain.handle('request-microphone-permission', async (event) => {
+    if (!isTrustedSender(event)) return { granted: false, status: 'denied', platform: process.platform };
+    if (process.platform === 'darwin') {
+      try {
+        const status = systemPreferences.getMediaAccessStatus('microphone');
+        if (status === 'granted') {
+          return { granted: true, status: 'granted', platform: 'darwin' };
+        }
+        if (status === 'not-determined') {
+          const granted = await systemPreferences.askForMediaAccess('microphone');
+          return { granted, status: granted ? 'granted' : 'denied', platform: 'darwin' };
+        }
+        return { granted: false, status, platform: 'darwin' };
+      } catch (e) {
+        console.warn('[Microphone] macOS permission request error:', e);
+        return { granted: false, status: 'denied', platform: 'darwin' };
+      }
+    }
+    const appPerm = rememberedPermissions.get('app')?.get('media');
+    if (appPerm) {
+      return { granted: appPerm.allow, status: appPerm.allow ? 'granted' : 'denied', platform: process.platform };
+    }
+    return { granted: false, status: 'not-determined', platform: process.platform };
+  });
+
+  // IPC: open system settings cross-platform (macOS, Windows, Linux)
+  ipcMain.handle('open-system-settings', async (event, pane?: string) => {
+    if (!isTrustedSender(event)) return false;
+    try {
+      if (process.platform === 'darwin') {
+        const url = pane === 'microphone'
+          ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
+          : 'x-apple.systempreferences:';
+        await shell.openExternal(url).catch(() => {});
+        return true;
+      }
+      if (process.platform === 'win32') {
+        const winUri = pane === 'microphone'
+          ? 'ms-settings:privacy-microphone'
+          : 'ms-settings:';
+        await shell.openExternal(winUri).catch(() => {});
+        return true;
+      }
+      if (process.platform === 'linux') {
+        const { spawn } = await import('child_process');
+        if (pane === 'microphone') {
+          const pavu = spawn('pavucontrol', [], { detached: true, stdio: 'ignore' });
+          pavu.on('error', () => {
+            const gnome = spawn('gnome-control-center', ['sound'], { detached: true, stdio: 'ignore' });
+            gnome.on('error', () => {});
+            gnome.unref();
+          });
+          pavu.unref();
+          return true;
+        }
+        const settings = spawn('gnome-control-center', [], { detached: true, stdio: 'ignore' });
+        settings.on('error', () => {});
+        settings.unref();
+        return true;
+      }
+    } catch (e) {
+      console.warn('[SystemSettings] Failed to open system settings:', e);
+    }
+    return false;
+  });
+
+  applyStrictSecurityToSession(session.defaultSession);
+  applyStrictSecurityToSession(session.fromPartition('incognito'));
+
+  // Initialize MCP Server (default port 3020 with fallback, default OFF)
+  mcpServer = new BrowserMCPServer(3020);
+  mcpServer.setMainWindow(mainWindow);
+  // §11/§12: forwarded agent actions go through the policy classifier and the
+  // execution engine (approval dialog for sensitive decisions, STOP NOW support).
+  mcpServer.setPolicyEnforcement(true);
+  // §10: expose the engine to the renderer control panel (status, controls,
+  // STOP NOW, approvals). Renderer-facing channel names live in engineIpc.ts.
+  registerEngineIpc({
+    handle: (channel, listener) => {
+      ipcMain.handle(channel, listener as (event: Electron.IpcMainInvokeEvent, ...args: any[]) => unknown);
+    },
+    getEngine: () => (mcpServer ? mcpServer.getExecutionEngine() : null),
+    isTrustedSender: (event) => isTrustedSender(event as Electron.IpcMainInvokeEvent)
+  });
+
+  // MCP Server is OFF by default unless explicitly enabled in user settings
+  let shouldAutoStartMcp = false;
+  try {
+    const targetDir = process.env.PORTABLE_EXECUTABLE_DIR
+      ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'KingBrowserData')
+      : app.getPath('userData');
+    const userSettingsPath = path.join(targetDir, 'store_user_settings.json');
+    const legacySettingsPath = path.join(targetDir, 'store_settings.json');
+    const settingsFile = fs.existsSync(userSettingsPath) ? userSettingsPath : (fs.existsSync(legacySettingsPath) ? legacySettingsPath : null);
+    if (settingsFile) {
+      const rawContent = fs.readFileSync(settingsFile, 'utf-8');
+      const parsed = JSON.parse(rawContent);
+      const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+      if (settings && settings.mcpServerEnabled === true) {
+        shouldAutoStartMcp = true;
+      }
+    }
+  } catch (e) {
+    shouldAutoStartMcp = false;
+  }
+
+  if (shouldAutoStartMcp) {
+    const serverInstance = mcpServer;
+    serverInstance.start().then(() => {
+      const actualPort = serverInstance.getPort();
+      console.log(`[MCP] Server started on port ${actualPort}`);
+      sendToMainWindow('mcp-status-changed', { running: true, port: actualPort });
+    }).catch((err) => {
+      console.error('[MCP] Failed to start server:', err);
+      sendToMainWindow('mcp-status-changed', { running: false, port: 0 });
+    });
+  } else {
+    // Notify renderer that MCP server is offline by default
+    sendToMainWindow('mcp-status-changed', { running: false, port: 0 });
+  }
+
+  function isNewerVersion(remote: string, current: string): boolean {
+    const parse = (v: string) => v.replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+    const r = parse(remote);
+    const c = parse(current);
+    for (let i = 0; i < Math.max(r.length, c.length); i++) {
+      const rVal = r[i] ?? 0;
+      const cVal = c[i] ?? 0;
+      if (rVal > cVal) return true;
+      if (rVal < cVal) return false;
+    }
+    return false;
+  }
+
+  function getPlatformAsset(assets: any[]) {
+    if (!Array.isArray(assets) || assets.length === 0) return null;
+    const platform = process.platform;
+    const arch = process.arch;
+
+    if (platform === 'darwin') {
+      const isDmg = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.dmg') && !a.name.toLowerCase().endsWith('.blockmap');
+      const isZip = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.zip');
+      if (arch === 'arm64') {
+        return assets.find((a: any) => isDmg(a) && (a.name.toLowerCase().includes('arm64') || a.name.toLowerCase().includes('universal') || a.name.toLowerCase().includes('aarch64'))) ||
+               assets.find((a: any) => isZip(a) && (a.name.toLowerCase().includes('arm64') || a.name.toLowerCase().includes('universal') || a.name.toLowerCase().includes('aarch64'))) ||
+               assets.find((a: any) => isDmg(a) && !a.name.toLowerCase().includes('x64') && !a.name.toLowerCase().includes('intel')) ||
+               assets.find(isDmg);
+      }
+      return assets.find((a: any) => isDmg(a) && (a.name.toLowerCase().includes('x64') || a.name.toLowerCase().includes('x86_64') || a.name.toLowerCase().includes('intel') || a.name.toLowerCase().includes('universal'))) ||
+             assets.find((a: any) => isZip(a) && (a.name.toLowerCase().includes('x64') || a.name.toLowerCase().includes('x86_64') || a.name.toLowerCase().includes('intel') || a.name.toLowerCase().includes('universal'))) ||
+             assets.find((a: any) => isDmg(a) && !a.name.toLowerCase().includes('arm64') && !a.name.toLowerCase().includes('aarch64')) ||
+             assets.find((a: any) => isZip(a) && !a.name.toLowerCase().includes('arm64') && !a.name.toLowerCase().includes('aarch64'));
+    }
+
+    if (platform === 'win32') {
+      const isExe = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.exe') && !a.name.toLowerCase().endsWith('.blockmap');
+      const isZip = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.zip');
+      const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
+      const isArm = arch === 'arm64';
+
+      const matchesArch = (a: any) => {
+        const n = (typeof a.name === 'string' ? a.name : '').toLowerCase();
+        if (isArm) return n.includes('arm64');
+        return !n.includes('arm64') && (n.includes('x64') || n.includes('x86_64') || n.includes('win') || n.includes('setup'));
+      };
+
+      if (isPortable) {
+        return assets.find((a: any) => isExe(a) && !a.name.toLowerCase().includes('setup') && matchesArch(a)) ||
+               assets.find((a: any) => isExe(a) && !a.name.toLowerCase().includes('setup')) ||
+               assets.find((a: any) => isZip(a) && matchesArch(a)) ||
+               assets.find(isZip) ||
+               assets.find(isExe);
+      }
+      return assets.find((a: any) => isExe(a) && a.name.toLowerCase().includes('setup') && matchesArch(a)) ||
+             assets.find((a: any) => isExe(a) && a.name.toLowerCase().includes('setup')) ||
+             assets.find((a: any) => isExe(a) && matchesArch(a)) ||
+             assets.find(isExe) ||
+             assets.find(isZip);
+    }
+
+    if (platform === 'linux') {
+      const isAppImage = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.appimage');
+      const isDeb = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.deb');
+      const isArm = arch === 'arm64' || arch === 'arm';
+
+      const matchesArch = (a: any) => {
+        const n = (typeof a.name === 'string' ? a.name : '').toLowerCase();
+        if (isArm) return n.includes('arm64') || n.includes('aarch64');
+        return !n.includes('arm64') && !n.includes('aarch64') && (n.includes('x64') || n.includes('x86_64') || n.includes('amd64') || n.includes('linux'));
+      };
+
+      const isRunningAppImage = !!process.env.APPIMAGE;
+      if (isRunningAppImage) {
+        return assets.find((a: any) => isAppImage(a) && matchesArch(a)) ||
+               assets.find(isAppImage) ||
+               assets.find((a: any) => isDeb(a) && matchesArch(a)) ||
+               assets.find(isDeb);
+      }
+
+      return assets.find((a: any) => isAppImage(a) && matchesArch(a)) ||
+             assets.find((a: any) => isDeb(a) && matchesArch(a)) ||
+             assets.find(isAppImage) ||
+             assets.find(isDeb);
+    }
+
+    return assets.find((a: any) => typeof a.name === 'string' && !a.name.endsWith('.blockmap') && !a.name.endsWith('.yml')) || assets[0];
+  }
+
+  const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
+
+  /**
+   * The expected SHA-256 for a release asset, in order of trust:
+   *
+   * 1. `asset.digest` — GitHub's own per-asset metadata ("sha256:<64 hex>"),
+   *    served by the Releases API. This is the source to use: it is structured,
+   *    per-asset, and cannot be accidentally altered by pasting free text.
+   * 2. The release body text, for releases published before digests existed.
+   *    This is a weak fallback and only an exact asset-name match is accepted:
+   *    a King release carries ~18 assets and a checksums block, so a loose
+   *    "64 hex characters" match can easily pick up a DIFFERENT asset's hash
+   *    and then fail a perfectly good download.
+   *
+   * Returns undefined only when no usable digest exists at all. Callers must
+   * treat that as "unverified" rather than "verified" - see the download path.
+   */
+  function extractExpectedSha256(release: any, assetName: string): string | undefined {
+    if (!release) return undefined;
+
+    // 1. GitHub's structured per-asset digest.
+    if (assetName && Array.isArray(release.assets)) {
+      const asset = release.assets.find(
+        (a: any) => a && typeof a.name === 'string' && a.name === assetName
+      );
+      const digest = asset?.digest;
+      if (typeof digest === 'string') {
+        const match = /^sha256:([a-fA-F0-9]{64})$/.exec(digest.trim());
+        if (match) return match[1].toLowerCase();
+        // A digest we cannot parse is a hard signal, not something to guess at.
+        console.warn(`[Updater] Ignoring unrecognised digest format for ${assetName}: ${digest.slice(0, 32)}`);
+      }
+    }
+
+    // 2. Release body fallback, exact asset-name match only.
+    if (typeof release.body === 'string' && assetName) {
+      const escapedName = assetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const p1 = new RegExp(`([a-fA-F0-9]{64})\\s+[*]?${escapedName}(?![^\\n]*[a-fA-F0-9])`, 'i');
+      const m1 = release.body.match(p1);
+      if (m1 && SHA256_HEX_RE.test(m1[1].toLowerCase())) return m1[1].toLowerCase();
+
+      const p2 = new RegExp(`${escapedName}[^a-fA-F0-9\\n]*([a-fA-F0-9]{64})`, 'i');
+      const m2 = release.body.match(p2);
+      if (m2 && SHA256_HEX_RE.test(m2[1].toLowerCase())) return m2[1].toLowerCase();
+    }
+    return undefined;
+  }
+
+  // Auto Updater Configuration
+  autoUpdater.autoDownload = false;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.allowDowngrade = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  let isUpdateDownloaded = false;
+  let latestReleaseDownloadInfo: {
+    version: string;
+    downloadUrl: string;
+    assetName: string;
+    releaseNotes?: string;
+    releaseName?: string;
+    publishedAt?: string;
+    expectedSha256?: string;
+  } | null = null;
+  const downloadedUpdateFilePath: string | null = null;
+  let isDownloadingUpdate = false;
+
+  async function performSelfUpdateAndRelaunch(filePath: string): Promise<{ success: boolean; error?: string }> {
+    const platform = process.platform;
+    const currentPid = process.pid;
+
+    const resolvedFilePath = path.resolve(filePath);
+    if (!fs.existsSync(resolvedFilePath)) {
+      return { success: false, error: 'Update package does not exist on disk' };
+    }
+
+    console.log('[Updater] Starting self-update and relaunch with package:', resolvedFilePath);
+    updateInstallInProgress = true;
+    markQuitting();
+
+    if (mcpServer && mcpServer.isRunning()) {
+      try { mcpServer.stop(); } catch (_) {}
+    }
+
+    // 1. macOS (darwin)
+    if (platform === 'darwin') {
+      const isDmg = resolvedFilePath.toLowerCase().endsWith('.dmg');
+      const isZip = resolvedFilePath.toLowerCase().endsWith('.zip');
+
+      if (isDmg || isZip) {
+        let destinationApp = '/Applications/King Browser.app';
+        try {
+          const exePath = app.getPath('exe');
+          const appMatch = exePath.match(/^(.*?\.app)\/Contents\/MacOS\//);
+          if (appMatch && appMatch[1]) {
+            destinationApp = appMatch[1];
+          }
+        } catch (_) {}
+
+        const backupToken = crypto.randomBytes(16).toString('hex');
+        const tempDir = path.join(app.getPath('temp'), `king_update_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`);
+        fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
+        if (process.platform !== 'win32') {
+          try { fs.chmodSync(tempDir, 0o700); } catch (_) {}
+        }
+        const scriptPath = path.join(tempDir, 'update_and_relaunch.sh');
+
+        let scriptBody = '';
+        if (isDmg) {
+          const mountPoint = path.join(tempDir, 'mount');
+          fs.mkdirSync(mountPoint, { recursive: true, mode: 0o700 });
+          scriptBody = `#!/bin/bash
+FILE_PATH="$1"
+DEST_APP="$2"
+TARGET_PID="$3"
+TEMP_DIR="$4"
+BACKUP_TOKEN="$5"
+DEST_PARENT="$(dirname "\${DEST_APP}")"
+MOUNT_POINT="\${TEMP_DIR}/mount"
+STAGING_DIR="\${TEMP_DIR}/staging"
+STAGING_APP="\${STAGING_DIR}/King Browser.app"
+BACKUP_APP="\${DEST_PARENT}/.king_backup_\${BACKUP_TOKEN}"
+
+cleanup_mount() {
+  hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
+}
+
+mkdir -p "\${STAGING_DIR}" 2>/dev/null
+
+hdiutil attach "\${FILE_PATH}" -mountpoint "\${MOUNT_POINT}" -nobrowse -quiet -noautoopen
+SOURCE_APP=$(find "\${MOUNT_POINT}" -maxdepth 2 -name "*.app" | head -n 1)
+if [ -z "$SOURCE_APP" ]; then
+  cleanup_mount
+  open "\${FILE_PATH}"
+  exit 1
+fi
+
+# Bundle integrity & signature verification
+if [ ! -f "$SOURCE_APP/Contents/Info.plist" ] || [ ! -d "$SOURCE_APP/Contents/MacOS" ]; then
+  cleanup_mount
+  open "\${FILE_PATH}"
+  exit 1
+fi
+
+# Stage app cleanly inside isolated temp directory (never in /Applications)
+rm -rf "\${STAGING_APP}" 2>/dev/null
+if ! ditto "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null; then
+  cleanup_mount
+  open "\${FILE_PATH}"
+  exit 1
+fi
+
+if [ ! -f "\${STAGING_APP}/Contents/Info.plist" ] || [ ! -d "\${STAGING_APP}/Contents/MacOS" ]; then
+  cleanup_mount
+  open "\${FILE_PATH}"
+  exit 1
+fi
+
+if command -v codesign >/dev/null 2>&1; then
+  if ! codesign -v --deep "\${STAGING_APP}" 2>/dev/null; then
+    cleanup_mount
+    exit 1
+  fi
+fi
+
+while kill -0 "\${TARGET_PID}" 2>/dev/null; do
+  sleep 0.3
+done
+
+# Atomically backup old app to hidden directory without .app extension so LaunchServices ignores it
+if [ -d "\${DEST_APP}" ]; then
+  mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
+fi
+
+if ditto "\${STAGING_APP}" "\${DEST_APP}" 2>/dev/null && [ -f "\${DEST_APP}/Contents/Info.plist" ]; then
+  rm -rf "\${BACKUP_APP}" 2>/dev/null
+  rm -f "\${FILE_PATH}" 2>/dev/null
+  cleanup_mount
+  LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  if [ -x "$LSREGISTER" ]; then
+    "$LSREGISTER" -f "\${DEST_APP}" 2>/dev/null
+  fi
+  open -a "\${DEST_APP}"
+else
+  rm -rf "\${DEST_APP}" 2>/dev/null
+  if [ -d "\${BACKUP_APP}" ]; then
+    mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
+  fi
+  cleanup_mount
+  open "\${FILE_PATH}"
+fi
+`;
+        } else {
+          const extractDir = path.join(tempDir, 'extracted');
+          fs.mkdirSync(extractDir, { recursive: true, mode: 0o700 });
+          scriptBody = `#!/bin/bash
+FILE_PATH="$1"
+DEST_APP="$2"
+TARGET_PID="$3"
+TEMP_DIR="$4"
+BACKUP_TOKEN="$5"
+DEST_PARENT="$(dirname "\${DEST_APP}")"
+EXTRACT_DIR="\${TEMP_DIR}/extracted"
+BACKUP_APP="\${DEST_PARENT}/.king_backup_\${BACKUP_TOKEN}"
+
+ditto -xk "\${FILE_PATH}" "\${EXTRACT_DIR}"
+SOURCE_APP=$(find "\${EXTRACT_DIR}" -maxdepth 2 -name "*.app" | head -n 1)
+if [ -z "$SOURCE_APP" ]; then
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
+  exit 1
+fi
+
+# Bundle integrity & signature verification
+if [ ! -f "$SOURCE_APP/Contents/Info.plist" ] || [ ! -d "$SOURCE_APP/Contents/MacOS" ]; then
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
+  exit 1
+fi
+if command -v codesign >/dev/null 2>&1; then
+  if ! codesign -v --deep "$SOURCE_APP" 2>/dev/null; then
+    rm -rf "\${TEMP_DIR}" 2>/dev/null
+    exit 1
+  fi
+fi
+
+while kill -0 "\${TARGET_PID}" 2>/dev/null; do
+  sleep 0.3
+done
+
+# Atomically backup old app to hidden directory without .app extension so LaunchServices ignores it
+if [ -d "\${DEST_APP}" ]; then
+  mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
+fi
+
+if ditto "$SOURCE_APP" "\${DEST_APP}" 2>/dev/null && [ -f "\${DEST_APP}/Contents/Info.plist" ]; then
+  rm -rf "\${BACKUP_APP}" 2>/dev/null
+  rm -f "\${FILE_PATH}" 2>/dev/null
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
+  LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  if [ -x "$LSREGISTER" ]; then
+    "$LSREGISTER" -f "\${DEST_APP}" 2>/dev/null
+  fi
+  open -a "\${DEST_APP}"
+else
+  rm -rf "\${DEST_APP}" 2>/dev/null
+  if [ -d "\${BACKUP_APP}" ]; then
+    mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
+  fi
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
+  open "\${DEST_APP}" 2>/dev/null || open -a "King Browser"
+fi
+`;
+        }
+
+        try {
+          fs.writeFileSync(scriptPath, scriptBody, { mode: 0o755 });
+          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, destinationApp, String(currentPid), tempDir, backupToken], {
+            detached: true,
+            stdio: 'ignore'
+          });
+          runner.unref();
+
+          const allWindows = BrowserWindow.getAllWindows();
+          for (const win of allWindows) {
+            try { win.destroy(); } catch (_) {}
+          }
+          setTimeout(() => {
+            try { app.quit(); } catch (_) { app.exit(0); }
+          }, 300);
+
+          return { success: true };
+        } catch (scriptErr: any) {
+          console.warn('[Updater] Failed to launch bash updater script:', scriptErr);
+        }
+      }
+    }
+
+    // 2. Windows (win32)
+    if (platform === 'win32') {
+      if (resolvedFilePath.toLowerCase().endsWith('.exe')) {
+        const tempDir = app.getPath('temp');
+        const randomSuffix = crypto.randomBytes(8).toString('hex');
+        const updateDir = path.join(tempDir, `king_update_${Date.now()}_${randomSuffix}`);
+        fs.mkdirSync(updateDir, { recursive: true });
+        const batPath = path.join(updateDir, 'update.bat');
+        const destinationExe = app.getPath('exe');
+        // The batch reads its arguments from the environment (FILE_PATH /
+        // TARGET_PID / DEST_EXE) instead of %~1..%~3. `cmd` re-parses the whole
+        // string after /c with its own quote rules: with a username containing a
+        // space the OS temp path gets quoted, and because the command line then
+        // holds more than two quote characters cmd falls back to "strip the first
+        // quote, drop the last quote" — truncating the batch path. The batch never
+        // runs, yet `cmd.exe` itself started, so the caller still calls app.quit()
+        // and the browser disappears with no relaunch and no error. The
+        // environment is not parsed by cmd's command-line rules, so paths with
+        // spaces, quotes or metacharacters survive intact.
+        // `setlocal` below must therefore stay plain: enabling delayed expansion
+        // makes cmd expand every `!` in the inherited environment as it parses,
+        // so an install path containing one (C:\Users\Bob!\...) is silently
+        // mangled in %FILE_PATH% / %DEST_EXE% — the installer is not found, not
+        // deleted and the app does not relaunch, i.e. the same "browser
+        // disappears" symptom the env-variable change fixed, for a different
+        // username. No `!`-delayed read exists in the script to justify it.
+        const batContent = `@echo off
+rem Delayed expansion MUST stay disabled: with it enabled cmd consumes every
+rem "!" in the inherited environment while parsing, so an install path holding
+rem one (C:\\Users\\Bob!\\...) is silently mangled in %FILE_PATH% / %DEST_EXE%.
+rem Nothing in this script reads a "!"-delayed variable, so keep it off.
+setlocal
+set "UPDATE_DIR=%~dp0"
+
+:wait_loop
+if not "%TARGET_PID%"=="" (
+  tasklist /FI "PID eq %TARGET_PID%" 2>nul | findstr /i "%TARGET_PID%" >nul
+  if not errorlevel 1 (
+    ping 127.0.0.1 -n 2 >nul 2>&1
+    goto wait_loop
+  )
+)
+
+start /wait "" "%FILE_PATH%" /S
+del /f /q "%FILE_PATH%" 2>nul
+
+if not "%DEST_EXE%"=="" (
+  if exist "%DEST_EXE%" (
+    start "" "%DEST_EXE%"
+  ) else (
+    start "" "%LOCALAPPDATA%\\Programs\\King Browser\\King Browser.exe" 2>nul
+  )
+)
+
+cd /d "%TEMP%"
+rmdir /s /q "%UPDATE_DIR%" 2>nul
+exit
+`;
+        try {
+          fs.writeFileSync(batPath, batContent);
+          // Only the batch path is passed on the command line. A single argv entry
+          // makes libuv quote it as one token, so cmd's "exactly two quotes" rule
+          // preserves the path verbatim even when it contains spaces; every
+          // payload that used to travel as an argument now travels in the env.
+          const runner = child_process.spawn('cmd.exe', ['/c', batPath], {
+            detached: true,
+            stdio: 'ignore',
+            env: { ...process.env, FILE_PATH: resolvedFilePath, TARGET_PID: String(currentPid), DEST_EXE: destinationExe }
+          });
+          runner.unref();
+
+          const allWindows = BrowserWindow.getAllWindows();
+          for (const win of allWindows) {
+            try { win.destroy(); } catch (_) {}
+          }
+          setTimeout(() => {
+            try { app.quit(); } catch (_) { app.exit(0); }
+          }, 300);
+
+          return { success: true };
+        } catch (batErr: any) {
+          console.warn('[Updater] Failed to run bat installer:', batErr);
+        }
+      }
+    }
+
+    // 3. Linux
+    if (platform === 'linux') {
+      const isAppImage = resolvedFilePath.toLowerCase().endsWith('.appimage');
+      const isDeb = resolvedFilePath.toLowerCase().endsWith('.deb');
+
+      if (isAppImage) {
+        try {
+          fs.chmodSync(resolvedFilePath, 0o755);
+          const currentAppImage = process.env.APPIMAGE || '';
+          const tempDir = path.join(app.getPath('temp'), `king_update_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`);
+          fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
+          try { fs.chmodSync(tempDir, 0o700); } catch (_) {}
+          const scriptPath = path.join(tempDir, 'update_and_relaunch.sh');
+          const scriptContent = `#!/bin/bash
+FILE_PATH="$1"
+TARGET_PID="$2"
+TEMP_DIR="$3"
+CURRENT_APPIMAGE="$4"
+
+while kill -0 "\${TARGET_PID}" 2>/dev/null; do
+  sleep 0.3
+done
+
+chmod +x "\${FILE_PATH}" 2>/dev/null
+
+if [ -n "\${CURRENT_APPIMAGE}" ] && [ -f "\${CURRENT_APPIMAGE}" ]; then
+  BACKUP_APPIMAGE="\${CURRENT_APPIMAGE}.old"
+  mv "\${CURRENT_APPIMAGE}" "\${BACKUP_APPIMAGE}" 2>/dev/null
+  if cp "\${FILE_PATH}" "\${CURRENT_APPIMAGE}" 2>/dev/null || mv "\${FILE_PATH}" "\${CURRENT_APPIMAGE}" 2>/dev/null; then
+    chmod +x "\${CURRENT_APPIMAGE}" 2>/dev/null
+    rm -f "\${BACKUP_APPIMAGE}" 2>/dev/null
+    rm -rf "\${TEMP_DIR}" 2>/dev/null
+    "\${CURRENT_APPIMAGE}" &
+  else
+    if [ -f "\${BACKUP_APPIMAGE}" ]; then
+      mv "\${BACKUP_APPIMAGE}" "\${CURRENT_APPIMAGE}" 2>/dev/null
+    fi
+    rm -rf "\${TEMP_DIR}" 2>/dev/null
+    "\${CURRENT_APPIMAGE}" &
+  fi
+else
+  TARGET_RUN="\${FILE_PATH}"
+  "\${TARGET_RUN}" &
+fi
+`;
+          fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
+          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, String(currentPid), tempDir, currentAppImage], {
+            detached: true,
+            stdio: 'ignore'
+          });
+          runner.unref();
+
+          const allWindows = BrowserWindow.getAllWindows();
+          for (const win of allWindows) {
+            try { win.destroy(); } catch (_) {}
+          }
+          setTimeout(() => {
+            try { app.quit(); } catch (_) { app.exit(0); }
+          }, 300);
+
+          return { success: true };
+        } catch (linuxErr) {
+          console.warn('[Updater] Failed to launch Linux updater script:', linuxErr);
+        }
+      } else if (isDeb) {
+        try {
+          shell.openPath(resolvedFilePath);
+          setTimeout(() => {
+            try { app.quit(); } catch (_) { app.exit(0); }
+          }, 1000);
+          return { success: true };
+        } catch (debErr) {
+          console.warn('[Updater] Failed to open Linux .deb package:', debErr);
+        }
+      }
+    }
+
+    // Fallback: show item, open with default handler and exit
+    try {
+      shell.showItemInFolder(resolvedFilePath);
+    } catch (_) {}
+    const openRes = await shell.openPath(resolvedFilePath);
+    setTimeout(() => {
+      try { app.quit(); } catch (_) { app.exit(0); }
+    }, 1200);
+    return { success: !openRes, error: openRes || undefined };
+  }
+
+  type UpdateCheckResult = { success: boolean; version?: string; isAvailable?: boolean; error?: string };
+  // In-flight update check, mirroring the isDownloadingUpdate lock lifecycle
+  // above: the slot is claimed synchronously before the first await and released
+  // on both fulfilment and rejection, so it can never get stuck.
+  let checkForUpdatesPromise: Promise<UpdateCheckResult> | null = null;
+
+  /**
+   * Deduplicates overlapping update checks onto a single run.
+   *
+   * The startup check, the manual `check-for-updates` IPC and the 4-hourly timer
+   * can all overlap, and the manual GitHub path is not internally deduped: each
+   * extra call issued its own api.github.com fetch and the last writer won on
+   * `latestReleaseDownloadInfo`. If a release were published mid-flight the UI
+   * could be told about 1.2.3 and then handed 1.2.4's URL — the button shows one
+   * version and installs another.
+   */
+  function checkForUpdatesInternal(): Promise<UpdateCheckResult> {
+    if (checkForUpdatesPromise) {
+      console.log('[Updater] Update check already in flight; reusing the running check');
+      return checkForUpdatesPromise;
+    }
+    const inFlight = runUpdateCheckInternal();
+    checkForUpdatesPromise = inFlight;
+    // Release on both paths so a thrown/rejected check cannot wedge the guard.
+    // The identity check keeps a late release from clearing a newer run's slot.
+    const release = () => { if (checkForUpdatesPromise === inFlight) checkForUpdatesPromise = null; };
+    inFlight.then(release, release);
+    return inFlight;
+  }
+
+  /**
+   * Performs one update check. Callers should go through
+   * checkForUpdatesInternal(), which dedupes overlapping calls onto one run.
+   */
+  async function runUpdateCheckInternal(): Promise<UpdateCheckResult> {
+    try {
+      const isManualUpdateOnly = !app.isPackaged || process.platform === 'linux' || process.platform === 'darwin' || !!process.env.PORTABLE_EXECUTABLE_DIR;
+      if (isManualUpdateOnly) {
+        const res = await fetch('https://api.github.com/repos/MOT1209/my-video/releases', {
+          headers: { 'User-Agent': getStandardUserAgent() },
+          signal: AbortSignal.timeout(10000)
+        });
+        if (res.ok) {
+          const releases = await res.json();
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && !r.prerelease && r.tag_name) : null;
+          if (latestRelease) {
+            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
+            const currentVersion = app.getVersion();
+            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
+              const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              const expectedSha = extractExpectedSha256(latestRelease, platformAsset?.name || '');
+              latestReleaseDownloadInfo = {
+                version: latestTag,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name || '',
+                releaseNotes: latestRelease.body || '',
+                releaseName: latestRelease.name || `v${latestTag}`,
+                publishedAt: latestRelease.published_at || new Date().toISOString(),
+                expectedSha256: expectedSha
+              };
+              sendToMainWindow('update-available', {
+                version: latestTag,
+                releaseDate: latestRelease.published_at,
+                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
+                assetName: platformAsset?.name,
+                isManual: true,
+                releaseNotes: latestRelease.body || '',
+                releaseName: latestRelease.name || `v${latestTag}`
+              });
+              return { success: true, version: latestTag, isAvailable: true };
+            }
+          }
+          sendToMainWindow('update-not-available', { version: app.getVersion() });
+          return { success: true, version: app.getVersion(), isAvailable: false };
+        }
+      }
+      const result = await autoUpdater.checkForUpdatesAndNotify();
+      if (result?.updateInfo?.version && isNewerVersion(result.updateInfo.version, app.getVersion())) {
+        return { success: true, version: result.updateInfo.version, isAvailable: true };
+      } else {
+        sendToMainWindow('update-not-available', { version: app.getVersion() });
+        return { success: true, version: app.getVersion(), isAvailable: false };
+      }
+    } catch (err: any) {
+      console.warn('Check for updates failed via primary method, checking GitHub releases directly:', err?.message);
+      try {
+        const res = await fetch('https://api.github.com/repos/MOT1209/my-video/releases', {
+          headers: { 'User-Agent': getStandardUserAgent() },
+          signal: AbortSignal.timeout(10000)
+        });
+        if (res.ok) {
+          const releases = await res.json();
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && !r.prerelease && r.tag_name) : null;
+          if (latestRelease) {
+            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
+            const currentVersion = app.getVersion();
+            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
+              const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              const expectedSha = extractExpectedSha256(latestRelease, platformAsset?.name || '');
+              latestReleaseDownloadInfo = {
+                version: latestTag,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name || '',
+                releaseNotes: latestRelease.body || '',
+                releaseName: latestRelease.name || `v${latestTag}`,
+                publishedAt: latestRelease.published_at || new Date().toISOString(),
+                expectedSha256: expectedSha
+              };
+              sendToMainWindow('update-available', {
+                version: latestTag,
+                releaseDate: latestRelease.published_at,
+                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
+                assetName: platformAsset?.name,
+                isManual: true,
+                releaseNotes: latestRelease.body || '',
+                releaseName: latestRelease.name || `v${latestTag}`
+              });
+              return { success: true, version: latestTag, isAvailable: true };
+            }
+          }
+        }
+      } catch (_) {}
+      sendToMainWindow('update-not-available', { version: app.getVersion() });
+      return { success: true, version: app.getVersion(), isAvailable: false };
+    }
+  }
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for updates...');
+    sendToMainWindow('update-checking');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info.version);
+    latestReleaseDownloadInfo = {
+      version: info.version || '',
+      downloadUrl: '',
+      assetName: '',
+      releaseNotes: (info as any)?.releaseNotes || '',
+      releaseName: (info as any)?.releaseName || `v${info.version}`
+    };
+    sendToMainWindow('update-available', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      isManual: false,
+      releaseNotes: (info as any)?.releaseNotes || '',
+      releaseName: (info as any)?.releaseName || `v${info.version}`
+    });
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('No update available. Current version is up to date:', info?.version || app.getVersion());
+    sendToMainWindow('update-not-available', { version: info?.version || app.getVersion() });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`Download progress: ${Math.round(progress.percent)}%`);
+    sendToMainWindow('update-download-progress', {
+      percent: progress.percent,
+      bytesPerSecond: progress.bytesPerSecond,
+      transferred: progress.transferred,
+      total: progress.total
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    isUpdateDownloaded = true;
+    console.log('Update downloaded:', info.version);
+    sendToMainWindow('update-downloaded', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      integrityVerified: true
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('AutoUpdater error:', err);
+    sendToMainWindow('update-error', { message: err?.message || 'Update check encountered an error' });
+  });
+
+  ipcMain.handle('check-for-updates', async (event) => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
+    sendToMainWindow('update-checking');
+    return await checkForUpdatesInternal();
+  });
+
+  ipcMain.handle('get-update-info', (event) => {
+    if (!isTrustedSender(event)) return null;
+    return latestReleaseDownloadInfo;
+  });
+
+  ipcMain.handle('download-update', async (event, customUrl?: string) => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
+    if (isDownloadingUpdate) return { success: false, error: 'Download already in progress' };
+    // Claim the lock synchronously, before the first await. It used to be set
+    // ~65 lines later, so two invocations both passed the guard: each then ran
+    // the `.download_` cleanup (unlinking the other's in-flight temp file, which
+    // made its rename throw ENOENT), raced each other on the same target path,
+    // interleaved their progress events, and one run's error handler cleared
+    // the flag while the other was still downloading.
+    isDownloadingUpdate = true;
+    try {
+      return await runUpdateDownload(customUrl);
+    } finally {
+      isDownloadingUpdate = false;
+    }
+  });
+
+  async function runUpdateDownload(customUrl?: string) {
+    let targetUrl = (typeof customUrl === 'string' && customUrl.trim()) ? customUrl.trim() : latestReleaseDownloadInfo?.downloadUrl;
+    let targetVersion = latestReleaseDownloadInfo?.version || '';
+    let assetName = latestReleaseDownloadInfo?.assetName || '';
+    let targetExpectedSha = latestReleaseDownloadInfo?.expectedSha256;
+
+    // If no URL stored yet, query GitHub releases API directly
+    if (!targetUrl) {
+      try {
+        const res = await fetch('https://api.github.com/repos/MOT1209/my-video/releases', {
+          headers: { 'User-Agent': getStandardUserAgent() },
+          signal: AbortSignal.timeout(10_000)
+        });
+        if (res.ok) {
+          const releases = await res.json();
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && !r.prerelease && r.tag_name) : null;
+          if (latestRelease) {
+            targetVersion = (latestRelease.tag_name || '').replace(/^v/, '');
+            const platformAsset = getPlatformAsset(latestRelease.assets || []);
+            targetUrl = platformAsset?.browser_download_url || latestRelease.html_url;
+            assetName = platformAsset?.name || '';
+            if (!targetExpectedSha) {
+              targetExpectedSha = extractExpectedSha256(latestRelease, assetName);
+            }
+          }
+        }
+      } catch (fetchErr: any) {
+        console.error('[Updater] Failed to retrieve release for download:', fetchErr);
+      }
+    }
+
+    if (!targetUrl || typeof targetUrl !== 'string') {
+      return { success: false, error: 'No download URL available' };
+    }
+
+    try {
+      const parsed = new URL(targetUrl);
+      const isOfficialHost = (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com' || parsed.hostname === 'objects.githubusercontent.com');
+      if (!isOfficialHost || parsed.protocol !== 'https:') {
+        return { success: false, error: 'Untrusted update download URL' };
+      }
+      // Security: Updates must strictly originate from the official repository
+      if ((parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com') &&
+          !parsed.pathname.startsWith('/MOT1209/my-video/')) {
+        return { success: false, error: 'Untrusted update repository: updates must originate from MOT1209/my-video' };
+      }
+      if (customUrl && typeof customUrl === 'string') {
+        const parsedCustom = new URL(customUrl.trim());
+        if (parsedCustom.protocol !== 'https:' ||
+            (parsedCustom.hostname !== 'github.com' && parsedCustom.hostname !== 'www.github.com') ||
+            !parsedCustom.pathname.startsWith('/MOT1209/my-video/')) {
+          return { success: false, error: 'Untrusted custom update URL: must originate from official MOT1209/my-video repository' };
+        }
+      }
+      const isReleaseWebpage = parsed.pathname.includes('/releases/tag/') || parsed.pathname.endsWith('/releases/latest');
+      if (isReleaseWebpage && !assetName) {
+        try {
+          await shell.openExternal(targetUrl);
+        } catch (_) {}
+        return { success: false, error: 'Direct installer asset not available yet for this platform. Opened release page in browser.' };
+      }
+    } catch {
+      return { success: false, error: 'Malformed update download URL' };
+    }
+
+    // Release snapshot: `latestReleaseDownloadInfo` is re-read from a global that
+    // a mid-download check can overwrite, which used to report the newer
+    // release's notes next to the older package that was actually downloaded.
+    const downloadedReleaseNotes = latestReleaseDownloadInfo?.releaseNotes || '';
+    const downloadedReleaseName = latestReleaseDownloadInfo?.releaseName || `v${targetVersion}`;
+
+    // Attempt official autoUpdater download engine first
+    try {
+      if (autoUpdater && typeof (autoUpdater as any).downloadUpdate === 'function') {
+        const dlPromise = (autoUpdater as any).downloadUpdate();
+        if (dlPromise && typeof dlPromise.then === 'function') {
+          await dlPromise;
+          return {
+            success: true,
+            version: targetVersion,
+            releaseNotes: downloadedReleaseNotes,
+            releaseName: downloadedReleaseName
+          };
+        }
+      }
+    } catch (updaterErr: any) {
+      console.warn('[Updater] electron-updater download failed, falling back to browser download:', updaterErr?.message || updaterErr);
+    }
+
+    // Safe fallback: open official release page in browser
+    try {
+      await shell.openExternal(targetUrl);
+    } catch (_) {}
+    return {
+      success: false,
+      error: 'Direct background installer not available; opened official release page in browser.'
+    };
+  }
+
+  ipcMain.handle('install-update', async (event) => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
+    console.log('[Updater] Restart and install requested.');
+    try {
+      updateInstallInProgress = true;
+      markQuitting();
+      if (downloadedUpdateFilePath && fs.existsSync(downloadedUpdateFilePath)) {
+        return await performSelfUpdateAndRelaunch(downloadedUpdateFilePath);
+      }
+
+      if (mcpServer && mcpServer.isRunning()) {
+        try { mcpServer.stop(); } catch (_) {}
+      }
+
+      const allWindows = BrowserWindow.getAllWindows();
+      for (const win of allWindows) {
+        try {
+          win.removeAllListeners('close');
+          win.destroy();
+        } catch (_) {}
+      }
+
+      setTimeout(() => {
+        try {
+          if (isUpdateDownloaded) {
+            autoUpdater.quitAndInstall(false, true);
+          } else {
+            app.relaunch();
+            app.exit(0);
+          }
+        } catch (quitErr) {
+          console.error('[Updater] quitAndInstall threw error, fallback to app.relaunch:', quitErr);
+          try {
+            app.relaunch();
+            app.exit(0);
+          } catch (_) {}
+        }
+      }, 250);
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('[Updater] Install update failed:', err);
+      try {
+        app.relaunch();
+        app.exit(0);
+      } catch (_) {}
+      return { success: false, error: err?.message };
+    }
+  });
+
+  ipcMain.handle('open-external', async (event, targetUrl: string) => {
+    if (!isTrustedSender(event)) return false;
+    try {
+      if (typeof targetUrl === 'string') {
+        const parsed = new URL(targetUrl);
+        // Security: Strictly enforce https: protocol only. Reject plaintext http: and custom schemes.
+        if (parsed.protocol !== 'https:') {
+          console.warn(`[Security] Blocked open-external for non-https protocol: ${parsed.protocol}`);
+          return false;
+        }
+        // Security: Block loopback, intranet, and link-local destinations to prevent SSRF and local service compromise
+        const host = parsed.hostname.toLowerCase();
+        const isPrivateOrLoopback = (() => {
+          if (isLocalOrIntranetHost(host)) return true;
+          // Single-label hostnames (e.g. 'router', 'nas', 'intranet') resolve internally on LANs
+          if (!host.includes('.') || host.endsWith('.')) return true;
+          if (/^0x[0-9a-f]+$/i.test(host) || /^\d+$/.test(host)) {
+            return true;
+          }
+          const ipv4Match = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+          if (ipv4Match) {
+            const o1 = Number(ipv4Match[1]);
+            const o2 = Number(ipv4Match[2]);
+            if (o1 === 127) return true; // 127.0.0.0/8 loopback
+            if (o1 === 10) return true; // 10.0.0.0/8 private
+            if (o1 === 172 && o2 >= 16 && o2 <= 31) return true; // 172.16.0.0/12 private (172.16.x - 172.31.x)
+            if (o1 === 192 && o2 === 168) return true; // 192.168.0.0/16 private
+            if (o1 === 169 && o2 === 254) return true; // 169.254.0.0/16 link-local / cloud metadata (169.254.169.254)
+            if (o1 === 0) return true; // 0.0.0.0/8
+            if (o1 === 100 && o2 >= 64 && o2 <= 127) return true; // 100.64.0.0/10 carrier-grade NAT
+          }
+          if (host.startsWith('[') && host.endsWith(']')) {
+            const rawIpv6 = host.slice(1, -1);
+            if (rawIpv6 === '::1' || rawIpv6.startsWith('fe80:') || rawIpv6.startsWith('fc00:') || rawIpv6.startsWith('fd00:')) {
+              return true;
+            }
+          }
+          // Fallback: normalize hex/octal/decimal obfuscations (0x7f.0.0.1,
+          // 0177.0.0.1, 2130706433, 0x7f000001) then re-check via shared policy.
+          // This also catches TEST-NET/multicast/reserved ranges the inline
+          // checks above miss. DNS rebinding is handled by the async DNS pin
+          // below (mirrors validatePreviewUrl); literal-IP parsing only here.
+          const normalizeObfuscatedIPv4 = (value: string): string | null => {
+            const parsePart = (part: string): number | null => {
+              if (/^0x[0-9a-f]+$/i.test(part)) {
+                const n = parseInt(part, 16);
+                return Number.isSafeInteger(n) ? n : null;
+              }
+              if (/^0[0-7]+$/.test(part)) {
+                const n = parseInt(part, 8);
+                return Number.isSafeInteger(n) ? n : null;
+              }
+              if (/^\d+$/.test(part)) {
+                const n = parseInt(part, 10);
+                return Number.isSafeInteger(n) ? n : null;
+              }
+              return null;
+            };
+            if (/^0x[0-9a-f]+$/i.test(value) || /^\d+$/.test(value)) {
+              const n = parsePart(value);
+              if (n === null || n < 0 || n > 0xffffffff) return null;
+              return `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`;
+            }
+            const parts = value.split('.');
+            if (parts.length === 4) {
+              const nums: number[] = [];
+              for (const p of parts) {
+                const n = parsePart(p);
+                if (n === null || n < 0 || n > 255) return null;
+                nums.push(n);
+              }
+              return nums.join('.');
+            }
+            return null;
+          };
+          try {
+            const normalizedIp = normalizeObfuscatedIPv4(host);
+            if (normalizedIp && isPrivateIP(normalizedIp)) return true;
+            // Canonical dotted-decimal that slipped past inline checks (TEST-NET-1/2/3,
+            // IETF assignments, multicast/reserved) still fails closed via shared policy.
+            if (/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.test(host) && isPrivateIP(host)) return true;
+            // IPv6 literals (bracketed or bare incl. ::, ff02::1, 2001:db8::1,
+            // ::ffff:127.0.0.1, NAT64, 6to4) via shared policy.
+            const bareV6 = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+            if (bareV6.includes(':') && isPrivateIP(bareV6)) return true;
+          } catch {}
+          return false;
+        })();
+
+        if (isPrivateOrLoopback) {
+          console.warn(`[Security] Blocked open-external to private/loopback host: ${host}`);
+          return false;
+        }
+        // Resolve the hostname and refuse if any answer is private; fail closed on
+        // error. NOTE: this is a check-then-connect, NOT a pin. The answer below
+        // is not bound to the connection, because `shell.openExternal` hands the
+        // URL to the OS default browser, which resolves it again with its own
+        // resolver. A 0-second-TTL name can pass here and reach 127.0.0.1. Only
+        // `fetch-page-html` genuinely pins, by injecting the vetted address as
+        // the agent's `lookup`. Closing this needs the same treatment or a
+        // Chromium-side resolver; see agentNavigationGuard for the same caveat.
+        let dnsTimeoutTimer: NodeJS.Timeout | undefined;
+        try {
+          const lookupHost = (host.startsWith('[') && host.endsWith(']')) ? host.slice(1, -1) : host;
+          const lookupPromise = dnsLookup(lookupHost, { all: true }) as Promise<any>;
+          lookupPromise.catch(() => {});
+          const dnsResult = await Promise.race([
+            lookupPromise,
+            new Promise<never>((_, reject) => {
+              dnsTimeoutTimer = setTimeout(() => reject(new Error('DNS lookup timeout')), 3000);
+            }),
+          ]);
+          const addrList = Array.isArray(dnsResult) ? dnsResult : [dnsResult];
+          if (addrList.length === 0 || addrList.some((entry: any) => isPrivateIP(entry?.address ?? String(entry ?? '')))) {
+            console.warn(`[Security] Blocked open-external to DNS-pinned private IP for host: ${host}`);
+            return false;
+          }
+        } catch (dnsErr: any) {
+          console.warn(`[Security] Blocked open-external, DNS resolution failed for host: ${host}`, dnsErr?.message || dnsErr);
+          return false;
+        } finally {
+          if (dnsTimeoutTimer) clearTimeout(dnsTimeoutTimer);
+        }
+        // Security: Block embedded credentials in URLs (phishing, SSRF, or credential harvesting vector)
+        if (parsed.username || parsed.password) {
+          console.warn(`[Security] Blocked open-external with embedded credentials for host: ${parsed.host}`);
+          return false;
+        }
+        // Security: Block dangerous file extensions that could execute on the host OS,
+        // unless it is an official release package from the verified King repository.
+        const pathname = parsed.pathname.toLowerCase();
+        const isOfficialRelease = (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com' || parsed.hostname === 'objects.githubusercontent.com') &&
+          (pathname.startsWith('/MOT1209/my-video/releases') || pathname.includes('/MOT1209/my-video/releases/'));
+
+        const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)($|\?|#)/i;
+        const queryHasDangerousExt = Array.from(parsed.searchParams.values()).some(val => DANGEROUS_EXT_REGEX.test(val.toLowerCase())) ||
+          Array.from(parsed.searchParams.keys()).some(key => DANGEROUS_EXT_REGEX.test(key.toLowerCase()));
+
+        if (!isOfficialRelease && (DANGEROUS_EXT_REGEX.test(pathname) || queryHasDangerousExt)) {
+          console.warn(`[Security] Blocked open-external for dangerous file extension: ${parsed.href}`);
+          return false;
+        }
+        await shell.openExternal(parsed.href);
+        return true;
+      }
+    } catch (e) {
+      console.error('[Security] Failed to open external URL:', e);
+    }
+    return false;
+  });
+
+  ipcMain.handle('get-app-version', (event) => {
+    if (!isTrustedSender(event)) return null;
+    return app.getVersion();
+  });
+
+  ipcMain.handle('get-system-versions', (event) => {
+    if (!isTrustedSender(event)) return null;
+    return {
+      app: app.getVersion(),
+      electron: process.versions.electron || '',
+      chrome: process.versions.chrome || '',
+      node: process.versions.node || '',
+      v8: process.versions.v8 || '',
+      platform: process.platform,
+      arch: process.arch
+    };
+  });
+
+  ipcMain.handle('get-changelog-releases', async (event, forceRefresh?: boolean) => {
+    if (!isTrustedSender(event)) return null;
+
+    const cachePath = path.join(app.getPath('userData'), 'changelog_cache.json');
+    const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+    // 1. Read cached releases if valid and not forcing refresh
+    if (!forceRefresh && fs.existsSync(cachePath)) {
+      try {
+        const cachedRaw = fs.readFileSync(cachePath, 'utf8');
+        const cached = JSON.parse(cachedRaw);
+        if (cached && Array.isArray(cached.releases) && (Date.now() - (cached.timestamp || 0) < CACHE_TTL_MS)) {
+          return cached.releases;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Fetch fresh releases from GitHub API
+    try {
+      const res = await fetch('https://api.github.com/repos/MOT1209/my-video/releases?per_page=10', {
+        headers: { 'User-Agent': getStandardUserAgent() },
+        signal: AbortSignal.timeout(8000)
+      });
+
+      if (!res.ok) {
+        if (fs.existsSync(cachePath)) {
+          try {
+            const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+            if (cached && Array.isArray(cached.releases)) return cached.releases;
+          } catch (_) {}
+        }
+        return null;
+      }
+
+      const releases = await res.json();
+      if (!Array.isArray(releases)) return null;
+
+      const parsedReleases = [];
+
+      for (let i = 0; i < releases.length; i++) {
+        const r = releases[i];
+        if (r.draft) continue;
+
+        const prev = releases.slice(i + 1).find((x: any) => !x.draft && x.tag_name);
+        const tag = r.tag_name || '';
+        const version = tag.replace(/^v/, '');
+        const title = r.name || `King Browser v${version}`;
+
+        let dateStr = '';
+        if (r.published_at) {
+          try {
+            const d = new Date(r.published_at);
+            dateStr = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          } catch (_) {
+            dateStr = r.published_at;
+          }
+        }
+
+        const changes: Array<{ category: 'feature' | 'fix' | 'security' | 'performance' | 'improvement'; text: string }> = [];
+
+        // Check if release body has markdown bullets
+        const lines = (r.body || '').split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            const rawText = trimmed.replace(/^[-*]\s+/, '').trim();
+            if (!rawText.toLowerCase().includes('full changelog') && !rawText.includes('sha256') && rawText.length > 5) {
+              const match = rawText.match(/^([a-z]+)(?:\(([^)]+)\))?:\s*(.+)$/i);
+              if (match) {
+                const type = match[1].toLowerCase();
+                const scope = match[2] ? `[${match[2]}] ` : '';
+                const desc = match[3];
+                let cat: 'feature' | 'fix' | 'security' | 'performance' | 'improvement' = 'improvement';
+                if (type === 'feat') cat = 'feature';
+                else if (type === 'fix') cat = 'fix';
+                else if (type === 'perf') cat = 'performance';
+                else if (type === 'security' || type === 'sec' || scope.toLowerCase().includes('security')) cat = 'security';
+                changes.push({ category: cat, text: scope + desc.charAt(0).toUpperCase() + desc.slice(1) });
+              } else {
+                changes.push({ category: 'improvement', text: rawText.charAt(0).toUpperCase() + rawText.slice(1) });
+              }
+            }
+          }
+        }
+
+        // If body has no bullets and there is a previous tag, query compare API to get commits
+        if (changes.length === 0 && prev?.tag_name) {
+          try {
+            const safePrev = String(prev.tag_name).trim();
+            const safeCurr = String(tag).trim();
+            if (/^[a-zA-Z0-9._-]+$/.test(safePrev) && /^[a-zA-Z0-9._-]+$/.test(safeCurr)) {
+              const compRes = await fetch(`https://api.github.com/repos/MOT1209/my-video/compare/${encodeURIComponent(safePrev)}...${encodeURIComponent(safeCurr)}`, {
+                headers: { 'User-Agent': getStandardUserAgent() },
+                signal: AbortSignal.timeout(5000)
+              });
+              if (compRes.ok) {
+                const compData = await compRes.json();
+                if (Array.isArray(compData.commits)) {
+                  for (const c of compData.commits) {
+                    const msg = (c.commit?.message || '').split('\n')[0].trim();
+                    if (!msg || msg.startsWith('Merge') || msg.startsWith('release:')) continue;
+                    const match = msg.match(/^([a-z]+)(?:\(([^)]+)\))?:\s*(.+)$/i);
+                    if (match) {
+                      const type = match[1].toLowerCase();
+                      const scope = match[2] ? `[${match[2]}] ` : '';
+                      const desc = match[3];
+                      let cat: 'feature' | 'fix' | 'security' | 'performance' | 'improvement' = 'improvement';
+                      if (type === 'feat') cat = 'feature';
+                      else if (type === 'fix') cat = 'fix';
+                      else if (type === 'perf') cat = 'performance';
+                      else if (type === 'security' || type === 'sec' || scope.toLowerCase().includes('security')) cat = 'security';
+                      changes.push({ category: cat, text: scope + desc.charAt(0).toUpperCase() + desc.slice(1) });
+                    } else {
+                      changes.push({ category: 'improvement', text: msg.charAt(0).toUpperCase() + msg.slice(1) });
+                    }
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        const highlights: string[] = [];
+        for (const ch of changes) {
+          if (highlights.length < 4 && (ch.category === 'feature' || ch.category === 'security' || ch.category === 'fix')) {
+            highlights.push(ch.text);
+          }
+        }
+        if (highlights.length === 0) {
+          for (const ch of changes.slice(0, 3)) {
+            highlights.push(ch.text);
+          }
+        }
+
+        parsedReleases.push({
+          version,
+          date: dateStr || 'Recent',
+          title,
+          highlights,
+          changes
+        });
+      }
+
+      // Cache the parsed releases
+      try {
+        fs.writeFileSync(cachePath, JSON.stringify({ timestamp: Date.now(), releases: parsedReleases }, null, 2), 'utf8');
+      } catch (_) {}
+
+      return parsedReleases;
+    } catch (err) {
+      console.warn('[Changelog] Failed to fetch live releases from GitHub:', err);
+      if (fs.existsSync(cachePath)) {
+        try {
+          const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+          if (cached && Array.isArray(cached.releases)) return cached.releases;
+        } catch (_) {}
+      }
+      return null;
+    }
+  });
+
+  // Wait 15 seconds before background update check on startup to not slow down initialization
+  const startupTimer = setTimeout(() => {
+    checkForUpdatesInternal().catch(err => console.error("[Updater] Startup background check error:", err));
+  }, 15000);
+  startupTimer.unref?.();
+
+  // Periodically check for updates every 4 hours
+  const updateInterval = setInterval(() => {
+    checkForUpdatesInternal().catch(err => console.error("[Updater] Periodic background check error:", err));
+  }, 4 * 60 * 60 * 1000);
+  updateInterval.unref?.();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+
+  // NOTE: System-wide globalShortcut hooks (Cmd+K / Cmd+F) were removed.
+  // Cmd+K is now handled app-locally via before-input-event in createWindow();
+  // Cmd+F is covered by the Edit menu accelerator ("Find in Page...").
+});
+
+/**
+ * Restricts subframe navigation strictly to safe schemes: http:, https:, and about:blank.
+ */
+export function isSafeSubframeNavigation(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    const isSafeHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
+    const isSafeAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
+    return isSafeHttp || isSafeAboutBlank;
+  } catch {
+    return false;
+  }
+}
+
+app.on('web-contents-created', (_event, contents) => {
+  // Security: Force secure webPreferences for any <webview> tags
+  contents.on('will-attach-webview', (event, webPreferences, params) => {
+    // Force entirely secure environment for webviews
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInWorker = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.webSecurity = true;
+    webPreferences.allowRunningInsecureContent = false;
+    webPreferences.experimentalFeatures = false;
+    webPreferences.sandbox = true;
+    webPreferences.backgroundThrottling = true;
+
+    // Security: Validate partition to prevent unauthorized partitions (e.g. persist:admin)
+    const part = (webPreferences as any).partition || (params as any).partition;
+    if (part && typeof part === 'string') {
+      if (part !== '' && !/^incognito-[a-zA-Z0-9_-]+$/.test(part)) {
+        console.warn(`[Security] Blocked unauthorized webview partition: ${part}`);
+        event.preventDefault();
+        return;
+      }
+      if (part.startsWith('incognito-')) {
+        hardenIncognitoPartition(part);
+      }
+    }
+
+    // Security: Only attach webstore-preload.cjs to authorized Chrome Web Store origins.
+    // Untrusted third-party websites must never receive webstore APIs or privileges.
+    // Enforce strict protocol confinement on webview src: only allow http(s), about:blank,
+    // or valid chrome-extension. Block file:, javascript:, data:, vbscript:, blob:, etc.
+    let isAuthorizedWebstore = false;
+    if (params.src) {
+      try {
+        const parsed = new URL(params.src);
+        const allowedProtocols = ['http:', 'https:'];
+        const isAllowedAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
+        // An extension-shaped id is not enough: a page can window.open any
+        // chrome-extension://<id> and this accepted it, so the isInstalled gate
+        // the other two entry points enforce was skipped. Shape AND existence.
+        const isAllowedExtension = parsed.protocol === 'chrome-extension:' &&
+          /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) &&
+          (loadedExtensions.some(ext => ext.id === parsed.hostname) ||
+            Boolean(session.defaultSession.getExtension(parsed.hostname)));
+
+        if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank && !isAllowedExtension) ||
+            parsed.username || parsed.password) {
+          console.warn(`[Security] Blocked unauthorized webview scheme in src: ${params.src}`);
+          event.preventDefault();
+          return;
+        }
+
+        if (parsed.protocol === 'https:' && (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com') && (parsed.hostname === 'chromewebstore.google.com' || parsed.pathname.startsWith('/webstore/'))) {
+          isAuthorizedWebstore = true;
+        }
+      } catch {
+        console.warn(`[Security] Blocked malformed webview src: ${params.src}`);
+        event.preventDefault();
+        return;
+      }
+    }
+
+    if (isAuthorizedWebstore) {
+      webPreferences.preload = path.join(__dirname, 'webstore-preload.cjs');
+    } else {
+      // Sandboxed guest preload: isolated password capture and link hover detection.
+      // Zero Electron APIs or node globals are exposed to untrusted guest pages.
+      webPreferences.preload = path.join(__dirname, 'guest-preload.cjs');
+    }
+  });
+
+  // Security: Sliding-window rate limiter per WebContents to prevent popup flooding (DoS)
+  const popupHistory = new Map<number, number[]>();
+  contents.once('destroyed', () => {
+    popupHistory.delete(contents.id);
+  });
+
+  // Security: Block arbitrary window popups, rate-limit rapid bursts, and route valid HTTP/HTTPS URLs to our secure tab system
+  contents.setWindowOpenHandler(({ url }) => {
+    try {
+      const now = Date.now();
+      const id = contents.id;
+      const history = (popupHistory.get(id) || []).filter(ts => now - ts < 2000);
+      if (history.length >= 3) {
+        console.warn(`[Security] Blocked popup flood from webContents ${id} (url: ${url})`);
+        popupHistory.set(id, history);
+        return { action: 'deny' };
+      }
+      history.push(now);
+      popupHistory.set(id, history);
+
+      const parsed = new URL(url);
+      const isHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
+      const isExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) && !parsed.username && !parsed.password;
+      if (isHttp || isExtension) {
+        sendToMainWindow('new-tab', url);
+      }
+    } catch {}
+    return { action: 'deny' };
+  });
+
+  if (contents.getType() === 'webview') {
+    if (!app.isPackaged) {
+      contents.on('console-message', (details) => {
+        const isError = details.level === 'error';
+        const message = details.message;
+        const source = details.sourceId;
+        const line = details.lineNumber;
+        if (!isError || !source.startsWith('chrome-extension://')) return;
+        const safeMessage = message
+          .replace(/(password|token|secret|api[_-]?key|authorization)(\s*[:=]\s*)[^\s,;]+/gi, '$1$2[redacted]')
+          .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [redacted]')
+          .slice(0, 500);
+        let safeSource = source;
+        try {
+          const parsed = new URL(source);
+          safeSource = `${parsed.origin}${parsed.pathname}`;
+        } catch (_) {}
+        console.warn(`[Extensions:content-script] ${safeSource}:${line} ${safeMessage}`);
+      });
+    }
+
+    // Native Audio State Hook
+    const audioListener = (_audioEvt: any, audible: boolean) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('tab-audio-changed', {
+          webContentsId: contents.id,
+          isPlayingAudio: audible
+        });
+      }
+    };
+    (contents as any).on('audio-state-changed', audioListener);
+    contents.once('destroyed', () => {
+      (contents as any).removeListener('audio-state-changed', audioListener);
+    });
+
+    // Security: Restrict subframe navigation strictly to safe schemes: http:, https:, and about:blank
+    contents.on('will-frame-navigate', (event: any) => {
+      if (event && !event.isMainFrame) {
+        const frameUrl = typeof event.url === 'string' ? event.url : '';
+        if (!isSafeSubframeNavigation(frameUrl)) {
+          event.preventDefault();
+          console.warn('[Security] Blocked unauthorized subframe navigation to:', frameUrl);
+        }
+      }
+    });
+
+    contents.on('will-navigate', (e, navigationUrl) => {
+      // 0. Prevent dangerous protocols, local file access, and internal
+      // about: pages from being loaded inside untrusted webviews.
+      try {
+        const parsed = new URL(navigationUrl);
+        const allowedProtocols = ['http:', 'https:'];
+        const isAllowedAboutBlank = parsed.protocol === 'about:' && parsed.pathname === 'blank';
+        const isAllowedExtension = parsed.protocol === 'chrome-extension:' &&
+          /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) &&
+          (loadedExtensions.some(ext => ext.id === parsed.hostname) || Boolean(session.defaultSession.getExtension(parsed.hostname)));
+
+        if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank && !isAllowedExtension) ||
+            parsed.username || parsed.password) {
+          e.preventDefault();
+          console.warn('Blocked navigation to forbidden protocol or credential-bearing URL:', navigationUrl);
+          return;
+        }
+      } catch {
+        e.preventDefault();
+        return;
+      }
+
+      // 1. Phishing Check
+      if (checkPhishingDomain(navigationUrl)) {
+        e.preventDefault();
+        sendToMainWindow('blocked-site', { url: navigationUrl, reason: 'phishing' });
+        const escapedUrl = navigationUrl.substring(0, 500);
+        const safeUrlJson = JSON.stringify(escapedUrl);
+        if (!contents.isDestroyed()) {
+          contents.loadURL('about:blank').then(() => {
+            if (!contents.isDestroyed()) {
+              contents.executeJavaScript(`
+                (() => {
+                  document.title = 'Dangerous Site Blocked';
+                  document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
+                  const h1 = document.createElement('h1');
+                  h1.textContent = 'Dangerous Site Blocked';
+                  h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
+                  const p = document.createElement('p');
+                  p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
+                  p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
+                  document.body.appendChild(h1);
+                  document.body.appendChild(p);
+                })()
+              `).catch(() => {});
+            }
+          }).catch(() => {});
+        }
+        return;
+      }
+
+      // 2. HTTPS Upgrade
+      try {
+        const urlObj = new URL(navigationUrl);
+        if (urlObj.protocol === 'http:' && !isLocalOrIntranetHost(urlObj.hostname)) {
+          if (hasUpgradedUrl(navigationUrl)) {
+            // Zaten denedik ve patladı (SSL hatası vs.), sonsuz döngüye girmemek için devam et
+            // (yalnızca UPGRADED_URL_TTL_MS boyunca; sonra tekrar denenir)
+            return;
+          }
+
+          e.preventDefault();
+          addUpgradedUrl(navigationUrl);
+          const httpsUrl = navigationUrl.replace(/^http:/, 'https:');
+
+          // Security (L-7): never auto-fall back to plain HTTP when the HTTPS
+          // upgrade fails — a MITM can force that downgrade. Log and stay put.
+          // navigationUrl is now in upgradedUrls, so an EXPLICIT user retry of
+          // the http:// URL is still allowed through (see the check above).
+          if (!contents.isDestroyed()) {
+            contents.loadURL(httpsUrl).catch((upgradeErr: any) => {
+              console.warn('HTTPS upgrade failed, refusing to downgrade to HTTP for:', navigationUrl, upgradeErr?.message || upgradeErr);
+            });
+          }
+        }
+      } catch {}
+    });
+
+    // Redirects do not reliably pass through the renderer's navigation
+    // listeners. Apply the same protocol, credential, phishing, and HTTPS
+    // downgrade policy at the main-process boundary as well.
+    contents.on('will-redirect', (e, redirectUrl) => {
+      let parsed: URL;
+      try {
+        parsed = new URL(redirectUrl);
+      } catch {
+        e.preventDefault();
+        return;
+      }
+
+      if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+        e.preventDefault();
+        console.warn('Blocked redirect to forbidden protocol or credential-bearing URL:', redirectUrl);
+        return;
+      }
+      if (checkPhishingDomain(redirectUrl)) {
+        e.preventDefault();
+        sendToMainWindow('blocked-site', { url: redirectUrl, reason: 'phishing' });
+        const escapedUrl = redirectUrl.substring(0, 500);
+        const safeUrlJson = JSON.stringify(escapedUrl);
+        if (!contents.isDestroyed()) {
+          contents.loadURL('about:blank').then(() => {
+            if (!contents.isDestroyed()) {
+              contents.executeJavaScript(`
+                (() => {
+                  document.title = 'Dangerous Site Blocked';
+                  document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
+                  const h1 = document.createElement('h1');
+                  h1.textContent = 'Dangerous Site Blocked';
+                  h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
+                  const p = document.createElement('p');
+                  p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
+                  p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
+                  document.body.appendChild(h1);
+                  document.body.appendChild(p);
+                })()
+              `).catch(() => {});
+            }
+          }).catch(() => {});
+        }
+        return;
+      }
+
+      if (parsed.protocol === 'http:' && !isLocalOrIntranetHost(parsed.hostname)) {
+        if (hasUpgradedUrl(redirectUrl)) return;
+        e.preventDefault();
+        addUpgradedUrl(redirectUrl);
+        const httpsUrl = redirectUrl.replace(/^http:/i, 'https:');
+        if (!contents.isDestroyed()) {
+          contents.loadURL(httpsUrl).catch((err: any) => {
+            console.warn('HTTPS redirect upgrade failed; refusing HTTP:', redirectUrl, err?.message || err);
+          });
+        }
+      }
+    });
+  }
+});
+
+
+let clearOnExitInFlight = false;
+let clearOnExitCompleted = false;
+/**
+ * True from the moment an update install starts until the process is on its way
+ * out. The update's shell script blocks on this PID exiting, so anything that
+ * defers the quit would strand the browser on the old version.
+ */
+let updateInstallInProgress = false;
+
+function isUpdateInstallInProgress(): boolean {
+  return updateInstallInProgress;
+}
+
+/** Reads clearOnExit from the persisted settings, or false if unreadable. */
+function readClearOnExitSetting(): boolean {
+  try {
+    const userDataDir = app.getPath('userData');
+    const primary = path.join(userDataDir, 'store_user_settings.json');
+    const legacy = path.join(userDataDir, 'store_settings.json');
+    const settingsFile = fs.existsSync(primary) ? primary : (fs.existsSync(legacy) ? legacy : null);
+    if (!settingsFile) return false;
+    const parsed = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
+    const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+    return Boolean(settings && settings.clearOnExit);
+  } catch (_) {
+    return false;
+  }
+}
+
+app.on('before-quit', (event) => {
+  // Clear-on-exit: execute once before process exit.
+  // Must not loop when app.quit() is called upon completion.
+  // Must not defer when an update installation is in progress.
+  if (app.isReady() && !clearOnExitInFlight && !clearOnExitCompleted && readClearOnExitSetting() && !isUpdateInstallInProgress()) {
+    event.preventDefault();
+    clearOnExitInFlight = true;
+    clearOnExitCompleted = true;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearOnExitInFlight = false;
+      app.quit();
+    };
+    const watchdog = setTimeout(() => {
+      console.warn('[Quit] clear-on-exit timed out after 5s; proceeding with quit');
+      finish();
+    }, 5000);
+    if (typeof (watchdog as any).unref === 'function') (watchdog as any).unref();
+
+    Promise.allSettled([
+      session.defaultSession.clearStorageData(),
+      session.defaultSession.clearCache(),
+    ]).then(results => {
+      clearTimeout(watchdog);
+      for (const r of results) {
+        if (r.status === 'rejected') console.warn('[Quit] clear-on-exit step failed:', r.reason);
+      }
+      finish();
+    }).catch(() => {
+      clearTimeout(watchdog);
+      finish();
+    });
+    return;
+  }
+  markQuitting();
+  try {
+    if (mcpServer && mcpServer.isRunning()) {
+      mcpServer.stop();
+    }
+  } catch (e) {
+    console.warn('[Quit] MCP server stop failed:', e);
+  }
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+// IPC Handler for Privacy Shield Toggle
+ipcMain.handle('set-privacy-shield', (event, enabled: boolean) => {
+  if (!isTrustedSender(event)) return false;
+  isPrivacyShieldEnabled = Boolean(enabled);
+  applyAdBlockerToAllSessions(isPrivacyShieldEnabled, getAllActiveSessions());
+  return isPrivacyShieldEnabled;
+});
+
+ipcMain.handle('set-do-not-track', (event, enabled: boolean) => {
+  if (!isTrustedSender(event)) return;
+  isDoNotTrackEnabled = Boolean(enabled);
+});
+
+// IPC Handler to dynamically update Accept-Language across all Electron sessions
+ipcMain.handle('set-app-language', async (event, lang: unknown) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
+  if (typeof lang !== 'string' || !lang.trim()) return { success: false, error: 'Invalid language' };
+  const cleanLang = lang.trim().toLowerCase();
+  currentAcceptLanguages = getAcceptLanguagesForLocale(cleanLang);
+
+  try {
+    session.defaultSession.setUserAgent(getStandardUserAgent(), currentAcceptLanguages);
+    session.fromPartition('incognito').setUserAgent(getStandardUserAgent(), currentAcceptLanguages);
+    for (const partName of hardenedIncognitoPartitions) {
+      try {
+        const targetSession = session.fromPartition(partName, { cache: false });
+        targetSession.setUserAgent(getStandardUserAgent(), currentAcceptLanguages);
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  return { success: true, acceptLanguages: currentAcceptLanguages };
+});
+
+// Daily 4K Ultra HD Wallpaper Engine (Bing 4K UHD Archive + 4K Desktop Masterpieces)
+ipcMain.handle('fetch-wallpaper-photos', async (event) => {
+  if (!isTrustedSender(event)) return [];
+  const results: any[] = [];
+  const seenIds = new Set<string>();
+
+  const isSafeHttpUrl = (u: any): boolean => {
+    if (typeof u !== 'string' || !u.trim() || /["'\r\n\\]/.test(u)) return false;
+    try {
+      const p = new URL(u);
+      return p.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  const addPhoto = (photo: any) => {
+    if (!photo || !photo.id || !isSafeHttpUrl(photo.imageUrl) || seenIds.has(photo.id)) return;
+    seenIds.add(photo.id);
+    results.push(photo);
+  };
+
+  // Run all providers concurrently to eliminate sequential network latency
+  await Promise.allSettled([
+    // Bing Batch 1 (Today + recent days)
+    (async () => {
+      try {
+        const res = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US', {
+          signal: AbortSignal.timeout(8000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.images && Array.isArray(data.images)) {
+            for (const img of data.images) {
+              const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
+              addPhoto({
+                id: `bing-${img.hsh || img.startdate}`,
+                title: String(img.title || 'Bing Daily 4K Wallpaper').slice(0, 150),
+                author: String(img.copyright || 'Microsoft Bing Daily').slice(0, 100),
+                authorUrl: 'https://bing.com',
+                imageUrl: uhdUrl,
+                thumbnailUrl: `https://www.bing.com${img.url}`,
+                source: 'Bing 4K UHD Daily',
+                resolution: '3840x2160',
+                date: img.startdate
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Bing batch 0 fetch error:', e);
+      }
+    })(),
+
+    // Bing Batch 2 (Previous week)
+    (async () => {
+      try {
+        const res = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=7&n=8&mkt=en-US', {
+          signal: AbortSignal.timeout(8000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.images && Array.isArray(data.images)) {
+            for (const img of data.images) {
+              const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
+              addPhoto({
+                id: `bing-${img.hsh || img.startdate}`,
+                title: String(img.title || 'Bing Daily 4K Wallpaper').slice(0, 150),
+                author: String(img.copyright || 'Microsoft Bing Daily').slice(0, 100),
+                authorUrl: 'https://bing.com',
+                imageUrl: uhdUrl,
+                thumbnailUrl: `https://www.bing.com${img.url}`,
+                source: 'Bing 4K UHD Daily',
+                resolution: '3840x2160',
+                date: img.startdate
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Bing batch 7 fetch error:', e);
+      }
+    })(),
+
+    // Wallhaven Curated 4K Widescreen
+    (async () => {
+      try {
+        const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
+        const res = await fetch(whUrl, {
+          headers: { 'User-Agent': getStandardUserAgent(), 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(8000)
+        });
+        if (res.ok) {
+          const whData = await res.json();
+          if (whData.data && Array.isArray(whData.data) && whData.data.length > 0) {
+            for (const item of whData.data.slice(0, 15)) {
+              if (!isSafeHttpUrl(item.path)) continue;
+              const categoryLabel = item.category ? (item.category.charAt(0).toUpperCase() + item.category.slice(1)) : 'Curated';
+              addPhoto({
+                id: `wh-${item.id}`,
+                title: `${categoryLabel} Artwork`,
+                author: 'Wallhaven',
+                authorUrl: isSafeHttpUrl(item.url) ? item.url : 'https://wallhaven.cc',
+                imageUrl: item.path,
+                thumbnailUrl: isSafeHttpUrl(item.thumbs?.large) ? item.thumbs.large : (isSafeHttpUrl(item.thumbs?.small) ? item.thumbs.small : item.path),
+                source: '4K Ultra HD',
+                resolution: item.resolution || '3840x2160'
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Wallhaven toplist fetch error:', err);
+      }
+    })()
+  ]);
+
+  return results;
+});
+
+// Legacy alias for compatibility
+ipcMain.handle('fetch-unsplash-photos', async (event, query: string) => {
+  if (!isTrustedSender(event)) return [];
+  return [];
+});
+
+// Set theme source for dark mode rendering on pages
+ipcMain.on('set-theme', (event, theme: 'light' | 'dark' | 'system') => {
+  if (!isTrustedSender(event)) return;
+  if (theme === 'light' || theme === 'dark' || theme === 'system') {
+    nativeTheme.themeSource = theme;
+    if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        mainWindow.setTitleBarOverlay({
+          color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+          symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+          height: 44
+        });
+      } catch (_) {}
+    }
+  }
+});
+
+// Capture thumbnail from a webview via its webContentsId
+ipcMain.handle('capture-tab-thumbnail', async (event, webContentsId: number) => {
+  if (!isTrustedSender(event)) return null;
+  if (typeof webContentsId !== 'number' || !Number.isInteger(webContentsId)) return null;
+  try {
+    const wc = webContents.fromId(webContentsId);
+    if (!wc || wc.isDestroyed()) return null;
+
+    // Security: Only allow capturing webviews (tabs)
+    if (wc.getType() !== 'webview') return null;
+
+    const image = await wc.capturePage();
+    if (image.isEmpty()) return null;
+    return image.resize({ width: 320, height: 200 }).toDataURL();
+  } catch (err) {
+    return null;
+  }
+});
+
+// Capture full page screenshot using CDP
+ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
+  if (!isTrustedSender(event)) return null;
+  if (typeof webContentsId !== 'number' || !Number.isInteger(webContentsId)) return null;
+  try {
+    const wc = webContents.fromId(webContentsId);
+    if (!wc || wc.isDestroyed() || wc.getType() !== 'webview') return null;
+
+    let attached = false;
+    try {
+      if (!wc.debugger.isAttached()) {
+        wc.debugger.attach('1.3');
+        attached = true;
+      }
+    } catch (err) {
+      console.error('Debugger attach failed: ', err);
+      return null;
+    }
+
+    let dataUrl = null;
+    let metricsOverridden = false;
+    try {
+      const metrics = await wc.debugger.sendCommand('Page.getLayoutMetrics');
+      const MAX_SCREENSHOT_WIDTH = 8192;
+      const MAX_SCREENSHOT_HEIGHT = 16384;
+      const rawWidth = Math.ceil((metrics as any).cssContentSize?.width || (metrics as any).contentSize?.width || 1920);
+      const rawHeight = Math.ceil((metrics as any).cssContentSize?.height || (metrics as any).contentSize?.height || 1080);
+      const width = Math.min(Math.max(Number.isFinite(rawWidth) ? rawWidth : 1920, 320), MAX_SCREENSHOT_WIDTH);
+      const height = Math.min(Math.max(Number.isFinite(rawHeight) ? rawHeight : 1080, 200), MAX_SCREENSHOT_HEIGHT);
+
+      // Force the viewport to expand to the full height of the page to ensure off-screen content is rendered
+      await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+        mobile: false,
+        width,
+        height,
+        deviceScaleFactor: 1,
+        screenOrientation: { angle: 0, type: 'portraitPrimary' }
+      });
+      metricsOverridden = true;
+
+      // Wait a moment for the page to layout and paint the newly exposed areas
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const response = await wc.debugger.sendCommand('Page.captureScreenshot', {
+        format: 'png',
+        captureBeyondViewport: true,
+        fromSurface: true,
+        clip: {
+          x: 0,
+          y: 0,
+          width,
+          height,
+          scale: 1
+        }
+      });
+
+      if (response && (response as any).data) {
+        dataUrl = `data:image/png;base64,${(response as any).data}`;
+      }
+    } catch (err) {
+      console.error('Screenshot CDP command failed:', err);
+    } finally {
+      if (metricsOverridden && wc && !wc.isDestroyed() && wc.debugger.isAttached()) {
+        try {
+          await wc.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
+        } catch (_) {}
+      }
+      if (attached && wc && !wc.isDestroyed() && wc.debugger.isAttached()) {
+        try {
+          wc.debugger.detach();
+        } catch (_) {}
+      }
+    }
+
+    return dataUrl;
+  } catch (err) {
+    console.error('Failed to capture full page:', err);
+    return null;
+  }
+});
+
+/**
+ * Opens a dedicated sandboxed window to safely view page source without
+ * routing dangerous view-source: schemes through renderer navigation.
+ */
+export async function openPageSourceViewer(currentUrl: string, wc?: any): Promise<BrowserWindow | null> {
+  if (!currentUrl || typeof currentUrl !== 'string') return null;
+
+  let isInternalPage = false;
+  let isViewSource = false;
+  try {
+    const parsed = new URL(currentUrl);
+    isInternalPage = parsed.protocol.startsWith('king');
+    isViewSource = parsed.protocol === 'view-source:';
+  } catch {
+    isInternalPage = currentUrl.toLowerCase().startsWith('king');
+    isViewSource = currentUrl.toLowerCase().startsWith('view-source:');
+  }
+
+  if (isInternalPage || isViewSource) return null;
+
+  let htmlSource = '';
+  if (wc && !wc.isDestroyed() && typeof wc.executeJavaScript === 'function') {
+    try {
+      htmlSource = await wc.executeJavaScript('document.documentElement.outerHTML');
+    } catch {}
+  }
+
+  if (!htmlSource && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
+    try {
+      const validated = await validatePreviewUrl(currentUrl);
+      if (!('error' in validated)) {
+        const { url: parsedUrl, pinnedIp } = validated;
+        const isHttps = parsedUrl.protocol === 'https:';
+        const agentOptions = {
+          lookup: (_hostname: string, _opts: any, cb: any) => {
+            cb(null, pinnedIp, pinnedIp.includes(':') ? 6 : 4);
+          }
+        };
+        const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
+        const resp = await fetch(currentUrl, {
+          agent,
+          signal: AbortSignal.timeout(8000),
+          headers: {
+            'User-Agent': getStandardUserAgent()
+          }
+        } as any);
+        // Bounded like every sibling fetch path: an adversarially large or
+        // never-ending body would otherwise be buffered into the main process and
+        // then serialised a second time into the viewer, twice over.
+        htmlSource = await readResponseTextWithLimit(resp, 8 * 1024 * 1024);
+      }
+    } catch {}
+  }
+
+  const sourceWin = new BrowserWindow({
+    title: `Source: ${currentUrl}`,
+    width: 1000,
+    height: 700,
+    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    }
+  });
+
+  sourceWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  sourceWin.webContents.on('will-navigate', (navEvt) => navEvt.preventDefault());
+
+  try {
+    if (!sourceWin.isDestroyed()) {
+      await sourceWin.loadURL('about:blank');
+      if (!sourceWin.isDestroyed()) {
+        await sourceWin.webContents.executeJavaScript(`
+          document.title = ${JSON.stringify(`Source: ${currentUrl}`)};
+          document.body.style.cssText = 'margin:0;padding:16px;background:#0f172a;color:#e2e8f0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;overflow-x:auto;';
+          const pre = document.createElement('pre');
+          pre.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-all;';
+          pre.textContent = ${JSON.stringify(htmlSource || '<!-- No source available -->')};
+          document.body.appendChild(pre);
+        `);
+      }
+    }
+  } catch {}
+
+  return sourceWin;
+}
+
+// Google rejects sign-in inside embedded browsers. Offer the user's default
+// browser instead of a dead end; never try to evade the check.
+function watchGoogleSigninRejection(wc: Electron.WebContents): void {
+  let lastNonGoogleUrl: string | null = null;
+  let prompting = false;
+  wc.on('did-navigate', (_e, url) => {
+    if (!isGoogleEmbeddedSigninRejection(url)) {
+      try {
+        if (new URL(url).hostname !== 'accounts.google.com') lastNonGoogleUrl = url;
+      } catch {}
+      return;
+    }
+    if (prompting) return;
+    prompting = true;
+    const target = pickSystemBrowserUrl(lastNonGoogleUrl);
+    const options: Electron.MessageBoxOptions = {
+      type: 'info',
+      message: 'Google blocked sign-in in this browser',
+      detail: `Google does not allow signing in from embedded browsers such as King Browser. You can continue in your default browser:\n${target}`,
+      buttons: ['Open in Default Browser', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1
+    };
+    const shown = mainWindow && !mainWindow.isDestroyed()
+      ? dialog.showMessageBox(mainWindow, options)
+      : dialog.showMessageBox(options);
+    shown.then(({ response }) => {
+      if (response === 0) return shell.openExternal(target);
+    }).catch((err) => console.error('[Google Sign-in] Fallback failed:', err))
+      .finally(() => { prompting = false; });
+  });
+}
+
+// Auto-capture thumbnails and Native Chrome-Parity Context Menu for WebViews
+app.on('web-contents-created', (_event, wc) => {
+  if (wc.getType() === 'webview') watchGoogleSigninRejection(wc);
+  wc.removeAllListeners('context-menu');
+  wc.on('context-menu', (e, params) => {
+    // Only show for webviews
+    if (wc.getType() === 'webview') {
+      const menu = new Menu();
+
+      const labels = {
+        // Spellcheck
+        noGuesses: 'No guesses found',
+        addToDictionary: 'Add to Dictionary',
+
+        // Links
+        openLinkNewTab: 'Open Link in New Tab',
+        openLinkNewIncognitoTab: 'Open Link in Incognito Window',
+        saveLinkAs: 'Save Link As...',
+        copyLinkAddress: 'Copy Link Address',
+
+        // Images
+        openImageNewTab: 'Open Image in New Tab',
+        saveImageAs: 'Save Image As...',
+        copyImage: 'Copy Image',
+        copyImageAddress: 'Copy Image Address',
+        searchImageLens: 'Search Image with Google Lens',
+
+        // Audio & Video
+        play: 'Play',
+        pause: 'Pause',
+        mute: 'Mute',
+        unmute: 'Unmute',
+        loop: 'Loop',
+        showControls: 'Show Controls',
+        pictureInPicture: 'Picture in Picture',
+        saveVideoAs: 'Save Video As...',
+        copyVideoAddress: 'Copy Video Address',
+        saveAudioAs: 'Save Audio As...',
+        copyAudioAddress: 'Copy Audio Address',
+
+        // Selection
+        copy: 'Copy',
+        cut: 'Cut',
+        paste: 'Paste',
+        pasteAsPlainText: 'Paste as Plain Text',
+        selectAll: 'Select All',
+        undo: 'Undo',
+        redo: 'Redo',
+        delete: 'Delete',
+        searchFor: (query: string) => `Search Google for "${query}"`,
+        aiExplain: 'Explain with King AI',
+
+        // Page Navigation
+        back: 'Back',
+        forward: 'Forward',
+        reload: 'Reload',
+        translatePage: 'Translate Page',
+        openInSystemBrowser: 'Open Page in Default Browser',
+        savePageAs: 'Save As...',
+        print: 'Print...',
+        viewSource: 'View Page Source',
+        inspect: 'Inspect',
+      };
+
+      // 1. Spellcheck Suggestions (if misspelled word)
+      if (params.misspelledWord) {
+        if (params.dictionarySuggestions && params.dictionarySuggestions.length > 0) {
+          for (const suggestion of params.dictionarySuggestions) {
+            menu.append(new MenuItem({
+              label: suggestion,
+              click: () => {
+                if (!wc.isDestroyed()) wc.replaceMisspelling(suggestion);
+              }
+            }));
+          }
+        } else {
+          menu.append(new MenuItem({
+            label: labels.noGuesses,
+            enabled: false
+          }));
+        }
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(new MenuItem({
+          label: labels.addToDictionary,
+          click: () => {
+            if (!wc.isDestroyed()) wc.session.addWordToSpellCheckerDictionary(params.misspelledWord);
+          }
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 2. Link Actions
+      if (params.linkURL) {
+        const isHttpLink = params.linkURL.startsWith('http://') || params.linkURL.startsWith('https://');
+        const isAllowedLinkScheme = isHttpLink || params.linkURL.startsWith('chrome-extension://');
+        if (isAllowedLinkScheme) {
+          menu.append(new MenuItem({
+            label: labels.openLinkNewTab,
+            click: () => sendToMainWindow('new-tab', params.linkURL)
+          }));
+          menu.append(new MenuItem({
+            label: labels.openLinkNewIncognitoTab,
+            click: () => sendToMainWindow('new-incognito-tab', params.linkURL)
+          }));
+        }
+        if (isHttpLink) {
+          menu.append(new MenuItem({
+            label: labels.saveLinkAs,
+            click: () => {
+              if (!wc.isDestroyed()) {
+                markNextDownloadAsSaveAs(wc.id);
+                wc.downloadURL(params.linkURL);
+              }
+            }
+          }));
+        }
+        menu.append(new MenuItem({
+          label: labels.copyLinkAddress,
+          click: () => clipboard.writeText(params.linkURL)
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 3. Image Actions
+      if (params.srcURL && params.mediaType === 'image') {
+        const isSafeImage = isSafeMediaDownloadUrl(params.srcURL, ['image']);
+        const isHttpImage = params.srcURL.startsWith('http://') || params.srcURL.startsWith('https://');
+
+        if (isSafeImage) {
+          if (isHttpImage) {
+            menu.append(new MenuItem({
+              label: labels.openImageNewTab,
+              click: () => sendToMainWindow('new-tab', params.srcURL)
+            }));
+          }
+          menu.append(new MenuItem({
+            label: labels.saveImageAs,
+            click: () => {
+              if (!wc.isDestroyed()) {
+                markNextDownloadAsSaveAs(wc.id);
+                wc.downloadURL(params.srcURL);
+              }
+            }
+          }));
+        }
+        menu.append(new MenuItem({
+          label: labels.copyImage,
+          click: () => {
+            try {
+              if (!wc.isDestroyed()) wc.copyImageAt(params.x, params.y);
+            } catch {
+              if (isSafeImage) clipboard.writeText(params.srcURL);
+            }
+          }
+        }));
+        if (isSafeImage) {
+          menu.append(new MenuItem({
+            label: labels.copyImageAddress,
+            click: () => clipboard.writeText(params.srcURL)
+          }));
+        }
+        if (isHttpImage) {
+          menu.append(new MenuItem({
+            label: labels.searchImageLens,
+            click: () => sendToMainWindow('new-tab', `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`)
+          }));
+        }
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 4. Video & Audio Actions
+      if (params.mediaType === 'video' || params.mediaType === 'audio') {
+        const isVideo = params.mediaType === 'video';
+        const flags = params.mediaFlags as any;
+        const safeX = Number.isFinite(params.x) ? Math.round(params.x) : 0;
+        const safeY = Number.isFinite(params.y) ? Math.round(params.y) : 0;
+        const mediaTarget = `(document.elementFromPoint(${safeX}, ${safeY})?.closest('video, audio') || document.querySelector('video:hover, audio:hover') || document.querySelector('video, audio'))`;
+        const videoTarget = `(document.elementFromPoint(${safeX}, ${safeY})?.closest('video') || document.querySelector('video:hover') || document.querySelector('video'))`;
+        if (flags) {
+          if (flags.canPlay) {
+            menu.append(new MenuItem({
+              label: flags.isPaused ? labels.play : labels.pause,
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) { if(el.paused) el.play(); else el.pause(); } })()`).catch(() => {});
+                }
+              }
+            }));
+          }
+          if (flags.canMute) {
+            menu.append(new MenuItem({
+              label: flags.isMuted ? labels.unmute : labels.mute,
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.muted = !el.muted; })()`).catch(() => {});
+                }
+              }
+            }));
+          }
+          if (flags.canLoop) {
+            menu.append(new MenuItem({
+              label: labels.loop,
+              type: 'checkbox',
+              checked: flags.isLooping,
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.loop = !el.loop; })()`).catch(() => {});
+                }
+              }
+            }));
+          }
+          if (flags.canShowControls) {
+            menu.append(new MenuItem({
+              label: labels.showControls,
+              type: 'checkbox',
+              checked: flags.isShowingControls,
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.controls = !el.controls; })()`).catch(() => {});
+                }
+              }
+            }));
+          }
+          if (isVideo && flags.canPictureInPicture) {
+            menu.append(new MenuItem({
+              label: labels.pictureInPicture,
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${videoTarget}; if(el) { if(document.pictureInPictureElement) document.exitPictureInPicture(); else el.requestPictureInPicture(); } })()`).catch(() => {});
+                }
+              }
+            }));
+          }
+          menu.append(new MenuItem({ type: 'separator' }));
+        }
+        if (params.srcURL) {
+          const isSafeMedia = isSafeMediaDownloadUrl(params.srcURL, [isVideo ? 'video' : 'audio']);
+          if (isSafeMedia) {
+            menu.append(new MenuItem({
+              label: isVideo ? labels.saveVideoAs : labels.saveAudioAs,
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  markNextDownloadAsSaveAs(wc.id);
+                  wc.downloadURL(params.srcURL);
+                }
+              }
+            }));
+            menu.append(new MenuItem({
+              label: isVideo ? labels.copyVideoAddress : labels.copyAudioAddress,
+              click: () => clipboard.writeText(params.srcURL)
+            }));
+            menu.append(new MenuItem({ type: 'separator' }));
+          }
+        }
+      }
+
+      // 5. Selected Text Actions
+      if (params.selectionText && !params.isEditable) {
+        const queryText = params.selectionText.trim();
+        const shortQuery = queryText.length > 24 ? queryText.substring(0, 24) + '...' : queryText;
+        menu.append(new MenuItem({ role: 'copy', label: labels.copy, accelerator: 'CmdOrCtrl+C' }));
+        menu.append(new MenuItem({
+          label: labels.searchFor(shortQuery),
+          click: () => sendToMainWindow('new-tab', `https://www.google.com/search?q=${encodeURIComponent(queryText)}`)
+        }));
+        menu.append(new MenuItem({
+          label: labels.aiExplain,
+          click: () => sendToMainWindow('quick-ai-action', queryText)
+        }));
+        menu.append(new MenuItem({
+          label: labels.print,
+          accelerator: 'CmdOrCtrl+P',
+          click: () => {
+            if (!wc.isDestroyed()) wc.print();
+          }
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 6. Editable Fields (Inputs, Textareas)
+      if (params.isEditable) {
+        menu.append(new MenuItem({ role: 'undo', label: labels.undo, accelerator: 'CmdOrCtrl+Z' }));
+        menu.append(new MenuItem({ role: 'redo', label: labels.redo, accelerator: process.platform === 'darwin' ? 'Shift+Cmd+Z' : 'CmdOrCtrl+Y' }));
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(new MenuItem({ role: 'cut', label: labels.cut, accelerator: 'CmdOrCtrl+X' }));
+        menu.append(new MenuItem({ role: 'copy', label: labels.copy, accelerator: 'CmdOrCtrl+C' }));
+        menu.append(new MenuItem({ role: 'paste', label: labels.paste, accelerator: 'CmdOrCtrl+V' }));
+        menu.append(new MenuItem({ role: 'pasteAndMatchStyle', label: labels.pasteAsPlainText, accelerator: 'Shift+CmdOrCtrl+V' }));
+        menu.append(new MenuItem({ role: 'delete', label: labels.delete }));
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(new MenuItem({ role: 'selectAll', label: labels.selectAll, accelerator: 'CmdOrCtrl+A' }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 7. Standard Page Navigation (when clicking background / empty page area)
+      if (!params.linkURL && !params.selectionText && params.mediaType === 'none' && !params.isEditable) {
+        menu.append(new MenuItem({
+          label: labels.back,
+          accelerator: process.platform === 'darwin' ? 'Cmd+[' : 'Alt+Left',
+          click: () => {
+            if (!wc.isDestroyed()) wc.goBack();
+          },
+          enabled: !wc.isDestroyed() && (wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack())
+        }));
+        menu.append(new MenuItem({
+          label: labels.forward,
+          accelerator: process.platform === 'darwin' ? 'Cmd+]' : 'Alt+Right',
+          click: () => {
+            if (!wc.isDestroyed()) wc.goForward();
+          },
+          enabled: !wc.isDestroyed() && (wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward())
+        }));
+        menu.append(new MenuItem({
+          label: labels.reload,
+          accelerator: 'CmdOrCtrl+R',
+          click: () => {
+            if (!wc.isDestroyed()) wc.reload();
+          }
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+
+        // Save Page As...
+        menu.append(new MenuItem({
+          label: labels.savePageAs,
+          accelerator: 'CmdOrCtrl+S',
+          click: async () => {
+            if (wc.isDestroyed()) return;
+            const currentUrl = wc.getURL();
+            if (currentUrl && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
+              const safeTitle = (wc.getTitle() || 'page').replace(/[/\\?%*:|"<>]/g, '_').slice(0, 100);
+              const defaultFilename = safeTitle + '.html';
+              const saveRes = await dialog.showSaveDialog(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined as any, {
+                defaultPath: path.join(app.getPath('downloads'), defaultFilename),
+                filters: [{ name: 'HTML Complete Page', extensions: ['html', 'htm'] }]
+              });
+              if (!saveRes.canceled && saveRes.filePath) {
+                try {
+                  if (!wc.isDestroyed()) {
+                    await wc.savePage(saveRes.filePath, 'HTMLComplete');
+                  }
+                } catch (err) {
+                  console.error('savePage error:', err);
+                }
+              }
+            }
+          }
+        }));
+
+        // Print...
+        menu.append(new MenuItem({
+          label: labels.print,
+          accelerator: 'CmdOrCtrl+P',
+          click: () => {
+            if (!wc.isDestroyed()) wc.print();
+          }
+        }));
+
+        // View Page Source
+        menu.append(new MenuItem({
+          label: labels.viewSource,
+          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+U' : 'Ctrl+U',
+          click: async () => {
+            if (wc.isDestroyed()) return;
+            const currentUrl = wc.getURL();
+            try {
+              await openPageSourceViewer(currentUrl, wc);
+            } catch (err) {
+              console.error('[View Source] Failed to open source viewer:', err);
+            }
+          }
+        }));
+
+        const activePageUrl = !wc.isDestroyed() ? (wc.getURL() || '') : '';
+        if (activePageUrl && (activePageUrl.startsWith('http://') || activePageUrl.startsWith('https://'))) {
+          menu.append(new MenuItem({
+            label: labels.translatePage,
+            click: () => {
+              if (!wc.isDestroyed()) {
+                sendToMainWindow('trigger-page-translation', { targetLang: 'en', webContentsId: wc.id });
+              }
+            }
+          }));
+        }
+
+        // Sites that refuse embedded browsers (Google sign-in) still work in
+        // the user's regular browser.
+        if (activePageUrl && canOpenInSystemBrowser(activePageUrl)) {
+          menu.append(new MenuItem({
+            label: labels.openInSystemBrowser,
+            click: () => {
+              shell.openExternal(activePageUrl).catch((err) => console.error('[Open Externally] Failed:', err));
+            }
+          }));
+        }
+
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 8. Inspect / DevTools (Always available at bottom just like Chrome)
+      menu.append(new MenuItem({
+        label: labels.inspect,
+        accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
+        click: () => {
+          if (!wc.isDestroyed()) {
+            if (wc.isDevToolsOpened()) {
+              wc.devToolsWebContents?.focus();
+            }
+            wc.inspectElement(params.x, params.y);
+          }
+        }
+      }));
+
+      menu.popup({ window: mainWindow || undefined });
+    }
+  });
+});
+
+// Download Controls (handlers live in main/downloads.ts)
+initDownloads(sendToMainWindow, isTrustedSender);
+
+// MCP Server Controls
+ipcMain.handle('start-mcp-server', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  if (mcpServer && !mcpServer.isRunning()) {
+    try {
+      await mcpServer.start();
+    } catch (err) {
+      console.error('[MCP] Failed to start server:', err);
+      return false;
+    }
+    const actualPort = mcpServer.getPort();
+    sendToMainWindow('mcp-status-changed', { running: true, port: actualPort });
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('stop-mcp-server', (event) => {
+  if (!isTrustedSender(event)) return false;
+  if (mcpServer && mcpServer.isRunning()) {
+    mcpServer.stop();
+    sendToMainWindow('mcp-status-changed', { running: false, port: 0 });
+    return true;
+  }
+  return false;
+});
+
+let clipboardTokenClearTimer: NodeJS.Timeout | null = null;
+ipcMain.handle('copy-mcp-token', (event) => {
+  if (!isTrustedSender(event)) return false;
+  const token = mcpServer?.getToken();
+  if (token) {
+    clipboard.writeText(token);
+    // Security: Auto-clear token from clipboard after 15 seconds to prevent unauthorized exfiltration
+    if (clipboardTokenClearTimer) clearTimeout(clipboardTokenClearTimer);
+    clipboardTokenClearTimer = setTimeout(() => {
+      try {
+        if (clipboard.readText() === token) {
+          clipboard.clear();
+        }
+      } catch (_) {}
+    }, 15000);
+    return true;
+  }
+  return false;
+});
+let clipboardConfigClearTimer: NodeJS.Timeout | null = null;
+ipcMain.handle('copy-mcp-config', (event) => {
+  if (!isTrustedSender(event)) return false;
+  const token = mcpServer?.getToken() || '';
+  const port = mcpServer ? mcpServer.getPort() : 3020;
+  const config = JSON.stringify({
+    mcpServers: {
+      "king-browser": {
+        url: `http://localhost:${port}/sse`,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    }
+  }, null, 2);
+  clipboard.writeText(config);
+  // Security: Auto-clear Bearer-bearing config from clipboard after 15s (same as copy-mcp-token)
+  if (clipboardConfigClearTimer) clearTimeout(clipboardConfigClearTimer);
+  clipboardConfigClearTimer = setTimeout(() => {
+    try {
+      if (clipboard.readText() === config) {
+        clipboard.clear();
+      }
+    } catch (_) {}
+  }, 15000);
+  return { ok: true, autoClearSec: 15 };
+});
+ipcMain.handle('get-mcp-token-status', (event) => {
+  if (!isTrustedSender(event)) return { configured: false, prefix: '' };
+  const token = mcpServer?.getToken();
+  return {
+    configured: Boolean(token),
+    prefix: token ? 'king_mcp_••••••••' : ''
+  };
+});
+ipcMain.handle('rotate-mcp-token', (event) => {
+  if (!isTrustedSender(event)) return false;
+  mcpServer?.rotateToken();
+  return true;
+});
+ipcMain.handle('get-mcp-tool-settings', (event) => {
+  if (!isTrustedSender(event)) return [];
+  return mcpServer?.getDisabledTools() || [];
+});
+ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolean) => {
+  if (!isTrustedSender(event)) return false;
+  if (!toolName || typeof toolName !== 'string') return false;
+  mcpServer?.setToolEnabled(toolName, Boolean(enabled));
+  return true;
+});
+
+ipcMain.handle('get-mcp-status', (event) => {
+  if (!isTrustedSender(event)) return { running: false, port: 0, clients: [], clientCount: 0 };
+  if (!mcpServer) return { running: false, port: 0, clients: [], clientCount: 0 };
+  return {
+    running: mcpServer.isRunning(),
+    port: mcpServer.getPort(),
+    clientCount: mcpServer.getClientCount(),
+    clients: mcpServer.getConnectedClientsInfo()
+  };
+});
+
+// Tracks which per-tab incognito partitions have already been hardened to avoid stacking listeners.
+// Security: Init and harden a new per-tab incognito partition. Called by the renderer
+// immediately after creating a new incognito tab, before any navigation occurs.
+// Applies the same permission/download/proxy restrictions as defaultSession.
+ipcMain.handle('init-incognito-partition', async (event, tabId: unknown) => {
+  if (!isTrustedSender(event)) return false;
+  if (typeof tabId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(tabId) || tabId.length > 64) return false;
+  return hardenIncognitoPartition(`incognito-${tabId}`);
+});
+
+// Clear incognito mode session — accepts optional tabId for per-tab partition isolation.
+// When tabId is provided, clears only that tab's in-memory partition (incognito-{tabId}).
+// When omitted, clears the legacy shared 'incognito' partition (backward compat).
+ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
+  if (!isTrustedSender(event)) return false;
+  try {
+    if (tabId && typeof tabId === 'string' && /^[a-zA-Z0-9_-]+$/.test(tabId)) {
+      const partitionName = `incognito-${tabId}`;
+      hardenedIncognitoPartitions.delete(partitionName);
+      const sess = session.fromPartition(partitionName, { cache: false });
+      await sess.clearStorageData();
+      await sess.clearCache();
+    } else {
+      // Clear all active per-tab incognito partitions
+      const partitions = Array.from(hardenedIncognitoPartitions);
+      hardenedIncognitoPartitions.clear();
+      for (const partName of partitions) {
+        try {
+          const sess = session.fromPartition(partName, { cache: false });
+          await sess.clearStorageData();
+          await sess.clearCache();
+        } catch (_) {}
+      }
+
+      // Clear the legacy shared 'incognito' partition.
+      const legacySess = session.fromPartition('incognito', { cache: false });
+      await legacySess.clearStorageData();
+      await legacySess.clearCache();
+    }
+    return true;
+  } catch (err) {
+    console.error('Error clearing incognito session:', err);
+    return false;
+  }
+});
+
+// Clear AI model cache & Service Worker WebLLM cache
+ipcMain.handle('clear-ai-models-cache', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  try {
+    const defaultSess = session.defaultSession;
+    await defaultSess.clearStorageData({
+      storages: ['serviceworkers', 'cachestorage']
+    });
+    await defaultSess.clearCache();
+    // The Cache API and the HTTP cache above hold nothing on disk for us to
+    // reclaim: model shards are written by the main process straight to
+    // <userData>/models/<sha256>. Without this the "clear AI models cache"
+    // button freed zero bytes and the feature kept working off disk.
+    // `force` ignores a missing directory; the write path re-creates it.
+    await fs.promises.rm(modelCacheDir(), { recursive: true, force: true });
+    return true;
+  } catch (err) {
+    console.error('Error clearing AI models cache:', err);
+    return false;
+  }
+});
+
+// Purge inactive RAM, host resolver cache and session cache for maximum performance
+ipcMain.handle('purge-system-memory', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  try {
+    const defaultSess = session.defaultSession;
+    await defaultSess.clearCache();
+    await defaultSess.clearHostResolverCache();
+    await defaultSess.clearAuthCache();
+
+    // Deep purge memory cache for any active incognito partitions
+    for (const partName of Array.from(hardenedIncognitoPartitions)) {
+      try {
+        const partSess = session.fromPartition(partName, { cache: false });
+        await partSess.clearCache();
+        await partSess.clearHostResolverCache();
+      } catch (_) {}
+    }
+
+    if (typeof (global as any).gc === 'function') {
+      (global as any).gc();
+    }
+    return true;
+  } catch (err) {
+    console.error('Error purging system memory:', err);
+    return false;
+  }
+});
+
+// Password Manager: save-password channel (fire-and-forget, validated with isTrustedSender)
+ipcMain.on('save-password', (event, data: { hostname: string; username: string; password: string }) => {
+  if (!isTrustedSender(event)) return;
+  if (!data || typeof data !== 'object') return;
+  const { hostname, username, password } = data;
+  if (typeof hostname !== 'string' || typeof username !== 'string' || typeof password !== 'string') return;
+  const cleanUser = username.trim();
+  let cleanHost = hostname.trim().toLowerCase();
+  try {
+    if (cleanHost.includes('://')) {
+      cleanHost = new URL(cleanHost).hostname.toLowerCase();
+    } else {
+      cleanHost = new URL(`https://${cleanHost}`).hostname.toLowerCase();
+    }
+  } catch {
+    cleanHost = cleanHost.replace(/:\d+$/, '').replace(/\.+$/, '');
+  }
+  if (!cleanHost || !cleanUser || !password) return;
+  // Emit event to the main window to trigger password prompt
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('password-form-submitted', { hostname: cleanHost, username: cleanUser, password });
+  }
+});
+
+// Generic Secure Storage API (for future password manager, etc.)
+// Mutex: serialize concurrent secure-store operations to prevent read-modify-write races
+// when multiple tabs call save-password / secure-store-set simultaneously.
+let secureStoreMutexChain: Promise<unknown> = Promise.resolve();
+function withSecureStoreMutex<T>(fn: () => Promise<T>): Promise<T> {
+  const next = secureStoreMutexChain.then(fn, fn) as Promise<T>;
+  // Swallow any rejection on the chain tail so the mutex never stalls permanently.
+  secureStoreMutexChain = next.catch(() => undefined);
+  return next;
+}
+ipcMain.handle('secure-store-set', async (event, key: string, value: string) => {
+  if (!isTrustedSender(event)) return false;
+  return withSecureStoreMutex(async () => {
+    try {
+      if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
+      if (typeof value !== 'string') throw new Error('Invalid value format');
+      // VULN-23 parity: enforce max value size of 5MB (store-set enforces 10MB)
+      const MAX_SECURE_STORE_VALUE_SIZE = 5_000_000; // 5MB
+      if (Buffer.byteLength(value, 'utf-8') > MAX_SECURE_STORE_VALUE_SIZE) {
+        throw new Error('Value exceeds maximum allowed size of 5MB');
+      }
+      const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+      if (safeStorage.isEncryptionAvailable()) {
+        const encrypted = safeStorage.encryptString(value);
+        // writeFile opens O_TRUNC, so a crash between truncate and write leaves a
+        // short file. secure-store-get then fails decryptString, fails the
+        // fallback magic check, and fails closed to null - and the next sync
+        // re-seals that null as an empty set, so every saved password is gone.
+        // `store-set` already uses this exact pattern for the same reason.
+        const secureTmp = `${keyPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+        try {
+          await fs.promises.writeFile(secureTmp, encrypted, { mode: 0o600 });
+          await fs.promises.rename(secureTmp, keyPath);
+        } catch (err) {
+          try { await fs.promises.unlink(secureTmp); } catch (_) {}
+          throw err;
+        }
+        try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
+      } else {
+        console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
+        const getFallbackKey = (): Buffer => {
+          const secretPath = path.join(app.getPath('userData'), '.machine_secret');
+          let secret: Buffer;
+          try {
+            secret = fs.readFileSync(secretPath);
+            if (secret.length !== 32) {
+              throw new Error(
+                `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
+                'Values encrypted with it cannot be recovered; restore a backup or clear secure storage.'
+              );
+            }
+          } catch (err: any) {
+            if (err?.code === 'ENOENT') {
+              secret = crypto.randomBytes(32);
+              fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+              if (process.platform !== 'win32') {
+                try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
+              }
+            } else {
+              throw err;
+            }
+          }
+          // K-3: Bind salt to machine identity so copying userData to another machine/account fails
+          const machineSalt = getMachineSalt('nova-secure-salt');
+          return crypto.scryptSync(secret, machineSalt, 32);
+        };
+        const keyBuf = getFallbackKey();
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv);
+        const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+        const tag = cipher.getAuthTag();
+        const payload = Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
+        // Same reasoning as the safeStorage branch above: O_TRUNC in place turns a
+        // crash mid-write into unreadable ciphertext that then reads as null.
+        const nencTmp = `${keyPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+        try {
+          await fs.promises.writeFile(nencTmp, payload, { mode: 0o600 });
+          await fs.promises.rename(nencTmp, keyPath);
+        } catch (err) {
+          try { await fs.promises.unlink(nencTmp); } catch (_) {}
+          throw err;
+        }
+        if (process.platform !== 'win32') {
+          try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
+        }
+      }
+      return true;
+    } catch (err) {
+      console.error('Secure store set error:', err);
+      return false;
+    }
+  });
+});
+
+ipcMain.handle('secure-store-get', async (event, key: string) => {
+  if (!isTrustedSender(event)) return null;
+  // Read under the same mutex the writer uses: otherwise a read can land inside
+  // the writer's truncate window, fail to decrypt the partial buffer, and
+  // report "no credential stored" for a secret that exists.
+  return withSecureStoreMutex(async () => {
+  try {
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
+    const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+    try {
+      const raw = await fs.promises.readFile(keyPath);
+      if (safeStorage.isEncryptionAvailable()) {
+        try {
+          return safeStorage.decryptString(raw);
+        } catch (_) {}
+      }
+      // Check for fallback AES-256-GCM format
+      if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
+        try {
+          const secretPath = path.join(app.getPath('userData'), '.machine_secret');
+          if (fs.existsSync(secretPath)) {
+            const secret = fs.readFileSync(secretPath);
+            const machineSalt = getMachineSalt('nova-secure-salt');
+            const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
+            const iv = raw.subarray(4, 16);
+            const tag = raw.subarray(16, 32);
+            const enc = raw.subarray(32);
+            const decipher = crypto.createDecipheriv('aes-256-gcm', keyBuf, iv);
+            decipher.setAuthTag(tag);
+            return decipher.update(enc) + decipher.final('utf8');
+          }
+        } catch (_) {}
+      }
+      // K-4: Fail closed: do NOT read unauthenticated plaintext
+      return null;
+    } catch {
+      return null;
+    }
+  } catch (err) {
+    console.error('Secure store get error:', err);
+  }
+  return null;
+  });
+});
+
+ipcMain.handle('secure-store-delete', async (event, key: string) => {
+  if (!isTrustedSender(event)) return false;
+  return withSecureStoreMutex(async () => {
+  try {
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return false;
+    const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+    try {
+      await fs.promises.unlink(keyPath);
+    } catch (_) {}
+    return true;
+  } catch (err) {
+    console.error('Secure store delete error:', err);
+    return false;
+  }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// On-device model cache
+//
+// The packaged app is loaded with loadFile(), so the renderer runs on an opaque
+// `file://` origin where the Cache API is unavailable. transformers.js therefore
+// cannot cache its model shards and would re-download ~41 MB on every launch.
+// These handlers give it a disk-backed cache in userData instead.
+//
+// The URL is never used to build a path: the file name is a SHA-256 of the URL,
+// and only HTTPS requests to the model CDNs the app's CSP already allows are
+// accepted, so a hostile renderer cannot write anywhere it likes.
+// ---------------------------------------------------------------------------
+const MODEL_CACHE_HOST_RE = /(^|\.)(huggingface\.co|hf\.co)$/i;
+
+// Hoisted function (not a const) so `clear-ai-models-cache`, registered further
+// up the file, can resolve the shard directory without a TDZ reference.
+function modelCacheDir(): string {
+  return path.join(app.getPath('userData'), 'models');
+}
+
+function modelCachePathFor(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:') return null;
+  if (parsed.username || parsed.password) return null;
+  if (!MODEL_CACHE_HOST_RE.test(parsed.hostname.toLowerCase())) return null;
+  const hash = crypto.createHash('sha256').update(url).digest('hex');
+  return path.join(modelCacheDir(), hash);
+}
+
+ipcMain.handle('model-cache-get', async (event, url: unknown) => {
+  if (!isTrustedSender(event)) return null;
+  if (typeof url !== 'string') return null;
+  const filePath = modelCachePathFor(url);
+  if (!filePath) return null;
+  try {
+    const handle = await fs.promises.open(filePath, 'r');
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size === 0 || stat.size > MAX_MODEL_CACHE_FILE_BYTES) return null;
+      const buffer = await handle.readFile();
+      // Transfer as a plain ArrayBuffer so the structured clone copies the bytes
+      // instead of exposing a Node Buffer to the renderer.
+      return buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength
+      );
+    } finally {
+      await handle.close();
+    }
+  } catch (err: any) {
+    // A bare `return null` is indistinguishable from "not cached" in the
+    // renderer, and forwarded renderer output can be redacted — so the main
+    // process is the only reliable place to record an unexpected read failure.
+    // ENOENT is the ordinary miss and stays silent.
+    if (err?.code !== 'ENOENT') {
+      console.warn('[ModelCache] Failed to read model file:', err, filePath);
+    }
+    return null;
+  }
+});
+
+ipcMain.handle('model-cache-set', async (event, url: unknown, data: unknown) => {
+  if (!isTrustedSender(event)) return false;
+  if (typeof url !== 'string') return false;
+  const filePath = modelCachePathFor(url);
+  if (!filePath) return false;
+  // Same per-call uniqueness requirement as `store-set`: a pid-only temp name
+  // would let two concurrent shard writes truncate one shared file and splice
+  // their bytes, so the rename would not be atomic in practice.
+  const tmpPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    let buffer: Buffer;
+    if (data instanceof ArrayBuffer) {
+      if (data.byteLength === 0 || data.byteLength > MAX_MODEL_CACHE_FILE_BYTES) return false;
+      buffer = Buffer.from(new Uint8Array(data));
+    } else if (ArrayBuffer.isView(data)) {
+      const view = data as ArrayBufferView;
+      if (view.byteLength === 0 || view.byteLength > MAX_MODEL_CACHE_FILE_BYTES) return false;
+      buffer = Buffer.from(view.buffer, view.byteOffset, view.byteLength);
+    } else {
+      return false;
+    }
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+    // A per-file cap is not a budget: each distinct URL gets its own file, so
+    // without a total ceiling the cache can fill the user's disk. Make room
+    // (oldest first) before promoting the new file.
+    const withinBudget = await enforceModelCacheBudget(
+      path.dirname(filePath), buffer.byteLength, filePath
+    );
+    if (!withinBudget) {
+      console.warn('[ModelCache] Write exceeds the total cache budget; refusing to cache this model.');
+      try { await fs.promises.unlink(tmpPath); } catch (_) {}
+      return false;
+    }
+    await fs.promises.writeFile(tmpPath, buffer, { mode: 0o600 });
+    await fs.promises.rename(tmpPath, filePath);
+    return true;
+  } catch (err) {
+    console.warn('[ModelCache] Failed to persist model file:', err);
+    try { await fs.promises.unlink(tmpPath); } catch (_) {}
+    return false;
+  }
+});
+
+// Second layer of the agent navigation policy. The renderer check
+// (isSafeAgentNavigationUrl) cannot resolve a DNS name, so a public hostname
+// that points at a private address still needs to be refused here, where the
+// name can actually be resolved. Trusted-sender only, and read-only.
+ipcMain.handle('agent-navigation-host-check', async (event, url: unknown) => {
+  if (!isTrustedSender(event)) return { allowed: false, reason: 'untrusted sender' };
+  if (typeof url !== 'string') return { allowed: false, reason: 'invalid url' };
+  return isAgentNavigationHostPublic(url);
+});
+
+// Generic JSON Storage API (for highlights, stats, whitelists, etc.)
+ipcMain.handle('store-set', async (event, key: string, value: string) => {
+  if (!isTrustedSender(event)) return false;
+  try {
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) {
+      return { error: 'Invalid key format' };
+    }
+    const RESTRICTED_STORE_KEYS = ['passwords', 'secrets', 'auth'];
+    if (RESTRICTED_STORE_KEYS.includes(key.toLowerCase())) {
+      return { error: 'Access denied: restricted storage key' };
+    }
+    if (typeof value !== 'string') {
+      return { error: 'Invalid value format: must be string' };
+    }
+    // VULN-23: Enforce max value size of 10MB
+    const MAX_STORE_VALUE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (Buffer.byteLength(value, 'utf-8') > MAX_STORE_VALUE_SIZE) {
+      console.error('Store set error: Value exceeds maximum size of 10MB');
+      return { error: 'Value exceeds maximum allowed size of 10MB' };
+    }
+    const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
+    // Atomic replace. `writeFile` truncates in place, and the renderer has two
+    // concurrent writers per key (the debounced persistence effect plus the
+    // beforeunload / visibilitychange flush, which fires on every app switch).
+    // An interleaved write left a spliced file, and every consumer swallows the
+    // resulting JSON.parse error and silently falls back to defaults — so a
+    // torn write looked exactly like "your tabs/bookmarks/settings are gone".
+    // The temp name must be unique per call, not just per process: keyed on the
+    // pid alone, both writers opened and truncated the SAME temp file, so the
+    // payload that survived the rename was a byte-level splice of the two values
+    // (invalid JSON) and the losing rename rejected with ENOENT.
+    const tmpPath = `${keyPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+    try {
+      await fs.promises.writeFile(tmpPath, value, 'utf-8');
+      await fs.promises.rename(tmpPath, keyPath);
+    } catch (writeErr) {
+      try { await fs.promises.unlink(tmpPath); } catch (_) {}
+      throw writeErr;
+    }
+
+    if (key === 'adblocker_whitelist') {
+      try {
+        const wl = JSON.parse(value);
+        if (Array.isArray(wl)) updateAdblockWhitelist(wl);
+      } catch(e) {}
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Store set error:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('store-get', async (event, key: string) => {
+  if (!isTrustedSender(event)) return null;
+  try {
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
+    const RESTRICTED_STORE_KEYS = ['passwords', 'secrets', 'auth'];
+    if (RESTRICTED_STORE_KEYS.includes(key.toLowerCase())) return null;
+    const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
+    return await fs.promises.readFile(keyPath, 'utf-8');
+  } catch (err) {
+    // File not found or read error
+  }
+  return null;
+});
+
+// IPC Handler for VPN
+ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: string }) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (!config || typeof config !== 'object') {
+    return { error: 'Invalid VPN config object' };
+  }
+  const isEnabled = Boolean(config.enabled);
+  const rawProxyUrl = typeof config.proxyUrl === 'string' ? config.proxyUrl.trim() : '';
+
+  if (isEnabled && rawProxyUrl) {
+    if (!isValidSecureProxy(rawProxyUrl)) {
+      console.error('Secure proxy required: https:// or socks5://');
+      return { error: 'Secure proxy required: https:// or socks5://' };
+    }
+  }
+
+  // Security: Chromium setProxy does not recognize socks5h:// (falls back to direct://).
+  // In Chromium, socks5:// already performs remote DNS resolution. Normalize to socks5://.
+  const chromiumRules = (isEnabled && rawProxyUrl) ? normalizeProxyForChromium(rawProxyUrl) : 'direct://';
+
+  await applyProxyToAllSessions(chromiumRules);
+  try {
+    const vpnConfigPath = path.join(app.getPath('userData'), 'vpn_proxy.json');
+    if (isEnabled && rawProxyUrl) {
+      // Store encrypted with safeStorage / AES-256-GCM machine secret (avoids plaintext & protects on Windows)
+      const payload = JSON.stringify({ enabled: true, proxyRules: rawProxyUrl });
+      const encrypted = encryptDataWithFallback(payload, app.getPath('userData'), safeStorage);
+      fs.writeFileSync(vpnConfigPath, encrypted, { mode: 0o600 });
+      if (process.platform !== 'win32') {
+        try { fs.chmodSync(vpnConfigPath, 0o600); } catch (_) {}
+      }
+    } else if (fs.existsSync(vpnConfigPath)) {
+      fs.unlinkSync(vpnConfigPath);
+    }
+  } catch (_) {}
+  return true;
+});
+
+const dnsLookup = promisify(dns.lookup);
+
+interface ValidatedPreviewTarget {
+  url: URL;
+  pinnedIp: string;
+}
+
+async function validatePreviewUrl(rawUrl: string): Promise<ValidatedPreviewTarget | { error: string }> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(rawUrl);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return { error: 'Only HTTP/HTTPS protocols are allowed for this operation.' };
+    }
+    if (parsedUrl.username || parsedUrl.password) {
+      return { error: 'URLs with embedded credentials are not allowed.' };
+    }
+  } catch {
+    return { error: 'Invalid URL format' };
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+    return { error: 'Requests to local hostnames are blocked.' };
+  }
+
+  let pinnedIp = '';
+  let dnsTimeoutTimer: NodeJS.Timeout | undefined;
+  try {
+    const lookupPromise = dnsLookup(hostname, { all: true }) as Promise<any>;
+    lookupPromise.catch(() => {});
+    const addresses = await Promise.race([
+      lookupPromise,
+      new Promise<never>((_, reject) => {
+        dnsTimeoutTimer = setTimeout(() => reject(new Error('DNS lookup timeout')), 3000);
+      })
+    ]);
+    const addrList = Array.isArray(addresses) ? addresses : [addresses];
+    if (addrList.length === 0 || addrList.some((entry: any) => isPrivateIP(entry?.address))) {
+      return { error: 'Requests to private/internal IP addresses are blocked.' };
+    }
+    pinnedIp = String(addrList[0]?.address || '');
+    if (!pinnedIp) {
+      return { error: 'DNS resolution returned empty address.' };
+    }
+  } catch {
+    return { error: 'DNS resolution failed.' };
+  } finally {
+    if (dnsTimeoutTimer) clearTimeout(dnsTimeoutTimer);
+  }
+
+  const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
+  const activeMcpPort = String(mcpServer?.getPort?.() || 3020);
+  if (port === '3020' || port === activeMcpPort) {
+    return { error: 'Requests to MCP server port are blocked.' };
+  }
+  return { url: parsedUrl, pinnedIp };
+}
+
+const MAX_PREVIEW_HTML_BYTES = 5 * 1024 * 1024;
+
+// Read a response body with a hard byte limit even when the server omits
+// Content-Length. This keeps the SSRF-protected preview endpoint bounded for
+// chunked/streaming responses as well as normal buffered responses.
+async function readResponseTextWithLimit(response: any, maxBytes: number): Promise<string> {
+  const body = response?.body;
+  if (body && typeof body.on === 'function') {
+    return await new Promise<string>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      let received = 0;
+      let settled = false;
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        try { body.destroy?.(); } catch (_) {}
+        reject(error);
+      };
+      body.on('data', (chunk: Buffer | string) => {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        received += buffer.length;
+        if (received > maxBytes) {
+          fail(new Error(`Response body exceeds ${maxBytes} byte size limit`));
+          return;
+        }
+        chunks.push(buffer);
+      });
+      body.on('end', () => {
+        if (settled) return;
+        settled = true;
+        resolve(Buffer.concat(chunks).toString('utf8'));
+      });
+      body.on('error', (error: Error) => fail(error));
+    });
+  }
+
+  if (body && typeof body.getReader === 'function') {
+    const reader = body.getReader();
+    const chunks: Buffer[] = [];
+    let received = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const buffer = Buffer.from(value);
+        received += buffer.length;
+        if (received > maxBytes) {
+          try { await reader.cancel(); } catch (_) {}
+          throw new Error(`Response body exceeds ${maxBytes} byte size limit`);
+        }
+        chunks.push(buffer);
+      }
+      return Buffer.concat(chunks).toString('utf8');
+    } finally {
+      try { reader.releaseLock?.(); } catch (_) {}
+    }
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > maxBytes) {
+    throw new Error(`Response body exceeds ${maxBytes} byte size limit`);
+  }
+  return Buffer.from(arrayBuffer).toString('utf8');
+}
+
+// IPC Handler to fetch raw HTML (Bypasses CORS for Link Preview with SSRF protection)
+ipcMain.handle('fetch-page-html', async (event, url: string) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (!url || typeof url !== 'string') return { error: 'Invalid URL' };
+
+  let currentUrl = url;
+  const MAX_REDIRECTS = 3;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    // Validate every hop. Redirects can cross from a public host to localhost,
+    // a private IP, a mapped IPv4 address, or the local MCP port.
+    const validated = await validatePreviewUrl(currentUrl);
+    if ('error' in validated) return validated;
+    const { url: parsedUrl, pinnedIp } = validated;
+    currentUrl = parsedUrl.href;
+
+    try {
+      const isHttps = parsedUrl.protocol === 'https:';
+      const agentOptions = {
+        lookup: (_hostname: string, _opts: any, cb: any) => {
+          cb(null, pinnedIp, pinnedIp.includes(':') ? 6 : 4);
+        }
+      };
+      const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
+
+      const res = await fetch(currentUrl, {
+        headers: {
+          'User-Agent': getStandardUserAgent(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+        },
+        agent,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(5000)
+      } as any);
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location');
+        if (!location) return { error: 'Redirect without Location header' };
+        currentUrl = new URL(location, currentUrl).href;
+        continue;
+      }
+
+      if (res.ok) {
+        const contentLength = res.headers.get('content-length');
+        if (contentLength && parseInt(contentLength, 10) > MAX_PREVIEW_HTML_BYTES) {
+          return { error: 'Response body exceeds 5MB size limit' };
+        }
+        const rawHtml = await readResponseTextWithLimit(res, MAX_PREVIEW_HTML_BYTES);
+        // Security: Robust AST-based DOMPurify sanitization in main process
+        let html = getMainDOMPurify().sanitize(rawHtml, {
+          WHOLE_DOCUMENT: true,
+          FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'svg', 'base', 'math', 'form', 'meta', 'link'],
+          FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'formaction', 'ontoggle', 'oninput', 'onchange', 'onsubmit', 'onkeydown', 'onkeyup', 'onkeypress', 'onmouseenter', 'onmouseleave', 'onmousedown', 'onmouseup', 'ondblclick', 'oncontextmenu', 'onwheel', 'onscroll', 'ondragstart', 'srcdoc']
+        });
+        // Security: Cap sanitized output at 3MB (also bounds the ReaderMode
+        // outerHTML -> fetchPageHtml fallback path at the main-process boundary).
+        const MAX_SANITIZED_HTML_CHARS = 3 * 1024 * 1024;
+        if (html.length > MAX_SANITIZED_HTML_CHARS) {
+          console.warn(`[fetch-page-html] Sanitized HTML exceeds 3MB (${html.length} chars), truncating`);
+          html = html.slice(0, MAX_SANITIZED_HTML_CHARS);
+        }
+        return { success: true, html };
+      }
+      return { error: 'HTTP ' + res.status };
+    } catch (err: any) {
+      return { error: err.message };
+    }
+  }
+
+  return { error: 'Too many redirects' };
+});
+
+async function translateTextWithGoogle(text: string, sourceLang: string = 'auto', targetLang: string = 'tr'): Promise<string> {
+  const url = `https://translate.googleapis.com/translate_a/single?client=dict-chrome-ex&sl=${encodeURIComponent(sourceLang)}&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': getStandardUserAgent(),
+    },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!res.ok) {
+    throw new Error(`Translation failed with status ${res.status}`);
+  }
+  const data = await res.json();
+  if (Array.isArray(data) && Array.isArray(data[0])) {
+    return data[0].map((item: any) => item[0] || '').join('');
+  }
+  return text;
+}
+
+async function detectLanguageWithGoogle(sampleText: string): Promise<string> {
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=dict-chrome-ex&sl=auto&tl=en&dt=t&q=${encodeURIComponent(sampleText.slice(0, 300))}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': getStandardUserAgent(),
+      },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && typeof data[2] === 'string') {
+        return data[2]; // e.g. 'en', 'de', 'es', 'fr', 'tr', 'ru', 'ja'
+      }
+    }
+  } catch (err) {
+    console.warn('[Translate] Language detection error:', err);
+  }
+  return 'auto';
+}
+
+function escapeHtmlForTranslation(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+const TRANSLATION_HTML_ENTITY_MAP: Record<string, string> = {
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&nbsp;': ' ',
+  '&amp;': '&'
+};
+
+function unescapeHtmlForTranslation(str: string): string {
+  return str.replace(/&(?:lt|gt|quot|#39|nbsp|amp);/g, (match) => TRANSLATION_HTML_ENTITY_MAP[match] || match);
+}
+
+// IPC Handlers for One-Click Page Translation
+const MAX_TRANSLATION_ITEMS = 500;
+const MAX_TRANSLATION_TEXT_CHARS = 4000;
+const MAX_TRANSLATION_TOTAL_CHARS = 100_000;
+
+ipcMain.handle('translate-text-batch', async (event, payload: unknown) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized', translations: [] };
+  const input = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  const rawTexts = Array.isArray(input.texts) ? input.texts : [];
+  const safeTexts: string[] = [];
+  let remainingChars = MAX_TRANSLATION_TOTAL_CHARS;
+
+  for (const rawText of rawTexts.slice(0, MAX_TRANSLATION_ITEMS)) {
+    if (typeof rawText !== 'string' || remainingChars <= 0) {
+      safeTexts.push('');
+      continue;
+    }
+    const text = rawText.slice(0, Math.min(MAX_TRANSLATION_TEXT_CHARS, remainingChars));
+    safeTexts.push(text);
+    remainingChars -= text.length;
+  }
+
+  if (safeTexts.length === 0) return { translations: [], success: true };
+
+  const validLanguage = (value: unknown, fallback: string): string => {
+    if (typeof value !== 'string' || !/^[a-zA-Z]{2,12}(?:[-_][a-zA-Z0-9]{2,12})?$/.test(value)) {
+      return fallback;
+    }
+    return value;
+  };
+  const sLang = validLanguage(input.sourceLang, 'auto');
+  const tLang = validLanguage(input.targetLang, 'en');
+  const texts = safeTexts;
+
+  try {
+    const results: string[] = [...texts];
+
+    // Group into HTML payload chunks of ~1600 chars or ~35 elements
+    const chunks: { indices: number[]; payload: string }[] = [];
+    let currentIndices: number[] = [];
+    let currentPayload = '';
+
+    for (let i = 0; i < texts.length; i++) {
+      const txt = texts[i] || '';
+      if (!txt.trim()) continue;
+
+      const itemHtml = `<p id="${i}">${escapeHtmlForTranslation(txt)}</p>`;
+      if (currentIndices.length >= 35 || (currentPayload.length + itemHtml.length > 1600 && currentIndices.length > 0)) {
+        chunks.push({ indices: currentIndices, payload: currentPayload });
+        currentIndices = [i];
+        currentPayload = itemHtml;
+      } else {
+        currentIndices.push(i);
+        currentPayload += itemHtml;
+      }
+    }
+
+    if (currentIndices.length > 0) {
+      chunks.push({ indices: currentIndices, payload: currentPayload });
+    }
+
+    // Process chunks concurrently (up to 3 at a time)
+    const CONCURRENCY = 3;
+    for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+      const batch = chunks.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(async (chunk) => {
+        try {
+          const rawTranslated = await translateTextWithGoogle(chunk.payload, sLang, tLang);
+          const regex = /<p id="?(\d+)"?>([\s\S]*?)<\/p>/gi;
+          let match;
+          while ((match = regex.exec(rawTranslated)) !== null) {
+            const idx = parseInt(match[1], 10);
+            const content = unescapeHtmlForTranslation(match[2].trim());
+            if (idx >= 0 && idx < results.length && content) {
+              results[idx] = content;
+            }
+          }
+        } catch (err: any) {
+          console.warn('[Translate] Chunk translation failed:', err.message);
+        }
+      }));
+      if (i + CONCURRENCY < chunks.length) {
+        await new Promise(r => setTimeout(r, 60));
+      }
+    }
+
+    return { translations: results, success: true };
+  } catch (err: any) {
+    console.error('[Translate] Batch translation error:', err);
+    return { error: err.message || 'Translation failed', translations: texts, success: false };
+  }
+});
+
+ipcMain.handle('detect-language', async (event, sampleText: string) => {
+  if (!isTrustedSender(event)) return 'auto';
+  if (!sampleText || typeof sampleText !== 'string') return 'auto';
+  const cleanText = sampleText.trim().slice(0, 2048);
+  if (!cleanText) return 'auto';
+  return await detectLanguageWithGoogle(cleanText);
+});
+
+// Autocomplete Suggestions handler (providers + LRU cache + staggered fallback live in main/suggestions.ts)
+initSuggestions(isTrustedSender);
+
+// Open dialog to select a folder for unpacked extension
+ipcMain.handle('select-extension-folder', async (event) => {
+  if (!isTrustedSender(event)) return { canceled: true };
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win) return { canceled: true };
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Select Extension Folder',
+    properties: ['openDirectory']
+  });
+  return { canceled, folderPath: filePaths[0] };
+});
+
+// Extension management (in‑memory list & persistence)
+let loadedExtensions: any[] = [];
+let activeExtensionPopupWin: BrowserWindow | null = null;
+let activeExtensionPopupUrl: string | null = null;
+
+const disabledExtensionsFile = path.join(app.getPath('userData'), 'disabled_extensions.json');
+const unpackedExtensionsFile = path.join(app.getPath('userData'), 'unpacked_extensions.json');
+
+function getDisabledExtensionIds(): string[] {
+  try {
+    if (fs.existsSync(disabledExtensionsFile)) {
+      const parsed = JSON.parse(fs.readFileSync(disabledExtensionsFile, 'utf8'));
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string' && /^[a-p]{32}$/.test(id)) : [];
+    }
+  } catch (_) {}
+  return [];
+}
+
+function setDisabledExtensionIds(ids: string[]): void {
+  try {
+    const safeIds = Array.from(new Set(ids.filter(id => typeof id === 'string' && /^[a-p]{32}$/.test(id))));
+    fs.writeFileSync(disabledExtensionsFile, JSON.stringify(safeIds), { encoding: 'utf8', mode: 0o600 });
+  } catch (_) {}
+}
+
+function getUnpackedExtensionPaths(): Record<string, string> {
+  try {
+    if (!fs.existsSync(unpackedExtensionsFile)) return {};
+    const parsed = JSON.parse(fs.readFileSync(unpackedExtensionsFile, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([id, folderPath]) =>
+      /^[a-p]{32}$/.test(id) && typeof folderPath === 'string' && folderPath.length <= 4096
+    )) as Record<string, string>;
+  } catch (_) {
+    return {};
+  }
+}
+
+function setUnpackedExtensionPaths(paths: Record<string, string>): void {
+  try {
+    const safeEntries = Object.entries(paths).filter(([id, folderPath]) =>
+      /^[a-p]{32}$/.test(id) && typeof folderPath === 'string' && folderPath.length <= 4096
+    );
+    fs.writeFileSync(unpackedExtensionsFile, JSON.stringify(Object.fromEntries(safeEntries)), { encoding: 'utf8', mode: 0o600 });
+  } catch (err) {
+    console.error('[Extensions] Could not persist unpacked extension list:', err);
+  }
+}
+
+function loadExtensionDiagnostics(): void {
+  if (app.isPackaged) return;
+  const workers = session.defaultSession.serviceWorkers;
+  workers.on('console-message', (_event, details) => {
+    if (details.level < 2) return;
+    try {
+      const worker = workers.getInfoFromVersionID(details.versionId);
+      if (!worker.scriptUrl.startsWith('chrome-extension://')) return;
+      const safeMessage = details.message
+        .replace(/(password|token|secret|api[_-]?key|authorization)(\s*[:=]\s*)[^\s,;]+/gi, '$1$2[redacted]')
+        .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [redacted]')
+        .slice(0, 500);
+      const source = new URL(worker.scriptUrl);
+      console.warn(`[Extensions:service-worker] ${source.origin}${source.pathname} ${safeMessage}`);
+    } catch (_) {}
+  });
+}
+
+async function loadPersistentExtensions(): Promise<void> {
+  const extensionsPath = path.join(app.getPath('userData'), 'extensions');
+  const disabledIds = getDisabledExtensionIds();
+  const unpackedPaths = getUnpackedExtensionPaths();
+  const seenIds = new Set<string>();
+
+  const rememberDisabled = (id: string, extensionPath: string, manifest: any) => {
+    loadedExtensions.push({
+      id,
+      name: typeof manifest.name === 'string' ? manifest.name : id,
+      path: extensionPath,
+      version: typeof manifest.version === 'string' ? manifest.version : '1.0',
+      description: typeof manifest.description === 'string' ? manifest.description : '',
+      enabled: false
+    });
+  };
+
+  const restoreExtension = async (id: string, extensionPath: string) => {
+    if (!/^[a-p]{32}$/.test(id) || seenIds.has(id)) return;
+    seenIds.add(id);
+    try {
+      const realPath = fs.realpathSync(extensionPath);
+      if (!fs.statSync(realPath).isDirectory()) return;
+      const manifestPath = path.join(realPath, 'manifest.json');
+      if (!fs.existsSync(manifestPath)) return;
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      if (disabledIds.includes(id)) {
+        rememberDisabled(id, realPath, manifest);
+        return;
+      }
+      const existing = session.defaultSession.getExtension(id);
+      const extInfo = existing || await session.defaultSession.loadExtension(realPath, { allowFileAccess: false });
+      loadedExtensions.push(extInfo);
+      console.log(`[Extensions] Restored ${extInfo.name || id}`);
+    } catch (err) {
+      console.error(`[Extensions] Failed to restore ${id}:`, err);
+    }
+  };
+
+  try {
+    if (fs.existsSync(extensionsPath)) {
+      for (const dir of fs.readdirSync(extensionsPath)) {
+        if (/^[a-p]{32}$/.test(dir)) {
+          await restoreExtension(dir, path.join(extensionsPath, dir));
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Extensions] Failed to scan installed extensions:', err);
+  }
+
+  for (const [id, folderPath] of Object.entries(unpackedPaths)) {
+    await restoreExtension(id, folderPath);
+  }
+}
+
+function getLocalizedManifestString(extPath: string, text: string, fallback: string = ''): string {
+  if (!text || typeof text !== 'string') return fallback;
+  if (!text.startsWith('__MSG_') || !text.endsWith('__')) return text;
+  const key = text.slice(6, -2);
+
+  const localesDir = path.join(extPath, '_locales');
+  if (!fs.existsSync(localesDir)) return fallback || text;
+
+  const candidateLocales = ['en', 'en_US', 'en_GB', 'tr'];
+  try {
+    const allLocales = fs.readdirSync(localesDir);
+    const searchOrder = [...candidateLocales.filter(l => allLocales.includes(l)), ...allLocales];
+
+    for (const loc of searchOrder) {
+      const msgFile = path.join(localesDir, loc, 'messages.json');
+      if (fs.existsSync(msgFile)) {
+        try {
+          const content = JSON.parse(fs.readFileSync(msgFile, 'utf8'));
+          if (content[key]?.message) {
+            return content[key].message;
+          }
+          const lowerKey = key.toLowerCase();
+          for (const k of Object.keys(content)) {
+            if (k.toLowerCase() === lowerKey && content[k]?.message) {
+              return content[k].message;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+
+  return fallback || text;
+}
+
+// Load an unpacked extension from a folder path
+ipcMain.handle('install-extension', async (event, folderPath: string) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win) return { error: 'No window available' };
+
+  if (!folderPath || typeof folderPath !== 'string' || !folderPath.trim()) {
+    return { error: 'Invalid extension folder path.' };
+  }
+
+  const normalizedInput = path.normalize(folderPath.trim());
+  // Guard against directory traversal in raw and normalized input
+  if (normalizedInput.includes('..') || folderPath.includes('..') || folderPath.includes('%2e%2e') || folderPath.includes('%2E%2E')) {
+    return { error: 'Invalid extension path: path traversal detected.' };
+  }
+
+  const resolvedFolder = path.resolve(normalizedInput);
+  let realFolder: string;
+  try {
+    realFolder = fs.realpathSync(resolvedFolder);
+    const stat = fs.statSync(realFolder);
+    if (!stat.isDirectory()) {
+      return { error: 'Selected path is not a directory.' };
+    }
+  } catch {
+    return { error: 'Extension directory does not exist or is inaccessible.' };
+  }
+
+  // No traversal guard here: `manifestPath` was assigned that exact path.join two
+  // lines up, so the previous check compared the value to itself and could never
+  // fire - a dead control that read like a defence. realFolder is already
+  // realpathSync'd and isDirectory-checked above, which is the real containment.
+  const manifestPath = path.join(realFolder, 'manifest.json');
+
+  if (!fs.existsSync(manifestPath)) {
+    return { error: 'No manifest.json found in the selected folder.' };
+  }
+
+  let manifest: any;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch {
+    return { error: 'Extension manifest.json is invalid.' };
+  }
+
+  const asStringArray = (value: unknown): string[] => (
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length <= 512) : []
+  );
+  const extensionPermissions = [
+    ...asStringArray(manifest.permissions),
+    ...asStringArray(manifest.optional_permissions),
+    ...asStringArray(manifest.host_permissions)
+  ];
+  const formattedPermissions = formatPermissionsForDisplay(extensionPermissions);
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'question',
+    buttons: ['Cancel', 'Install'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Review Extension Permissions',
+    message: `Extension "${String(manifest.name || 'Unpacked extension').slice(0, 120)}" requests the following permissions:`,
+    detail: formattedPermissions.length > 0
+      ? formattedPermissions.join('\\n\\n')
+      : 'This extension does not declare browser permissions.',
+    noLink: true
+  });
+  if (response !== 1) {
+    return { error: 'Extension installation cancelled by user.' };
+  }
+
+  try {
+    const targetSession = win.webContents?.session || session.defaultSession;
+    const extInfo = await targetSession.loadExtension(realFolder);
+
+    const disabledIds = getDisabledExtensionIds();
+    if (disabledIds.includes(extInfo.id)) {
+      setDisabledExtensionIds(disabledIds.filter(id => id !== extInfo.id));
+    }
+
+    if (targetSession === session.defaultSession) {
+      const managedRoot = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+      if (!realFolder.startsWith(managedRoot + path.sep)) {
+        const unpackedPaths = getUnpackedExtensionPaths();
+        unpackedPaths[extInfo.id] = realFolder;
+        setUnpackedExtensionPaths(unpackedPaths);
+      }
+    }
+
+    loadedExtensions = [...loadedExtensions.filter(e => e.id !== extInfo.id), extInfo];
+
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) {
+        w.webContents.send('extension-changed');
+      }
+    }
+
+    return { success: true, extension: extInfo };
+  } catch (err) {
+    console.error('Failed to load extension', err);
+    return { error: (err as any).message || 'Failed to load extension' };
+  }
+});
+
+// Toggle Extension enabled/disabled state
+ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: boolean) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (!extensionId || typeof extensionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(extensionId)) {
+    return { error: 'Invalid extension ID format' };
+  }
+
+  // NOTE: the disabled-extension list is intentionally NOT snapshotted here.
+  // Both branches below await a session call before persisting, so each one
+  // re-reads the list immediately before writing (see the comments inline).
+  const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+  const extPath = path.resolve(path.join(extensionsBaseDir, extensionId));
+  const foundExt = loadedExtensions.find(e => e.id === extensionId);
+  const unpackedPath = getUnpackedExtensionPaths()[extensionId];
+  const targetExtPath = (foundExt?.path && fs.existsSync(foundExt.path))
+    ? foundExt.path
+    : (unpackedPath && fs.existsSync(unpackedPath) ? unpackedPath : extPath);
+
+  try {
+    if (enabled) {
+      if (!fs.existsSync(path.join(targetExtPath, 'manifest.json'))) {
+        return { error: 'Extension files are missing. Remove and install the extension again.' };
+      }
+      const existing = session.defaultSession.getExtension(extensionId);
+      const extInfo = existing || await session.defaultSession.loadExtension(targetExtPath, { allowFileAccess: false });
+      if (extInfo.id !== extensionId) {
+        if (!existing) {
+          try { session.defaultSession.removeExtension(extInfo.id); } catch (_) {}
+        }
+        return { error: 'Extension identity changed. Remove and install the extension again.' };
+      }
+      // Re-read immediately before writing instead of using a snapshot taken
+      // before the await above: two toggles within the same second both read
+      // the same list, and whichever write lands last would clobber the other,
+      // silently re-enabling (or re-disabling) an extension on next launch.
+      setDisabledExtensionIds(getDisabledExtensionIds().filter(id => id !== extensionId));
+      loadedExtensions = [...loadedExtensions.filter(e => e.id !== extensionId), extInfo];
+    } else {
+      const extensionInfo = foundExt || session.defaultSession.getExtension(extensionId);
+      if (!extensionInfo && !fs.existsSync(path.join(targetExtPath, 'manifest.json'))) {
+        return { error: 'Extension files are missing. Remove and install the extension again.' };
+      }
+      if (session.defaultSession.getExtension(extensionId)) {
+        await session.defaultSession.removeExtension(extensionId);
+      }
+      // Same reason as the enable branch: this branch awaits removeExtension(),
+      // so the list must be re-read after the await, not before it.
+      const currentDisabledIds = getDisabledExtensionIds();
+      if (!currentDisabledIds.includes(extensionId)) setDisabledExtensionIds([...currentDisabledIds, extensionId]);
+      if (extensionInfo && !loadedExtensions.some(e => e.id === extensionId)) loadedExtensions.push(extensionInfo);
+    }
+
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('extension-changed');
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Failed to toggle extension:', err);
+    return { error: err.message || 'Failed to toggle extension' };
+  }
+});
+
+// Return list of loaded extensions
+ipcMain.handle('list-extensions', async (event) => {
+  if (!isTrustedSender(event)) return [];
+  const disabledIds = getDisabledExtensionIds();
+
+  // Sync with session extensions
+  try {
+    const sessionExts = (session.defaultSession.extensions?.getAllExtensions
+      ? session.defaultSession.extensions.getAllExtensions()
+      : (session.defaultSession as any).getAllExtensions());
+    for (const se of sessionExts) {
+      if (!loadedExtensions.some(e => e.id === se.id)) {
+        loadedExtensions.push(se);
+      }
+    }
+  } catch (_) {}
+
+  return Promise.all(loadedExtensions.map(async (e) => {
+    let iconData = undefined;
+    let popupUrl = undefined;
+    let optionsUrl = undefined;
+    let homepageUrl = undefined;
+    let localizedName = e.name;
+    let localizedDesc = e.description;
+    try {
+      const manifestPath = path.join(e.path, 'manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+        localizedName = getLocalizedManifestString(e.path, manifest.name, e.name);
+        localizedDesc = getLocalizedManifestString(e.path, manifest.description, e.description);
+
+        // Find popup URL (normalize leading slashes)
+        const rawPopup = manifest.action?.default_popup || manifest.browser_action?.default_popup || manifest.page_action?.default_popup;
+        if (rawPopup) {
+          popupUrl = String(rawPopup).replace(/^\.?\//, '');
+        }
+
+        // Find options page URL
+        const rawOptions = manifest.options_ui?.page || manifest.options_page;
+        if (rawOptions) {
+          optionsUrl = String(rawOptions).replace(/^\.?\//, '');
+        }
+
+        if (manifest.homepage_url) {
+          homepageUrl = manifest.homepage_url;
+        }
+
+        if (manifest.icons) {
+          // Find largest icon
+          const sizes = Object.keys(manifest.icons).map(Number).sort((a, b) => b - a);
+          if (sizes.length > 0) {
+            const rawIconRel = manifest.icons[sizes[0]];
+            if (typeof rawIconRel === 'string') {
+              let baseDir = path.resolve(e.path);
+              try {
+                baseDir = fs.realpathSync(baseDir);
+              } catch (_) {}
+              const resolvedIconPath = path.resolve(baseDir, rawIconRel);
+              const normalizedBase = baseDir + path.sep;
+              if (resolvedIconPath.startsWith(normalizedBase) && fs.existsSync(resolvedIconPath)) {
+                try {
+                  const realIconPath = fs.realpathSync(resolvedIconPath);
+                  if (realIconPath.startsWith(normalizedBase)) {
+                    const ext = path.extname(realIconPath).toLowerCase().substring(1) || 'png';
+                    const buffer = fs.readFileSync(realIconPath);
+                    iconData = `data:image/${ext};base64,${buffer.toString('base64')}`;
+                  }
+                } catch {}
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load extension icon', err);
+    }
+
+    return {
+      name: localizedName || e.name || e.id,
+      id: e.id,
+      enabled: !disabledIds.includes(e.id),
+      path: e.path,
+      version: e.version,
+      description: localizedDesc || e.description || '',
+      iconData,
+      popupUrl,
+      optionsUrl,
+      homepageUrl
+    };
+  }));
+});
+
+const incognitoAllowedExtensions = new Set<string>();
+
+export function isExtensionAllowedInIncognito(extensionId: string, manifest: any): boolean {
+  if (!extensionId) return false;
+  if (manifest?.incognito === 'not_allowed') return false;
+  return incognitoAllowedExtensions.has(extensionId);
+}
+
+// Open Extension Popup Window
+ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?: number; y?: number; width?: number; height?: number } | null, activeTabInfo?: Record<string, unknown> | null) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  // VULN-14: Validate URL protocol for extension popups
+  const blockedProtocols = ['javascript:', 'data:', 'vbscript:'];
+  if (typeof url !== 'string' || blockedProtocols.some(proto => url.trim().toLowerCase().startsWith(proto))) {
+    return { error: 'Blocked: dangerous URL protocol.' };
+  }
+  const extensionsDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+  if (url.startsWith('file://')) {
+    try {
+      const filePath = path.resolve(fileURLToPath(url));
+      // path.resolve collapses `..` but not symlinks, and the check is done on
+      // the string while Chromium re-resolves the real path. A link planted in
+      // <userData>/extensions would pass this and render an arbitrary local file
+      // in a chrome-less, always-on-top window. The sibling handlers here use
+      // realpathSync on both sides; this one was the odd case out.
+      const realExtensionsDir = fs.realpathSync(extensionsDir);
+      const realFilePath = fs.realpathSync(filePath);
+      if (!realFilePath.startsWith(realExtensionsDir + path.sep)) {
+        return { error: 'Blocked: file:// URL must be within extensions directory.' };
+      }
+    } catch {
+      return { error: 'Invalid file URL.' };
+    }
+  } else if (url.startsWith('chrome-extension://')) {
+    try {
+      const parsedExtensionUrl = new URL(url);
+      const extensionId = parsedExtensionUrl.hostname;
+      const isInstalled = loadedExtensions.some(extension => extension.id === extensionId) ||
+        Boolean(session.defaultSession.getExtension(extensionId));
+      if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) || !isInstalled) {
+        return { error: 'Blocked: extension is not installed.' };
+      }
+    } catch {
+      return { error: 'Invalid extension URL.' };
+    }
+  } else {
+    return { error: 'Blocked: only chrome-extension:// and local extension file:// URLs are allowed.' };
+  }
+
+  // Toggle behavior: if clicking the same extension popup while open, close it
+  if (activeExtensionPopupWin && !activeExtensionPopupWin.isDestroyed()) {
+    const isSameUrl = activeExtensionPopupUrl === url;
+    try {
+      activeExtensionPopupWin.close();
+    } catch (_) {}
+    activeExtensionPopupWin = null;
+    activeExtensionPopupUrl = null;
+    if (isSameUrl) {
+      return { success: true, toggled: true };
+    }
+  }
+
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getAllWindows().find(w => w !== activeExtensionPopupWin) || BrowserWindow.getAllWindows()[0];
+  if (!win) return { error: 'No main window available' };
+
+  const popupWidth = 380;
+  const popupHeight = 520;
+  let posX: number | undefined;
+  let posY: number | undefined;
+
+  if (bounds && typeof bounds.x === 'number' && typeof bounds.y === 'number') {
+    const [winX, winY] = win.getPosition();
+    const [winW, winH] = win.getSize();
+
+    // Calculate screen coordinate anchored directly under the button
+    const btnCenterX = winX + Math.round(bounds.x) + Math.round((bounds.width || 28) / 2);
+    const calculatedX = btnCenterX - Math.round(popupWidth / 2);
+
+    posX = Math.max(winX + 12, Math.min(calculatedX, winX + winW - popupWidth - 12));
+    posY = winY + Math.round(bounds.y) + Math.round(bounds.height || 28) + 6;
+  }
+
+  const popupWin = new BrowserWindow({
+    width: popupWidth,
+    height: popupHeight,
+    x: posX,
+    y: posY,
+    parent: win,
+    modal: false,
+    frame: false,
+    transparent: false,
+    backgroundColor: '#151122',
+    hasShadow: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      session: session.defaultSession
+    }
+  });
+
+  activeExtensionPopupWin = popupWin;
+  activeExtensionPopupUrl = url;
+
+  // Security: Restrict extension popup navigation to its own chrome-extension origin
+  let popupOrigin = '';
+  try {
+    popupOrigin = new URL(url).origin;
+  } catch {}
+
+  popupWin.webContents.on('will-navigate', (event, destUrl) => {
+    try {
+      const destParsed = new URL(destUrl);
+      if (popupOrigin && destParsed.origin === popupOrigin && destParsed.protocol === 'chrome-extension:') {
+        return;
+      }
+      event.preventDefault();
+      if (destParsed.protocol === 'http:' || destParsed.protocol === 'https:') {
+        sendToMainWindow('new-tab', destUrl);
+      }
+    } catch {
+      event.preventDefault();
+    }
+  });
+
+  popupWin.webContents.on('will-redirect', (event, destUrl) => {
+    try {
+      const destParsed = new URL(destUrl);
+      if (popupOrigin && destParsed.origin === popupOrigin && destParsed.protocol === 'chrome-extension:') {
+        return;
+      }
+      event.preventDefault();
+    } catch {
+      event.preventDefault();
+    }
+  });
+
+  // Security: Block arbitrary window popups from extension popup content
+  popupWin.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'chrome-extension:') {
+        sendToMainWindow('new-tab', url);
+      }
+    } catch {}
+    return { action: 'deny' };
+  });
+
+  // Inject active tab bridge into the extension popup
+  const injectActiveTabBridge = () => {
+    if (!activeTabInfo || !popupWin || popupWin.isDestroyed()) return;
+
+    let extId = '';
+    try {
+      if (url.startsWith('chrome-extension://')) {
+        extId = new URL(url).hostname;
+      }
+    } catch {}
+
+    const ext: any = (extId ? session.defaultSession.getExtension(extId) : null) ||
+      loadedExtensions.find(e => e.id === extId) ||
+      (url.startsWith('file://') ? loadedExtensions.find(e => url.includes(e.id)) : null);
+
+    let manifest: any = ext?.manifest;
+    if (!manifest && ext?.path) {
+      try {
+        const mPath = path.join(ext.path, 'manifest.json');
+        if (fs.existsSync(mPath)) {
+          manifest = JSON.parse(fs.readFileSync(mPath, 'utf8'));
+        }
+      } catch {}
+    }
+
+    const effectiveId = extId || ext?.id || '';
+    const perms: string[] = Array.isArray(manifest?.permissions) ? manifest.permissions : [];
+    const optPerms: string[] = Array.isArray(manifest?.optional_permissions) ? manifest.optional_permissions : [];
+    const hostPerms: string[] = Array.isArray(manifest?.host_permissions) ? manifest.host_permissions : [];
+    const allPerms = [...perms, ...optPerms];
+
+    const hasTabsPermission = allPerms.includes('tabs') || allPerms.includes('activeTab');
+    const activeUrl = typeof activeTabInfo.url === 'string' ? activeTabInfo.url : '';
+    const hasHostPermission = matchesExtensionHostPermission([...hostPerms, ...perms], activeUrl);
+    const hasTabAccess = hasTabsPermission || hasHostPermission;
+
+    const isIncognito = Boolean(activeTabInfo.isIncognito);
+    const isAllowedInIncognito = isExtensionAllowedInIncognito(effectiveId, manifest);
+    const canExposeSensitiveData = hasTabAccess && (!isIncognito || isAllowedInIncognito);
+
+    const tabData: Record<string, unknown> = {
+      id: activeTabInfo.webContentsId || 1,
+      index: 0,
+      windowId: win.id,
+      highlighted: true,
+      active: true,
+      selected: true,
+      pinned: false,
+      status: 'complete',
+      incognito: isIncognito,
+      width: win.getContentBounds().width,
+      height: win.getContentBounds().height
+    };
+
+    if (canExposeSensitiveData && activeUrl) {
+      tabData.url = activeUrl;
+      tabData.title = typeof activeTabInfo.title === 'string' ? activeTabInfo.title : 'New Tab';
+      tabData.favIconUrl = typeof activeTabInfo.favIconUrl === 'string' ? activeTabInfo.favIconUrl : '';
+    }
+
+    const bridgeCode = `
+      (function() {
+        try {
+          window.chrome = window.chrome || {};
+          window.chrome.tabs = window.chrome.tabs || {};
+          const realTab = ${JSON.stringify(tabData)};
+          const origQuery = window.chrome.tabs.query;
+          window.chrome.tabs.query = function(q, cb) {
+            if (typeof cb === 'function') {
+              if (!q || q.active || q.currentWindow || q.lastFocusedWindow) {
+                cb([realTab]);
+              } else if (origQuery) {
+                origQuery.call(window.chrome.tabs, q, function(res) {
+                  cb(res && res.length > 0 ? res : [realTab]);
+                });
+              } else {
+                cb([realTab]);
+              }
+            } else {
+              return Promise.resolve([realTab]);
+            }
+          };
+          window.chrome.tabs.get = function(id, cb) {
+            if (typeof cb === 'function') cb(realTab);
+            else return Promise.resolve(realTab);
+          };
+          window.chrome.tabs.getCurrent = function(cb) {
+            if (typeof cb === 'function') cb(realTab);
+            else return Promise.resolve(realTab);
+          };
+        } catch(e) {}
+      })();
+    `;
+
+    if (!popupWin.isDestroyed() && !popupWin.webContents.isDestroyed()) {
+      popupWin.webContents.executeJavaScript(bridgeCode).catch(() => {});
+    }
+  };
+
+  // Graceful show & blur handling: only allow blur-close after popup is stably shown
+  let canCloseOnBlur = false;
+  const showPopup = () => {
+    if (!popupWin.isDestroyed() && !popupWin.isVisible()) {
+      popupWin.show();
+      popupWin.focus();
+      setTimeout(() => {
+        canCloseOnBlur = true;
+      }, 400);
+    }
+  };
+
+  popupWin.webContents.on('dom-ready', async () => {
+    injectActiveTabBridge();
+    showPopup();
+
+    // Auto-fit popup dimensions to content
+    try {
+      if (!popupWin.isDestroyed() && !popupWin.webContents.isDestroyed()) {
+        const dimensions = await popupWin.webContents.executeJavaScript(`
+          ({
+            width: Math.max(document.body?.scrollWidth || 0, document.documentElement?.scrollWidth || 0, 320),
+            height: Math.max(document.body?.scrollHeight || 0, document.documentElement?.scrollHeight || 0, 200)
+          })
+        `);
+        if (dimensions && typeof dimensions.width === 'number' && typeof dimensions.height === 'number') {
+          const fitWidth = Math.min(Math.max(dimensions.width, 320), 800);
+          const fitHeight = Math.min(Math.max(dimensions.height, 200), 700);
+
+          if (!popupWin.isDestroyed()) {
+            popupWin.setSize(fitWidth, fitHeight);
+          }
+        }
+      }
+    } catch (_) {}
+  });
+
+  popupWin.once('ready-to-show', showPopup);
+
+  // Close popup when it loses focus (after grace period)
+  popupWin.on('blur', () => {
+    if (canCloseOnBlur && !popupWin.isDestroyed()) {
+      popupWin.close();
+    }
+  });
+
+  popupWin.on('closed', () => {
+    if (activeExtensionPopupWin === popupWin) {
+      activeExtensionPopupWin = null;
+      activeExtensionPopupUrl = null;
+    }
+  });
+
+  // Close popup when parent window moves or minimizes
+  const handleParentChange = () => {
+    if (!popupWin.isDestroyed()) popupWin.close();
+  };
+  win.once('move', handleParentChange);
+  win.once('minimize', handleParentChange);
+  popupWin.once('closed', () => {
+    win.removeListener('move', handleParentChange);
+    win.removeListener('minimize', handleParentChange);
+  });
+
+  try {
+    if (!popupWin.isDestroyed()) {
+      await popupWin.loadURL(url);
+      showPopup();
+      return { success: true };
+    }
+    return { error: 'Popup window was destroyed before load' };
+  } catch (err: any) {
+    if (!popupWin.isDestroyed()) popupWin.close();
+    return { error: 'Failed to load extension popup: ' + err.message };
+  }
+});
+
+// Read Chrome Bookmarks
+ipcMain.handle('import-chrome-bookmarks', async (event) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
+  const home = app.getPath('home');
+  const candidatePaths: string[] = [];
+
+  if (process.platform === 'darwin') {
+    candidatePaths.push(
+      path.join(home, 'Library/Application Support/Google/Chrome/Default/Bookmarks'),
+      path.join(home, 'Library/Application Support/Google/Chrome/Profile 1/Bookmarks'),
+      path.join(home, 'Library/Application Support/Chromium/Default/Bookmarks'),
+      path.join(home, 'Library/Application Support/BraveSoftware/Brave-Browser/Default/Bookmarks'),
+      path.join(home, 'Library/Application Support/Microsoft Edge/Default/Bookmarks')
+    );
+  } else if (process.platform === 'win32') {
+    let localAppData = process.env.LOCALAPPDATA;
+    if (!localAppData) {
+      try { localAppData = (app as any).getPath('localAppData'); } catch (_) {}
+    }
+    if (!localAppData) {
+      localAppData = path.join(app.getPath('appData'), '..', 'Local');
+    }
+    candidatePaths.push(
+      path.join(localAppData, 'Google', 'Chrome', 'User Data', 'Default', 'Bookmarks'),
+      path.join(localAppData, 'Google', 'Chrome', 'User Data', 'Profile 1', 'Bookmarks'),
+      path.join(localAppData, 'Chromium', 'User Data', 'Default', 'Bookmarks'),
+      path.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'Bookmarks'),
+      path.join(localAppData, 'Microsoft', 'Edge', 'User Data', 'Default', 'Bookmarks')
+    );
+  } else if (process.platform === 'linux') {
+    // 1. Native packages (~/.config/...)
+    candidatePaths.push(
+      path.join(home, '.config', 'google-chrome', 'Default', 'Bookmarks'),
+      path.join(home, '.config', 'google-chrome', 'Profile 1', 'Bookmarks'),
+      path.join(home, '.config', 'chromium', 'Default', 'Bookmarks'),
+      path.join(home, '.config', 'chromium', 'Profile 1', 'Bookmarks'),
+      path.join(home, '.config', 'BraveSoftware', 'Brave-Browser', 'Default', 'Bookmarks'),
+      path.join(home, '.config', 'microsoft-edge', 'Default', 'Bookmarks')
+    );
+    // 2. Flatpak packages (~/.var/app/...)
+    candidatePaths.push(
+      path.join(home, '.var', 'app', 'com.google.Chrome', 'config', 'google-chrome', 'Default', 'Bookmarks'),
+      path.join(home, '.var', 'app', 'org.chromium.Chromium', 'config', 'chromium', 'Default', 'Bookmarks'),
+      path.join(home, '.var', 'app', 'com.brave.Browser', 'config', 'BraveSoftware', 'Brave-Browser', 'Default', 'Bookmarks'),
+      path.join(home, '.var', 'app', 'com.microsoft.Edge', 'config', 'microsoft-edge', 'Default', 'Bookmarks')
+    );
+    // 3. Snap packages (~/snap/...)
+    candidatePaths.push(
+      path.join(home, 'snap', 'chromium', 'current', '.config', 'chromium', 'Default', 'Bookmarks'),
+      path.join(home, 'snap', 'chromium', 'common', 'chromium', 'Default', 'Bookmarks'),
+      path.join(home, 'snap', 'google-chrome', 'current', '.config', 'google-chrome', 'Default', 'Bookmarks'),
+      path.join(home, 'snap', 'brave', 'current', '.config', 'BraveSoftware', 'Brave-Browser', 'Default', 'Bookmarks')
+    );
+  }
+
+  let bookmarksPath = '';
+  let fd: number | null = null;
+  for (const candidate of candidatePaths) {
+    try {
+      fd = fs.openSync(candidate, 'r');
+      bookmarksPath = candidate;
+      break;
+    } catch {
+      // Path not found or not accessible; continue searching
+    }
+  }
+
+  if (fd === null || !bookmarksPath) {
+    return { success: false, error: 'Chrome Bookmarks file not found.' };
+  }
+
+  // VULN-27: Add user confirmation before reading another app's data
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const { response } = await dialog.showMessageBox(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined as any, {
+      type: 'question',
+      buttons: ['Import', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'Import Chrome Bookmarks',
+      message: 'King Browser would like to read your Google Chrome bookmarks to import them.',
+      detail: `Path: ${bookmarksPath}`
+    });
+    if (response !== 0) {
+      try { fs.closeSync(fd); } catch {}
+      return { success: false, error: 'Import cancelled by user.' };
+    }
+  }
+
+  try {
+    // Perf/Freeze fix: the read + parse below is synchronous on the main process.
+    // Chrome's Bookmarks file legitimately reaches tens of thousands of entries
+    // (tens of MB), and the old unbounded path froze every window while the main
+    // thread was stuck reading, parsing, URL()-ing and structured-cloning. Refuse
+    // implausibly large files outright, and cap the node walk below.
+    const MAX_BOOKMARKS_FILE_BYTES = 32 * 1024 * 1024;
+    const MAX_IMPORTED_BOOKMARKS = 20000;
+    let data: any;
+    try {
+      const fileSize = fs.fstatSync(fd).size;
+      if (fileSize > MAX_BOOKMARKS_FILE_BYTES) {
+        return {
+          success: false,
+          error: `Bookmarks file is too large to import safely (${(fileSize / (1024 * 1024)).toFixed(1)} MB, limit 32 MB).`
+        };
+      }
+      data = JSON.parse(fs.readFileSync(fd, 'utf8'));
+    } finally {
+      try { fs.closeSync(fd); } catch {}
+    }
+    const importedBookmarks: any[] = [];
+    let truncated = false;
+
+    // Recursive function to extract URLs safely
+    const extractNodes = (node: any, depth = 0) => {
+      if (depth > 20 || !node) return;
+      // Hard cap: a huge-but-under-the-size-limit file must not produce an
+      // unbounded result (nor an unbounded walk) either.
+      if (importedBookmarks.length >= MAX_IMPORTED_BOOKMARKS) {
+        truncated = true;
+        return;
+      }
+      if (node.type === 'url' && typeof node.url === 'string') {
+        try {
+          const parsed = new URL(node.url);
+          // Security: Only allow http and https protocols in imported bookmarks
+          if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            // Privacy: no favicon URL is synthesized here. Guessing
+            // https://<domain>/favicon.ico queued one request to a third-party
+            // host per bookmark, leaking the user's IP/UA to every site they ever
+            // bookmarked. The bookmark list renders a Globe icon when favicon is
+            // absent, so nothing breaks.
+            importedBookmarks.push({
+              id: `bm_imp_${crypto.randomUUID()}`,
+              title: String(node.name || node.url).substring(0, 200),
+              url: node.url
+            });
+          }
+        } catch (_) {}
+      } else if (node.type === 'folder' && Array.isArray(node.children)) {
+        for (const child of node.children) {
+          if (importedBookmarks.length >= MAX_IMPORTED_BOOKMARKS) {
+            truncated = true;
+            return;
+          }
+          extractNodes(child, depth + 1);
+        }
+      }
+    };
+
+    if (data.roots?.bookmark_bar) extractNodes(data.roots.bookmark_bar);
+    if (data.roots?.other) extractNodes(data.roots.other);
+    if (data.roots?.synced) extractNodes(data.roots.synced);
+
+    if (truncated) {
+      return {
+        success: false,
+        error: `Import stopped at ${MAX_IMPORTED_BOOKMARKS} bookmarks (limit reached). The bookmark list was not imported — narrow it down or remove old bookmarks and try again.`
+      };
+    }
+
+    return { success: true, bookmarks: importedBookmarks };
+  } catch (err) {
+    console.error('Failed to parse Chrome bookmarks:', err);
+    return { success: false, error: 'Failed to read bookmarks file.' };
+  }
+});
+
+// Remove Extension
+ipcMain.handle('remove-extension', async (event, extensionId: string) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (!extensionId || typeof extensionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(extensionId)) {
+    return { error: 'Invalid extension ID format' };
+  }
+
+  try {
+    const foundExt = loadedExtensions.find((e) => e.id === extensionId);
+
+    // 1. Close any active popup windows for this extension
+    if (activeExtensionPopupWin && !activeExtensionPopupWin.isDestroyed()) {
+      try {
+        activeExtensionPopupWin.close();
+        activeExtensionPopupWin = null;
+      } catch (_) {}
+    }
+
+    // 2. Remove from Electron runtime sessions (both default and window sessions)
+    try {
+      await session.defaultSession.removeExtension(extensionId);
+    } catch (_) {}
+
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed() && win.webContents?.session && win.webContents.session !== session.defaultSession) {
+        try {
+          await win.webContents.session.removeExtension(extensionId);
+        } catch (_) {}
+      }
+    }
+
+    // 3. Remove from in-memory state
+    loadedExtensions = loadedExtensions.filter((e) => e.id !== extensionId);
+
+    // 4. Remove from disabled extensions list so it doesn't linger
+    const disabledIds = getDisabledExtensionIds();
+    if (disabledIds.includes(extensionId)) {
+      setDisabledExtensionIds(disabledIds.filter((id) => id !== extensionId));
+    }
+
+    const unpackedPaths = getUnpackedExtensionPaths();
+    if (unpackedPaths[extensionId]) {
+      delete unpackedPaths[extensionId];
+      setUnpackedExtensionPaths(unpackedPaths);
+    }
+
+    // 5. Permanently remove extension directory from disk
+    const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+
+    // Path 1: Direct ID folder
+    const extDir = path.resolve(path.join(extensionsBaseDir, extensionId));
+    if (extDir.startsWith(extensionsBaseDir + path.sep) && fs.existsSync(extDir)) {
+      try {
+        fs.rmSync(extDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      } catch (rmErr) {
+        console.error(`[Extensions] Error removing directory ${extDir}:`, rmErr);
+      }
+    }
+
+    // Path 2: Loaded extension recorded path (if different)
+    if (foundExt?.path) {
+      const recordedPath = path.resolve(foundExt.path);
+      if (recordedPath.startsWith(extensionsBaseDir + path.sep) && fs.existsSync(recordedPath)) {
+        try {
+          fs.rmSync(recordedPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+        } catch (_) {}
+      }
+    }
+
+    // Path 3: Clean up any lingering downloaded .crx files in temp_extensions
+    const tempCrx = path.join(app.getPath('userData'), 'temp_extensions', `${extensionId}.crx`);
+    if (fs.existsSync(tempCrx)) {
+      try { fs.rmSync(tempCrx, { force: true }); } catch (_) {}
+    }
+
+    // 6. Notify all browser windows of the change
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('extension-changed');
+      }
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Failed to remove extension:', err);
+    return { error: err?.message || 'Failed to remove extension' };
+  }
+});
+
+// Extension incognito access management
+ipcMain.handle('set-extension-incognito-access', async (event, extensionId: unknown, allowed: unknown) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (typeof extensionId !== 'string' || !extensionId) return { error: 'Invalid extension ID' };
+  if (allowed === true) {
+    incognitoAllowedExtensions.add(extensionId);
+  } else {
+    incognitoAllowedExtensions.delete(extensionId);
+  }
+  return { success: true };
+});
+
+ipcMain.handle('get-extension-incognito-access', async (event, extensionId: unknown) => {
+  if (!isTrustedSender(event)) return false;
+  if (typeof extensionId !== 'string' || !extensionId) return false;
+  return incognitoAllowedExtensions.has(extensionId);
+});
+
+// Install from Chrome Web Store (CRX download + zip-slip guards live in main/crxInstaller.ts)
+ipcMain.handle('install-from-webstore', (event, urlOrId: string) => installFromWebstore({
+  isTrustedSender,
+  getMainWindow: () => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined),
+  isExtensionLoaded: (extensionId: string) => loadedExtensions.some(e => e.id === extensionId),
+  findLoadedExtension: (extensionId: string) => loadedExtensions.find(e => e.id === extensionId),
+  addLoadedExtension: (extInfo) => { loadedExtensions.push(extInfo); },
+  getDisabledExtensionIds,
+  setDisabledExtensionIds
+}, event, urlOrId));
+
+// Show extension permission review dialog before installation
+ipcMain.handle('review-extension-permissions', async (event, extensionId: string, extractPath: string) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (typeof extensionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(extensionId)) {
+    return { error: 'Invalid extension ID format' };
+  }
+  if (typeof extractPath !== 'string' || !extractPath.trim()) {
+    return { error: 'Invalid extension path' };
+  }
+
+  const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+  const resolvedExtractPath = path.resolve(extractPath.trim());
+  if (!resolvedExtractPath.startsWith(extensionsBaseDir + path.sep)) {
+    return { error: 'Extension permission path is outside the extensions directory' };
+  }
+  try {
+    const realBase = fs.realpathSync(extensionsBaseDir);
+    const realExtract = fs.realpathSync(resolvedExtractPath);
+    if (!realExtract.startsWith(realBase + path.sep) ||
+        path.basename(realExtract) !== extensionId) {
+      return { error: 'Invalid extension permission path' };
+    }
+  } catch {
+    return { error: 'Extension permission path does not exist' };
+  }
+
+  const permissions = await parseExtensionPermissions(resolvedExtractPath);
+
+  // Combine all permissions for display
+  const allPermissions = [
+    ...permissions.permissions,
+    ...permissions.optionalPermissions,
+    ...permissions.hostPermissions
+  ];
+
+  const formattedPermissions = formatPermissionsForDisplay(allPermissions);
+
+  const parentWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+
+  const confirmOptions: Electron.MessageBoxOptions = {
+    type: 'question',
+    buttons: ['Cancel', 'Install'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Review Extension Permissions',
+    message: `Extension "${extensionId}" requests the following permissions:`,
+    detail: formattedPermissions.join('\n\n'),
+    checkboxLabel: 'Remember this decision',
+    checkboxChecked: false
+  };
+
+  const { response, checkboxChecked } = parentWin
+    ? await dialog.showMessageBox(parentWin, confirmOptions)
+    : await dialog.showMessageBox(confirmOptions);
+
+  if (response !== 1) {
+    return { allowed: false, cancelled: true };
+  }
+
+  return { allowed: true, remember: checkboxChecked };
+});
+
+// --- NATIVE OS TEXT-TO-SPEECH (macOS High Fidelity) ---
+let activeTtsProcess: child_process.ChildProcess | null = null;
+// Generation counter: each speak request invalidates the previous one so a
+// killed request's close-handler can never spawn a fallback that talks over
+// the newer request.
+let ttsGeneration = 0;
+
+// Performance: async execFile so a slow `/usr/bin/say` can never block the Electron main process
+const execFileAsync = promisify(child_process.execFile);
+
+ipcMain.handle('native-tts-get-voices', async (event) => {
+  if (!isTrustedSender(event)) return [];
+  if (process.platform === 'darwin') {
+    try {
+      const { stdout } = await execFileAsync('/usr/bin/say', ['-v', '?'], { encoding: 'utf8', timeout: 5000 });
+      const lines = stdout.split('\n');
+      const list: { name: string; lang: string; description: string }[] = [];
+      for (const line of lines) {
+        const match = line.match(/^([^\t#]+?)\s+([a-zA-Z]{2}_[a-zA-Z0-9]+)\s+#\s*(.*)$/);
+        if (match) {
+          list.push({
+            name: match[1].trim(),
+            lang: match[2].replace('_', '-'),
+            description: match[3].trim()
+          });
+        }
+      }
+      return list;
+    } catch (e) {
+      console.error('Failed to get macOS native voices:', e);
+      return [];
+    }
+  }
+  return [];
+});
+
+ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: string, rate?: number, lang?: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
+  if (!text || typeof text !== 'string') return { success: false, error: 'Invalid text' };
+
+  // Limit text length to 100,000 chars to avoid memory exhaustion
+  if (text.length > 100000) {
+    text = text.substring(0, 100000);
+  }
+
+  // Invalidate any in-flight request BEFORE killing it: its close handler runs
+  // on a future tick, so bumping the generation first guarantees it observes
+  // the mismatch and never spawns a voice-fallback over this request.
+  const myGeneration = ++ttsGeneration;
+
+  if (activeTtsProcess) {
+    try {
+      activeTtsProcess.kill();
+    } catch (_) {}
+    activeTtsProcess = null;
+  }
+
+  if (process.platform === 'darwin') {
+    return new Promise((resolve) => {
+      // Robustness: hard overall cap so a hung `say` process can never leave this
+      // handler pending forever. Single shared deadline across voice-fallback retries.
+      let settled = false;
+      let sayTimedOut = false;
+      const sayTimeout = setTimeout(() => {
+        sayTimedOut = true;
+        if (activeTtsProcess) {
+          try { activeTtsProcess.kill(); } catch (_) {}
+          activeTtsProcess = null;
+        }
+      }, 120000);
+      sayTimeout.unref?.();
+      const finish = (result: { success: boolean; error?: string }) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(sayTimeout);
+        resolve(result);
+      };
+
+      // Security: Sanitize voice name strictly against command flag injection
+      let cleanVoice: string | null = null;
+      if (voiceName && typeof voiceName === 'string') {
+        const rawName = voiceName.split('(')[0].trim();
+        if (/^[a-zA-Z0-9\s]+$/.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {
+          cleanVoice = rawName;
+        }
+      }
+
+      // If no voice specified, determine best default by language
+      if (!cleanVoice && lang && typeof lang === 'string') {
+        const prefix = lang.toLowerCase().split('-')[0];
+        if (prefix === 'tr') cleanVoice = 'Yelda';
+        else if (prefix === 'de') cleanVoice = 'Anna';
+        else if (prefix === 'fr') cleanVoice = 'Thomas';
+        else if (prefix === 'es') cleanVoice = 'Mónica';
+        else if (prefix === 'it') cleanVoice = 'Alice';
+        else if (prefix === 'ja') cleanVoice = 'Kyoko';
+        else if (prefix === 'ru') cleanVoice = 'Milena';
+        else cleanVoice = 'Samantha';
+      }
+
+      const args: string[] = [];
+      if (cleanVoice) {
+        args.push('-v', cleanVoice);
+      }
+
+      if (rate && typeof rate === 'number' && Number.isFinite(rate)) {
+        const clampedRate = Math.max(0.5, Math.min(2.5, rate));
+        const wpm = Math.round(175 * clampedRate);
+        args.push('-r', String(wpm));
+      }
+
+      const runSay = (commandArgs: string[]) => {
+        try {
+          const proc = child_process.spawn('/usr/bin/say', commandArgs, {
+            stdio: ['pipe', 'ignore', 'pipe']
+          });
+          activeTtsProcess = proc;
+
+          // Robustness: drain stderr so pipe backpressure can never stall the process
+          if (proc.stderr) {
+            proc.stderr.on('data', () => {});
+          }
+
+          if (proc.stdin) {
+            proc.stdin.on('error', () => {});
+            try {
+              proc.stdin.write(text, 'utf8');
+              proc.stdin.end();
+            } catch (_) {}
+          }
+
+          proc.on('close', (code) => {
+            if (activeTtsProcess === proc) activeTtsProcess = null;
+            if (myGeneration !== ttsGeneration) {
+              // A newer speak request or stop request superseded this one.
+              finish({ success: false, error: 'Superseded or stopped' });
+            } else if (sayTimedOut) {
+              finish({ success: false, error: 'Speech synthesis timed out' });
+            } else if (code === 0) {
+              finish({ success: true });
+            } else if (code !== null && commandArgs.includes('-v') && myGeneration === ttsGeneration) {
+              // Only fallback if not cancelled/stopped and custom voice failed
+              const fallbackArgs = commandArgs.filter((a, i) => a !== '-v' && commandArgs[i - 1] !== '-v');
+              runSay(fallbackArgs);
+            } else {
+              finish({ success: false, error: `Process exited with code ${code}` });
+            }
+          });
+
+          proc.on('error', (err) => {
+            if (activeTtsProcess === proc) activeTtsProcess = null;
+            finish({ success: false, error: err.message });
+          });
+        } catch (err: any) {
+          activeTtsProcess = null;
+          finish({ success: false, error: err.message });
+        }
+      };
+
+      runSay(args);
+    });
+  }
+
+  return { success: false, error: 'Native TTS is only available on macOS' };
+});
+
+ipcMain.handle('native-tts-stop', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  ttsGeneration++; // Increment generation to invalidate any in-flight processes and close handlers
+  if (activeTtsProcess) {
+    try {
+      activeTtsProcess.kill('SIGKILL');
+    } catch (_) {}
+    activeTtsProcess = null;
+    return true;
+  }
+  return false;
+});
+
+// Sliding-window rate limit state for show-confirm-dialog (dialog flood protection)
+const CONFIRM_DIALOG_LIMIT = 5;
+const CONFIRM_DIALOG_WINDOW_MS = 10_000;
+const confirmDialogAttempts = new Map<number, number[]>();
+// Senders that already carry a 'destroyed' cleanup listener. `destroyed` never
+// fires on a live window (macOS keeps the app running when the last window
+// closes), so gating registration on the rate-limit map — whose entry is dropped
+// as soon as the 10s window empties — re-registered a permanent closure on an
+// app-lifetime webContents every 10 seconds. Settings toggles, "clear data" and
+// "restart" all come through here. Tracking ids in their own set keeps the
+// listener count at one per sender for the sender's whole lifetime.
+const confirmDialogCleanupRegistered = new Set<number>();
+
+ipcMain.handle('show-confirm-dialog', async (event, options: { title?: string; message: string; detail?: string; confirmLabel?: string; cancelLabel?: string }) => {
+  if (!isTrustedSender(event)) return false;
+  // Security: Sliding-window rate limit against dialog flood (5 per 10s per sender).
+  const now = Date.now();
+  const senderId = event.sender.id;
+  const recentAttempts = (confirmDialogAttempts.get(senderId) || []).filter(t => now - t < CONFIRM_DIALOG_WINDOW_MS);
+  if (recentAttempts.length === 0) confirmDialogAttempts.delete(senderId);
+  // Avoid unbounded growth from destroyed senders: drop state when the sender dies.
+  try {
+    if (!confirmDialogCleanupRegistered.has(senderId)) {
+      event.sender.once('destroyed' as any, () => {
+        confirmDialogAttempts.delete(senderId);
+        confirmDialogCleanupRegistered.delete(senderId);
+      });
+      // Marked only after once() succeeds, so a throw here still lets a later
+      // dialog retry the registration instead of stranding the sender unmarked.
+      confirmDialogCleanupRegistered.add(senderId);
+    }
+  } catch {}
+  if (recentAttempts.length >= CONFIRM_DIALOG_LIMIT) {
+    console.warn('[show-confirm-dialog] Rate limit exceeded for sender', senderId);
+    return false;
+  }
+  recentAttempts.push(now);
+  confirmDialogAttempts.set(senderId, recentAttempts);
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const targetWin = win && !win.isDestroyed() ? win : (mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined as any);
+  const hasCancel = Boolean(options?.cancelLabel && options.cancelLabel.trim().length > 0);
+  const rawButtons = hasCancel ? [options?.confirmLabel || 'OK', options!.cancelLabel!] : [options?.confirmLabel || 'OK'];
+  const buttons = rawButtons.map(b => String(b || '').slice(0, 2048));
+  const result = await dialog.showMessageBox(targetWin, {
+    type: hasCancel ? 'question' : 'info',
+    buttons,
+    defaultId: 0,
+    cancelId: hasCancel ? 1 : 0,
+    title: String(options?.title || (hasCancel ? 'Confirmation' : 'King Browser')).slice(0, 2048),
+    message: String(options?.message || '').slice(0, 2048),
+    detail: options?.detail ? String(options.detail).slice(0, 2048) : undefined,
+    noLink: true
+  });
+  return result.response === 0;
+});

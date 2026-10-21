@@ -1,0 +1,524 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "tw-shimmer";
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-accent: var(--nova-accent, var(--color-blue-500));
+  --color-accent-hover: var(--nova-accent-hover, var(--color-blue-600));
+  --color-accent-light: var(--nova-accent-light, var(--color-blue-100));
+  --color-accent-dark: var(--nova-accent-dark, var(--color-blue-700));
+  --color-accent-text: var(--nova-accent-text, #ffffff);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-slate-950: var(--nova-slate-950);
+  --color-slate-900: var(--nova-slate-900);
+  --color-slate-800: var(--nova-slate-800);
+  --color-slate-700: var(--nova-slate-700);
+  --color-slate-200: var(--nova-slate-200);
+  --color-slate-100: var(--nova-slate-100);
+  --color-slate-50: var(--nova-slate-50);
+}
+
+@theme inline {
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-color-sidebar-ring: var(----color-sidebar-ring);
+  --color-color-sidebar-border: var(----color-sidebar-border);
+  --color-color-sidebar-accent-foreground: var(----color-sidebar-accent-foreground);
+  --color-color-sidebar-accent: var(----color-sidebar-accent);
+  --color-color-sidebar-primary-foreground: var(----color-sidebar-primary-foreground);
+  --color-color-sidebar-primary: var(----color-sidebar-primary);
+  --color-color-sidebar-foreground: var(----color-sidebar-foreground);
+  --color-color-sidebar: var(----color-sidebar);
+  --color-color-chart-5: var(----color-chart-5);
+  --color-color-chart-4: var(----color-chart-4);
+  --color-color-chart-3: var(----color-chart-3);
+  --color-color-chart-2: var(----color-chart-2);
+  --color-color-chart-1: var(----color-chart-1);
+  --color-color-ring: var(----color-ring);
+  --color-color-input: var(----color-input);
+  --color-color-border: var(----color-border);
+  --color-color-destructive-foreground: var(----color-destructive-foreground);
+  --color-color-destructive: var(----color-destructive);
+  --color-color-accent-foreground: var(----color-accent-foreground);
+  --color-color-accent: var(----color-accent);
+  --color-color-muted-foreground: var(----color-muted-foreground);
+  --color-color-muted: var(----color-muted);
+  --color-color-secondary-foreground: var(----color-secondary-foreground);
+  --color-color-secondary: var(----color-secondary);
+  --color-color-primary-foreground: var(----color-primary-foreground);
+  --color-color-primary: var(----color-primary);
+  --color-color-popover-foreground: var(----color-popover-foreground);
+  --color-color-popover: var(----color-popover);
+  --color-color-card-foreground: var(----color-card-foreground);
+  --color-color-card: var(----color-card);
+  --color-color-foreground: var(----color-foreground);
+  --color-color-background: var(----color-background);
+}
+
+:root {
+  color-scheme: light;
+  --nova-slate-950: #020617;
+  --nova-slate-900: #0f172a;
+  --nova-slate-800: #1e293b;
+  --nova-slate-700: #334155;
+  --nova-slate-200: #e2e8f0;
+  --nova-slate-100: #f1f5f9;
+  --nova-slate-50: #f8fafc;
+
+  --background: #ffffff;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #18181b;
+
+  --nova-frame-bg: #f1f5f9;
+  --nova-header-bg: #f1f5f9;
+  --nova-toolbar-bg: #ffffff;
+  --nova-sidebar-bg: #f1f5f9;
+  --nova-active-tab-bg: #ffffff;
+  --nova-inactive-tab-hover-bg: rgba(0, 0, 0, 0.05);
+  --nova-border-subtle: rgba(0, 0, 0, 0.08);
+  --nova-card-bg: #ffffff;
+}
+
+.dark {
+  color-scheme: dark;
+  --nova-slate-950: #07050d;
+  --nova-slate-900: #151122;
+  --nova-slate-800: #1e1b2e;
+  --nova-slate-700: #2d2842;
+  --nova-slate-200: #e2e8f0;
+  --nova-slate-100: #f1f5f9;
+  --nova-slate-50: #f8fafc;
+
+  --background: var(--nova-slate-900);
+  --foreground: #fafafa;
+  --card: var(--nova-slate-800);
+  --card-foreground: #fafafa;
+  --popover: var(--nova-slate-800);
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #18181b;
+  --secondary: var(--nova-slate-800);
+  --secondary-foreground: #fafafa;
+  --muted: var(--nova-slate-800);
+  --muted-foreground: #a1a1aa;
+  --accent: var(--nova-slate-800);
+  --accent-foreground: #fafafa;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fafafa;
+  --border: var(--nova-slate-700);
+  --input: var(--nova-slate-800);
+  --ring: #d4d4d8;
+
+  --nova-frame-bg: var(--nova-slate-950);
+  --nova-header-bg: var(--nova-slate-900);
+  --nova-toolbar-bg: var(--nova-slate-800);
+  --nova-sidebar-bg: var(--nova-slate-950);
+  --nova-active-tab-bg: var(--nova-slate-800);
+  --nova-inactive-tab-hover-bg: rgba(255, 255, 255, 0.06);
+  --nova-border-subtle: rgba(255, 255, 255, 0.08);
+  --nova-card-bg: var(--nova-slate-800);
+}
+
+/* Accessibility: High-contrast focus rings for keyboard navigation (WCAG 2.1 AA) */
+:focus-visible {
+  outline: 2px solid var(--color-accent, #06b6d4) !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible,
+[role="switch"]:focus-visible {
+  outline: 2px solid var(--color-accent, #06b6d4) !important;
+  outline-offset: 2px !important;
+}
+
+/* Composite input subfields where the outer container provides the accessible focus-within ring */
+[data-subfield]:focus,
+[data-subfield]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+@layer utilities {
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  user-select: none;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+webview, iframe {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 1 auto !important;
+  border: none !important;
+}
+
+h1, h2, h3, h4, h5, h6, .font-serif {
+  font-family: 'Lora', serif;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.modal-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.dark .modal-scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* AI Chat & SidePanel Sleek Custom Scrollbar */
+.nova-chat-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.dark .nova-chat-scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.nova-chat-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.nova-chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nova-chat-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+
+.nova-chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
+.dark .nova-chat-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dark .nova-chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+/* Floating animation */
+@keyframes float-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-float {
+  animation: float-up 0.2s ease-out forwards;
+}
+
+/* Premium Interactive Globals */
+button {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.premium-card {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.premium-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+/* Top bar specific styles */
+.top-bar {
+  background: var(--bg-main);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* RTL Layout Support */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] input,
+[dir="rtl"] textarea {
+  text-align: right;
+}
+
+[dir="rtl"] input[type="url"],
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="password"] {
+  direction: ltr;
+  text-align: left;
+}
+
+/* RTL faz-1: logical helpers (search bar + container only) */
+[dir="rtl"] .rtl-rotate-arrow {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .rtl-text-start {
+  text-align: start;
+}
+
+/* AI chat input scrollbar (moved from inline <style> for strict CSP) */
+.prompt-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; background: transparent; }
+.prompt-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.prompt-scrollbar::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
+.prompt-scrollbar:hover::-webkit-scrollbar-thumb { background: rgb(148 163 184 / 0.35); }
+
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* prompt-kit loader keyframes (used by animate-[...] utilities in ui/loader.tsx) */
+@keyframes typing {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(-2px); opacity: 1; }
+}
+@keyframes loading-dots {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+@keyframes wave {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.6); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes text-blink {
+  0%, 100% { color: var(--primary); }
+  50% { color: var(--muted-foreground); }
+}
+@keyframes bounce-dots {
+  0%, 100% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+@keyframes thin-pulse {
+  0%, 100% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 0.4; }
+}
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.5); opacity: 1; }
+}
+@keyframes shimmer-text {
+  0% { background-position: 150% center; }
+  100% { background-position: -150% center; }
+}
+@keyframes wave-bars {
+  0%, 100% { transform: scaleY(1); opacity: 0.5; }
+  50% { transform: scaleY(0.6); opacity: 1; }
+}
+@keyframes shimmer {
+  0% { background-position: 200% 50%; }
+  100% { background-position: -200% 50%; }
+}
+@keyframes spinner-fade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+/* Keep tasks in the document flow when the assistant narrows the new tab. */
+.nova-newtab { container-type: inline-size; }
+.nova-newtab-layout { position: relative; min-height: 100%; display: grid; justify-content: center; align-content: center; justify-items: center; gap: 32px; padding-block: 40px; }
+@container (min-width: 1100px) {
+  .nova-newtab-layout { grid-template-columns: minmax(0, 672px) 288px; gap: 48px; }
+  .nova-newtab-layout:not(:has(.nova-tasks-widget)) { grid-template-columns: minmax(0, 672px); }
+}
+
+/* Keep backdrop capture on a permanent decorative layer. Hover/focus belongs
+   to the controls above it; changing a shortcut tint or its edit controls
+   does not mutate the element that captures the backdrop. */
+.nova-wallpaper-surface,
+.nova-newtab-glass,
+.nova-newtab-clean .nova-clock,
+.nova-newtab-clean .nova-shortcut {
+  isolation: isolate;
+}
+.nova-wallpaper-surface {
+  position: relative;
+  --nova-glass-tint: rgb(15 23 42 / 0.28);
+  background-color: transparent;
+  border: 1px solid rgb(255 255 255 / 0.18);
+}
+.nova-wallpaper-surface::before,
+.nova-newtab-glass::before,
+.nova-newtab-clean .nova-clock::before,
+.nova-newtab-clean .nova-shortcut::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: var(--nova-glass-tint, transparent);
+  -webkit-backdrop-filter: blur(var(--nova-glass-blur, 16px));
+  backdrop-filter: blur(var(--nova-glass-blur, 16px));
+  /* A stable compositor layer avoids promotion/demotion at hover boundaries. */
+  transform: translateZ(0);
+}
+.nova-shortcut.nova-wallpaper-surface::after,
+.nova-newtab-clean .nova-shortcut::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: transparent;
+  transition: background-color 160ms ease;
+}
+.nova-shortcut.nova-wallpaper-surface:hover::after,
+.nova-newtab-clean .nova-shortcut:hover::after {
+  background-color: rgb(255 255 255 / 0.06);
+}
+.nova-newtab-glass { --nova-glass-blur: 24px; }
+@supports not (backdrop-filter: blur(1px)) {
+  .nova-wallpaper-surface::before { background-color: rgb(15 23 42 / 0.65); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nova-shortcut.nova-wallpaper-surface::after { transition: none; }
+}
+
+/* Clean backgrounds use the same stable glass layer, with theme-aware tint. */
+.nova-newtab-clean {
+  --nova-clean-tint: rgb(255 255 255 / 0.5);
+  --nova-clean-border: rgb(148 163 184 / 0.3);
+}
+.nova-newtab-clean.dark {
+  --nova-clean-tint: rgb(255 255 255 / 0.06);
+  --nova-clean-border: rgb(255 255 255 / 0.14);
+}
+.nova-newtab-clean .nova-clock,
+.nova-newtab-clean .nova-shortcut,
+.nova-newtab-clean .nova-newtab-glass {
+  position: relative;
+  --nova-glass-tint: var(--nova-clean-tint);
+  background-color: transparent;
+  border: 1px solid var(--nova-clean-border);
+}
+.nova-newtab-clean .nova-clock {
+  padding: 24px 40px;
+  border-radius: 16px;
+}
+.nova-newtab-clean .nova-newtab-glass input {
+  background-color: transparent;
+  border-color: transparent;
+}
+.nova-newtab-clean .nova-newtab-glass:focus-within {
+  border-color: var(--nova-accent, #3b82f6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nova-newtab-clean .nova-shortcut::after { transition: none; }
+}

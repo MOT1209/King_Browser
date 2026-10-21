@@ -1,0 +1,100 @@
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection in test suite:', reason);
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception in test suite:', err);
+  process.exit(1);
+});
+
+console.log('Executing all test suites...');
+import './e2e/tier1_feature_coverage.test';
+import './e2e/tier2_boundary_corner.test';
+import './e2e/tier3_cross_feature.test';
+// Verify the English-only interface policy and legacy setting compatibility.
+import './i18n_loading.test';
+import './english_settings_migration.test';
+import './e2e/tier4_real_world.test';
+import './e2e/tier5_adversarial_stress.test';
+import './challenger2_empirical_verification';
+import './challenger_iter2_stress';
+import './challenger_m1_security_empirical';
+import './m1_adversarial_security.test';
+import './m2_adversarial_empirical.test';
+import './m3_performance_memoization.test';
+import './challenger_m3_performance_empirical';
+import './main_process_runtime_verification';
+import './challenger_m4_bundle_empirical';
+import './securityHardening.test';
+import './page_translation.test';
+import './security_regression_audit.test';
+import './ssrf_ip_policy.test';
+import './extension_archive_extraction.test';
+import './update_integrity.test';
+import './agent_navigation_guard.test';
+import './sync_pairing_ui.test';
+import './backup_tombstone.test';
+import './dialog_a11y.test';
+import './hover_only_controls.test';
+import './vertical_tabs.test';
+import './safe_navigation_comprehensive.test';
+import './search_engine_formatting.test';
+import './security_utils_classification.test';
+import './ai_memory_security.test';
+import './link_preview_lru.test';
+import './workspace_state_management.test';
+import './adblock_filter_engine.test';
+import './keyboard_shortcuts.test';
+import './reader_mode_sanitization.test';
+import './session_isolation.test';
+import './history_bookmarks_search.test';
+import './ai_agent_tools.test';
+import './webllm_config.test';
+import './adversarial_hacker_security.test';
+import './i18n_localization.test';
+import './ai_vram_anti_jank.test';
+import './tdz_initialization_safety.test';
+import './daily_wallpaper_sync.test';
+import './speed_dial_icons_links.test';
+import './newtab_wallpaper_contrast.test';
+import './split_view_drag_persistence.test';
+import './data_backup_sanitization.test';
+import './zoom_factors.test';
+import './tab_operations_deep.test';
+import './split_view_mechanics.test';
+import './safe_storage_resilience.test';
+import './component_correctness_regressions.test';
+import './id_generator_entropy.test';
+import './permission_prompts_lifecycle.test';
+import './history_recorder_lifecycle.test';
+import './hook_architecture_hardening.test';
+import './search_localization_captcha.test';
+import './sync_service_vault.test';
+import './sync_state_remerge.test';
+import './sync_deletion_and_conflict.test';
+import './local_persistence_data_safety.test';
+import './format_bytes.test';
+// Last on purpose: this one renders a component in jsdom and temporarily
+// installs window/document globals while it does.
+import './clipboard_qr_failure.test';
+import './download_open_policy.test';
+import './renderer_recovery.test';
+
+import './permission_boundary_regressions.test';
+import './mcp_lifecycle_regressions.test';
+import './mcp_startup_regressions.test';
+import './mcp_bridge_config_regressions.test';
+
+import './agent_document_boundary.test';
+import './codex_security_findings_remediation.test';
+import './performance_optimization_audit.test';
+
+import './tab_download_lifecycle_regressions.test';
+
+import './execution_engine.test';
+import './policy_engine.test';
+import './mcp_engine_wiring.test';
+import './engine_ipc.test';
+import './runtime_error_fixes.test';
+// Renders the §10 control panel in jsdom with its own window/document globals.
+import './agent_control_panel.test';

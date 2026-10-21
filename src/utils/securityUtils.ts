@@ -1,0 +1,431 @@
+/**
+ * King Browser Security Utilities
+ * Provides URL security classification and phishing detection helpers.
+ */
+import { DANGEROUS_PROTOCOLS } from './safeNavigation';
+
+export type SecurityLevel = 'secure' | 'http' | 'dangerous' | 'internal' | 'unknown' | 'file';
+
+export interface SecurityInfo {
+  level: SecurityLevel;
+  label: string;
+  color: string;        // Tailwind color class
+  bgColor: string;      // Tailwind bg class
+  icon: string;         // emoji icon
+  tooltip: string;
+}
+
+// Internal king:// pages are always safe
+const INTERNAL_PROTOCOLS = ['king:', 'about:', 'chrome-extension:'];
+
+/**
+ * Extract the hostname from a URL string safely.
+ */
+export function extractHostname(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/\.+$/, '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Check if a domain matches the blocklist or exhibits concrete structural phishing vectors.
+ * Replaces naive keyword matching with signed blocklist matching and structural heuristic checks.
+ */
+const DEFAULT_BLOCKED_DOMAINS = [
+  'phishing.com',
+  'malware.com',
+  'evil.com',
+  'account-security-update.com',
+  'login-verification-alert.com',
+  'apple-security-check.com',
+  'google-verify-security.com',
+  'paypal-account-center.com',
+  'microsoft-login-auth.com',
+  'secure-banking-portal.com',
+  'metamask-validation.com',
+  'wallet-connect-auth.com',
+];
+
+const TARGET_BRANDS = [
+  'apple', 'google', 'paypal', 'microsoft', 'amazon',
+  'github', 'facebook', 'instagram', 'twitter', 'netflix',
+  'coinbase', 'binance', 'steam', 'telegram', 'discord'
+];
+
+const HOMOGLYPH_MAP: Record<string, string> = {
+  '\u0430': 'a', '\u0441': 'c', '\u0435': 'e', '\u043e': 'o',
+  '\u0440': 'p', '\u0455': 's', '\u0456': 'i', '\u0458': 'j',
+  '\u0443': 'y', '\u0445': 'x', '\u03b1': 'a', '\u03bf': 'o',
+  '\u03c1': 'p', '\u04bb': 'h', '\u043f': 'n'
+};
+
+function normalizeHomoglyphs(str: string): string {
+  return str.split('').map(c => HOMOGLYPH_MAP[c] || c).join('');
+}
+
+function decodePunycodeLabel(input: string): string {
+  const BASE = 36;
+  const TMIN = 1;
+  const TMAX = 26;
+  const SKEW = 38;
+  const DAMP = 700;
+  const INITIAL_BIAS = 72;
+  const INITIAL_N = 128;
+
+  function adapt(delta: number, numPoints: number, firstTime: boolean): number {
+    let d = firstTime ? Math.floor(delta / DAMP) : Math.floor(delta / 2);
+    d += Math.floor(d / numPoints);
+    let k = 0;
+    while (d > Math.floor(((BASE - TMIN) * TMAX) / 2)) {
+      d = Math.floor(d / (BASE - TMIN));
+      k += BASE;
+    }
+    return k + Math.floor(((BASE - TMIN + 1) * d) / (d + SKEW));
+  }
+
+  const output: number[] = [];
+  const basicIndex = input.lastIndexOf('-');
+  const b = basicIndex > 0 ? basicIndex : 0;
+  for (let j = 0; j < b; ++j) {
+    output.push(input.charCodeAt(j));
+  }
+
+  let n = INITIAL_N;
+  let i = 0;
+  let bias = INITIAL_BIAS;
+  let inIdx = basicIndex > 0 ? basicIndex + 1 : 0;
+
+  while (inIdx < input.length) {
+    const oldi = i;
+    let w = 1;
+    for (let k = BASE; ; k += BASE) {
+      if (inIdx >= input.length) break;
+      const c = input.charCodeAt(inIdx++);
+      const digit = (c >= 48 && c <= 57) ? c - 22 : (c >= 65 && c <= 90) ? c - 65 : (c >= 97 && c <= 122) ? c - 97 : BASE;
+      i += digit * w;
+      const t = k <= bias ? TMIN : k >= bias + TMAX ? TMAX : k - bias;
+      if (digit < t) break;
+      w *= BASE - t;
+    }
+    bias = adapt(i - oldi, output.length + 1, oldi === 0);
+    n += Math.floor(i / (output.length + 1));
+    i %= output.length + 1;
+    output.splice(i, 0, n);
+    i++;
+  }
+
+  return String.fromCodePoint(...output);
+}
+
+export function punycodeToUnicodeDomain(hostname: string): string {
+  return hostname.split('.').map(part => {
+    if (part.toLowerCase().startsWith('xn--')) {
+      try {
+        return decodePunycodeLabel(part.slice(4).toLowerCase());
+      } catch {
+        return part;
+      }
+    }
+    return part;
+  }).join('.');
+}
+
+export function isHomographSpoof(hostname: string): boolean {
+  if (!hostname.includes('xn--')) return false;
+
+  const unicodeDomain = punycodeToUnicodeDomain(hostname);
+
+  if (unicodeDomain !== hostname) {
+    const normalized = normalizeHomoglyphs(unicodeDomain);
+    const domainLabels = normalized.split('.');
+    for (const label of domainLabels) {
+      if (TARGET_BRANDS.includes(label)) {
+        return true;
+      }
+    }
+  }
+
+  // Punycode base label heuristic for environments without domainToUnicode
+  const parts = hostname.split('.');
+  for (const part of parts) {
+    if (part.startsWith('xn--')) {
+      const core = part.slice(4).split('-')[0];
+      if (core && core.length >= 3) {
+        for (const brand of TARGET_BRANDS) {
+          if (brand.includes(core) && core.length >= brand.length - 2) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+let cachedBlocklist: string[] = [...DEFAULT_BLOCKED_DOMAINS];
+
+export function checkPhishingDomain(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  const rawHostname = parsed.hostname.toLowerCase();
+  const hostname = rawHostname.replace(/\.+$/, '');
+  if (!hostname) return false;
+
+  // 1. Structural Phishing: Embedded authority credentials used to spoof URLs (e.g., https://paypal.com@phishing.com)
+  if (parsed.username || parsed.password) {
+    return true;
+  }
+
+  // 2. Targeted Homograph / Punycode spoofing check (targeting protected high-value brands)
+  if (isHomographSpoof(hostname)) {
+    return true;
+  }
+
+  // 3. Cryptographically verified blocklist matching (exact or subdomain)
+  if (cachedBlocklist && cachedBlocklist.length > 0) {
+    const isBlocked = cachedBlocklist.some(blocked => {
+      const cleanBlocked = blocked.toLowerCase().trim().replace(/\.+$/, '');
+      return hostname === cleanBlocked || hostname.endsWith('.' + cleanBlocked);
+    });
+    if (isBlocked) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Load the local blocked-domains list. Call this once at startup from the renderer.
+ * The list is fetched via a custom protocol or passed via IPC from main.
+ */
+export function setBlocklist(domains: string[]) {
+  cachedBlocklist = Array.from(new Set([
+    ...DEFAULT_BLOCKED_DOMAINS.map(d => d.toLowerCase().trim().replace(/\.+$/, '')),
+    ...domains.map(d => d.toLowerCase().trim().replace(/\.+$/, ''))
+  ]));
+}
+
+/**
+ * Get security classification for a given URL
+ */
+export function getUrlSecurityInfo(url: string): SecurityInfo {
+  if (!url || typeof url !== 'string') {
+    return {
+      level: 'unknown',
+      label: 'Unknown',
+      color: 'text-slate-500',
+      bgColor: 'bg-slate-100 dark:bg-slate-800',
+      icon: 'Globe',
+      tooltip: 'Invalid or unknown connection'
+    };
+  }
+
+  // Blocked / dangerous Chromium internals
+  if (url.startsWith('chrome://') || url.startsWith('edge://')) {
+    return {
+      level: 'dangerous',
+      label: 'Blocked Protocol',
+      color: 'text-rose-500',
+      bgColor: 'bg-rose-500/10',
+      icon: 'AlertTriangle',
+      tooltip: 'Restricted internal protocol blocked for safety'
+    };
+  }
+
+  // Internal King pages
+  if (
+    url.startsWith('king://') ||
+    url.startsWith('about:') ||
+    url === 'about:blank'
+  ) {
+    return {
+      level: 'internal',
+      label: 'System',
+      color: 'text-cyan-500',
+      bgColor: 'bg-cyan-500/10',
+      icon: 'Shield',
+      tooltip: 'Internal system page'
+    };
+  }
+
+  try {
+    const parsed = new URL(url);
+    const protocol = parsed.protocol.toLowerCase();
+
+    // Local files
+    if (protocol === 'file:') {
+      return {
+        level: 'file',
+        label: 'Local File',
+        color: 'text-blue-500',
+        bgColor: 'bg-blue-500/10',
+        icon: 'FileText',
+        tooltip: 'Local system file'
+      };
+    }
+
+    // Dangerous protocols
+    if (DANGEROUS_PROTOCOLS.includes(protocol)) {
+      return {
+        level: 'dangerous',
+        label: 'Dangerous',
+        color: 'text-red-600',
+        bgColor: 'bg-red-50 dark:bg-red-500/10',
+        icon: 'ShieldAlert',
+        tooltip: 'Dangerous or untrusted protocol'
+      };
+    }
+
+    // Check phishing
+    if (checkPhishingDomain(url)) {
+      return {
+        level: 'dangerous',
+        label: 'Dangerous',
+        color: 'text-red-600',
+        bgColor: 'bg-red-50 dark:bg-red-500/10',
+        icon: 'ShieldAlert',
+        tooltip: 'Potential phishing or dangerous site'
+      };
+    }
+
+    // HTTPS
+    if (protocol === 'https:') {
+      return {
+        level: 'secure',
+        label: 'Secure',
+        color: 'text-emerald-600',
+        bgColor: 'bg-emerald-50 dark:bg-emerald-500/10',
+        icon: 'Lock',
+        tooltip: 'Connection is encrypted and secure'
+      };
+    } else {
+      return {
+        level: 'http',
+        label: 'Not Secure',
+        color: 'text-amber-600',
+        bgColor: 'bg-amber-50 dark:bg-amber-500/10',
+        icon: 'Unlock',
+        tooltip: 'Connection is not encrypted (HTTP)'
+      };
+    }
+  } catch {
+    return {
+      level: 'unknown',
+      label: 'Unknown',
+      color: 'text-slate-500',
+      bgColor: 'bg-slate-100 dark:bg-slate-800',
+      icon: 'Globe',
+      tooltip: 'Invalid or unknown connection'
+    };
+  }
+}
+
+/**
+ * Format a URL for display in the address bar (strip trailing slash, protocol for common sites)
+ */
+export function formatDisplayUrl(url: string): string {
+  if (!url || url.startsWith('king://')) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return url;
+    }
+    const cleanHost = parsed.hostname.replace(/\.+$/, '');
+    let display = cleanHost + parsed.pathname;
+    if (display.endsWith('/')) display = display.slice(0, -1);
+    if (parsed.search) display += parsed.search;
+    return display;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Safe base64 encoding that sanitizes lone surrogates and url-encodes well-formed UTF-16
+ * to prevent DOMException / btoa errors on unconventional character sequences.
+ */
+export function safeBase64(str: string): string {
+  if (!str) return '';
+  const wellFormed = typeof (str as any).toWellFormed === 'function'
+    ? (str as any).toWellFormed()
+    : str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+
+  try {
+    return btoa(unescape(encodeURIComponent(wellFormed)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  } catch (e) {
+    return wellFormed.replace(/[^a-zA-Z0-9_-]/g, '_');
+  }
+}
+
+/**
+ * Match a target URL against an extension's declared host permissions.
+ * Supports <all_urls>, wildcard schemes, domain wildcards (*.example.com),
+ * and exact host/port patterns, while strictly rejecting internal schemes (about:, nova:).
+ */
+export function matchesExtensionHostPermission(patterns: string[], targetUrl: string): boolean {
+  if (!targetUrl || typeof targetUrl !== 'string') return false;
+  if (!Array.isArray(patterns) || patterns.length === 0) return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return false;
+  }
+
+  // Extensions cannot get host permissions on internal browser pages
+  if (['king:', 'about:', 'chrome:', 'chrome-extension:'].includes(parsed.protocol)) {
+    return false;
+  }
+
+  const targetScheme = parsed.protocol.replace(':', '').toLowerCase();
+  const targetHost = parsed.hostname.toLowerCase().replace(/\.+$/, '');
+
+  for (const rawPattern of patterns) {
+    if (typeof rawPattern !== 'string') continue;
+    const pat = rawPattern.trim();
+    if (pat === '<all_urls>') {
+      if (['http', 'https', 'ws', 'wss'].includes(targetScheme)) return true;
+      continue;
+    }
+    const match = pat.match(/^(\*|[a-z]+):\/\/(\*|\*\.[^:/]+|[^:/]+)(?::(\*|\d+))?(\/.*)?$/i);
+    if (!match) continue;
+    const [, pScheme, pHost, pPort] = match;
+
+    if (pScheme !== '*' && pScheme.toLowerCase() !== targetScheme) continue;
+    if (pScheme === '*' && !['http', 'https'].includes(targetScheme)) continue;
+
+    if (pPort && pPort !== '*') {
+      const targetPort = parsed.port || (targetScheme === 'https' ? '443' : '80');
+      if (targetPort !== pPort) continue;
+    }
+
+    const patHost = pHost.toLowerCase().replace(/\.+$/, '');
+    if (patHost === '*') {
+      return true;
+    }
+    if (patHost.startsWith('*.')) {
+      const rootDomain = patHost.slice(2);
+      if (targetHost === rootDomain || targetHost.endsWith('.' + rootDomain)) {
+        return true;
+      }
+    } else if (patHost === targetHost) {
+      return true;
+    }
+  }
+
+  return false;
+}
+

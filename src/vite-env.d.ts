@@ -1,0 +1,398 @@
+/// <reference types="vite/client" />
+
+import type { DownloadItem, PermissionRequest } from './types/browser';
+import type { NativeVoiceInfo } from './services/tts';
+
+/** Wallpaper photo object returned by the main-process wallpaper providers. */
+interface ElectronWallpaperPhoto {
+  id: string;
+  title: string;
+  author: string;
+  authorUrl?: string;
+  imageUrl: string;
+  thumbnailUrl: string;
+  source: string;
+  resolution?: string;
+  date?: string;
+}
+
+/** Version/update metadata broadcast by the auto-updater. */
+interface ElectronUpdateInfo {
+  version: string;
+  releaseDate?: string;
+  downloadUrl?: string;
+  assetName?: string;
+  isManual?: boolean;
+  releaseNotes?: string;
+  releaseName?: string;
+}
+
+/** Numeric progress payload of the auto-updater `download-progress` event. */
+interface ElectronUpdateProgress {
+  percent: number;
+  bytesPerSecond: number;
+  transferred: number;
+  total: number;
+}
+
+/** Single connected MCP client as reported by `getConnectedClientsInfo`. */
+interface ElectronMcpClientInfo {
+  id: string;
+  connectedAt: number;
+  userAgent: string;
+}
+
+/** Aggregate MCP server status returned by `get-mcp-status`. */
+interface ElectronMcpStatus {
+  running: boolean;
+  port: number;
+  clientCount: number;
+  clients: ElectronMcpClientInfo[];
+}
+
+/** §11 engine state machine states as surfaced to the §10 control panel. */
+export type ElectronEngineState =
+  | 'idle'
+  | 'running'
+  | 'paused'
+  | 'awaiting_approval'
+  | 'stopping'
+  | 'stopped'
+  | 'error';
+
+export type ElectronEngineMode = 'auto' | 'step';
+type ElectronEngineRisk = 'safe' | 'sensitive';
+type ElectronEngineActionStatus =
+  | 'requested'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'rejected';
+
+/** Single agent action record as reported by the execution engine. */
+export interface ElectronEngineActionRecord {
+  id: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  risk: ElectronEngineRisk;
+  summary?: string;
+  domain?: string;
+  status: ElectronEngineActionStatus;
+  requestedAt: number;
+  startedAt?: number;
+  endedAt?: number;
+  error?: string;
+  stoppedBy?: string;
+}
+
+/** Action awaiting an explicit Approve/Reject decision. */
+export interface ElectronEnginePendingApproval {
+  actionId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  summary?: string;
+  domain?: string;
+}
+
+/** Active phase progress shown by the control panel. */
+export interface ElectronEnginePhaseInfo {
+  phase: {
+    objective: string;
+    permittedActions: string[];
+    maxActions: number;
+    approvalPoints?: string[];
+  };
+  actionsUsed: number;
+}
+
+/** Status snapshot returned by `getEngineStatus`. */
+export interface ElectronEngineStatus {
+  state: ElectronEngineState;
+  mode: ElectronEngineMode;
+  queueLength: number;
+  inFlight: ElectronEngineActionRecord | null;
+  pendingApproval: ElectronEnginePendingApproval | null;
+  phase: ElectronEnginePhaseInfo | null;
+  actionsUsedThisRun: number;
+  maxActionsPerRun: number;
+  stopReason: string | null;
+  lastFinalState: {
+    stoppedBy: string;
+    inFlightAborted: boolean;
+    inFlightSettledLater: boolean;
+  } | null;
+}
+
+/** Live engine event forwarded on the `mcp-engine-event` channel. */
+export type ElectronEngineEvent =
+  | { type: 'state_changed'; from: ElectronEngineState; to: ElectronEngineState; reason: string; at: number }
+  | { type: 'action_updated'; record: ElectronEngineActionRecord }
+  | { type: 'approval_needed'; approval: ElectronEnginePendingApproval }
+  | { type: 'approval_resolved'; actionId: string; approved: boolean }
+  | {
+      type: 'phase_updated';
+      phase: ElectronEnginePhaseInfo['phase'] | null;
+      actionsUsed: number;
+      status: 'running' | 'completed' | 'boundary' | 'failed';
+    };
+
+/** Result of a §10 control command invoked via `sendEngineCommand`. */
+export interface ElectronEngineCommandResult {
+  ok: boolean;
+  command: string;
+  detail: Record<string, unknown>;
+  state: ElectronEngineState;
+  mode: ElectronEngineMode;
+}
+
+/** Bookmark node imported from a Chrome/Chromium `Bookmarks` file. */
+interface ElectronImportedBookmark {
+  title: string;
+  url?: string;
+  children?: ElectronImportedBookmark[];
+}
+
+/** Extension descriptor returned by `list-extensions` / install handlers. */
+interface ElectronExtensionInfo {
+  id: string;
+  name: string;
+  enabled: boolean;
+  path?: string;
+  version?: string;
+  description?: string;
+  iconData?: string;
+  popupUrl?: string;
+  optionsUrl?: string;
+  homepageUrl?: string;
+}
+
+/** Anchor rectangle + originating tab context for `open-extension-popup`. */
+interface ElectronExtensionPopupBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface ElectronExtensionPopupTabInfo {
+  id?: string;
+  url?: string;
+  title?: string;
+  favIconUrl?: string;
+  webContentsId?: number;
+  isIncognito?: boolean;
+}
+
+/**
+ * Typed mirror of the `electronAPI` object exposed by `electron/preload.ts`
+ * via `contextBridge.exposeInMainWorld`. Every member here must match the
+ * preload expose list 1:1 — no `checkOllama` / `onAdBlocked` / `showAlert`
+ * (those are not IPC channels: `showAlert` is the renderer-side wrapper in
+ * `src/utils/confirmDialog.ts`), and every real channel present with its
+ * actual main-process request/response shape. The top-level object stays
+ * optional so web (non-Electron) builds type-check; when it exists, all
+ * members exist, so members are required and consumers can use
+ * `window.electronAPI` directly with full type safety (no casts).
+ */
+export interface ElectronAPI {
+  // Theme / privacy
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  setPrivacyShield: (enabled: boolean) => Promise<boolean>;
+  setDoNotTrack: (enabled: boolean) => Promise<void>;
+  getSuggestions: (query: string, engine?: string, locale?: string) => Promise<string[]>;
+  fetchWallpaperPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;
+  fetchUnsplashPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;
+  fetchPageHtml: (url: string) => Promise<{ success: boolean; html?: string; error?: string }>;
+  captureFullPage: (webContentsId: number) => Promise<string | null>;
+  // Translation
+  translateTextBatch: (
+    texts: string[],
+    sourceLang?: string,
+    targetLang?: string
+  ) => Promise<{ translations: string[]; success: boolean; error?: string }>;
+  detectLanguage: (sampleText: string) => Promise<string>;
+  onTriggerPageTranslation: (
+    callback: (data: { targetLang?: string; webContentsId?: number }) => void
+  ) => () => void;
+  // Downloads
+  pauseDownload: (id: string) => Promise<boolean>;
+  resumeDownload: (id: string) => Promise<boolean>;
+  cancelDownload: (id: string) => Promise<boolean>;
+  openDownload: (pathStr: string) => Promise<boolean>;
+  showDownloadInFolder: (pathStr: string) => Promise<boolean>;
+  // Auto updater & version
+  getAppVersion: () => Promise<string>;
+  getSystemVersions: () => Promise<{
+    app: string;
+    electron: string;
+    chrome: string;
+    node: string;
+    v8: string;
+    platform: string;
+    arch: string;
+  } | null>;
+  getChangelogReleases: (forceRefresh?: boolean) => Promise<any[] | null>;
+  checkForUpdates: () => Promise<{ success: boolean; version?: string; error?: string }>;
+  getUpdateInfo: () => Promise<ElectronUpdateInfo | null>;
+  downloadUpdate: (url?: string) => Promise<{ success: boolean; filePath?: string; version?: string; error?: string }>;
+  installUpdate: () => Promise<{ success: boolean; error?: string }>;
+  openExternal: (url: string) => Promise<boolean>;
+  onUpdateChecking: (callback: (event: null) => void) => () => void;
+  onUpdateAvailable: (callback: (event: null, info: ElectronUpdateInfo) => void) => () => void;
+  onUpdateNotAvailable: (callback: (event: null, info: ElectronUpdateInfo) => void) => () => void;
+  onUpdateDownloadProgress: (callback: (event: null, progress: ElectronUpdateProgress) => void) => () => void;
+  onUpdateDownloaded: (callback: (event: null, info: ElectronUpdateInfo) => void) => () => void;
+  onUpdateError: (callback: (event: null, error: string) => void) => () => void;
+  // MCP server
+  startMcpServer: () => Promise<boolean>;
+  importChromeBookmarks: () => Promise<{
+    success: boolean;
+    bookmarks?: ElectronImportedBookmark[];
+    error?: string;
+  }>;
+  stopMcpServer: () => Promise<boolean>;
+  getMcpStatus: () => Promise<ElectronMcpStatus>;
+  onMcpClientChanged: (
+    callback: (event: null, data: { count: number; clients: ElectronMcpClientInfo[] }) => void
+  ) => () => void;
+  onMcpStatusChanged: (
+    callback: (event: any, status: { running: boolean; port?: number } | boolean) => void
+  ) => () => void;
+  copyMcpToken: () => Promise<boolean>;
+  copyMcpConfig: () => Promise<{ ok: boolean; autoClearSec: number } | boolean>;
+  getMcpTokenStatus: () => Promise<{ configured: boolean; prefix: string }>;
+  rotateMcpToken: () => Promise<boolean>;
+  getMcpToolSettings: () => Promise<string[]>;
+  setMcpToolEnabled: (toolName: string, enabled: boolean) => Promise<boolean>;
+  // §10 execution control panel (engine bridge)
+  getEngineStatus: () => Promise<ElectronEngineStatus>;
+  getEngineHistory: () => Promise<ElectronEngineActionRecord[]>;
+  sendEngineCommand: (command: string, payload?: unknown) => Promise<ElectronEngineCommandResult>;
+  respondEngineApproval: (
+    actionId: string,
+    approved: boolean
+  ) => Promise<{ ok: boolean; resolved: boolean }>;
+  onEngineEvent: (callback: (event: ElectronEngineEvent) => void) => () => void;
+  // MCP action bridge (main process <-> renderer round-trip)
+  onMcpActionRequest: (
+    callback: (id: string, toolName: string, args: unknown, deadline: number) => void
+  ) => () => void;
+  onMcpActionCancel: (callback: (id: string) => void) => () => void;
+  respondMcpAction: (id: string, result?: unknown, error?: unknown) => void;
+  reportMcpActionPhase?: (id: string, phase: 'awaiting-approval' | 'executing') => void;
+  clearIncognitoSession: (tabId?: string) => Promise<boolean>;
+  initIncognitoPartition: (tabId: string) => Promise<boolean>;
+  resetRememberedPermissions: () => Promise<boolean>;
+  getRememberedPermissionsCount: () => Promise<number>;
+  getSitePermissions: (origin: string) => Promise<Record<string, { allow: boolean; ts: number }>>;
+  clearAiModelsCache: () => Promise<boolean>;
+  purgeSystemMemory: () => Promise<boolean>;
+  secureStoreSet: (key: string, value: string) => Promise<boolean>;
+  secureStoreGet: (key: string) => Promise<string | null>;
+  secureStoreDelete: (key: string) => Promise<boolean>;
+  // Disk-backed model cache: the packaged app runs on a `file://` origin where
+  // the Cache API is unavailable, so on-device model shards are cached in
+  // userData by the main process instead of being re-downloaded each launch.
+  modelCacheGet: (url: string) => Promise<ArrayBuffer | null>;
+  modelCacheSet: (url: string, data: ArrayBuffer | ArrayBufferView) => Promise<boolean>;
+  // Password manager: fire-and-forget send channel (not invoke)
+  savePassword: (data: { hostname: string; username: string; password: string }) => void;
+  storeSet: (key: string, value: string) => Promise<boolean | { error: string }>;
+  storeGet: (key: string) => Promise<string | null>;
+  showConfirmDialog: (options: {
+    title?: string;
+    message: string;
+    detail?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  }) => Promise<boolean>;
+  // VPN
+  setVpn: (config: { enabled: boolean; proxyUrl?: string }) => Promise<boolean | { error: string }>;
+  // Shortcuts, navigation & download events
+  onShortcut: (callback: (event: null, command: string) => void) => () => void;
+  onNewTab: (callback: (event: null, url: string) => void) => () => void;
+  onNewIncognitoTab: (callback: (event: null, url?: string) => void) => () => void;
+  onQuickAIAction: (callback: (event: null, text: string) => void) => () => void;
+  onDownloadUpdate: (callback: (event: null, data: DownloadItem) => void) => () => void;
+  // Extension management
+  installExtension: (folderPath: string) => Promise<{
+    success?: boolean;
+    extension?: ElectronExtensionInfo;
+    error?: string;
+  }>;
+  toggleExtension: (extensionId: string, enabled: boolean) => Promise<{
+    success?: boolean;
+    error?: string;
+  }>;
+  listExtensions: () => Promise<ElectronExtensionInfo[]>;
+  removeExtension: (extensionId: string) => Promise<{
+    success?: boolean;
+    error?: string;
+  }>;
+  openExtensionPopup: (
+    url: string,
+    bounds?: ElectronExtensionPopupBounds,
+    activeTabInfo?: ElectronExtensionPopupTabInfo
+  ) => Promise<{ success?: boolean; toggled?: boolean; error?: string }>;
+  setExtensionIncognitoAccess: (extensionId: string, allowed: boolean) => Promise<{ success?: boolean; error?: string }>;
+  getExtensionIncognitoAccess: (extensionId: string) => Promise<boolean>;
+  selectExtensionFolder: () => Promise<{ canceled: boolean; folderPath?: string }>;
+  installFromWebStore: (urlOrId: string) => Promise<{
+    success?: boolean;
+    extension?: ElectronExtensionInfo;
+    error?: string;
+  }>;
+  reviewExtensionPermissions: (
+    extensionId: string,
+    extractPath: string
+  ) => Promise<{ allowed?: boolean; cancelled?: boolean; remember?: boolean; error?: string }>;
+  onExtensionInstalledSilently: (
+    callback: (event: null, data: { success: boolean; name: string }) => void
+  ) => () => void;
+  onExtensionChanged: (callback: () => void) => () => void;
+  // Tab thumbnails
+  captureTabThumbnail: (webContentsId: number) => Promise<string | null>;
+  onTabAudioChanged: (
+    callback: (event: null, data: { webContentsId: number; isPlayingAudio: boolean }) => void
+  ) => () => void;
+  onAdBlockedBatch: (callback: (event: null, batch: Record<number, number>) => void) => () => void;
+  // Native OS TTS (macOS high quality voices)
+  nativeTtsGetVoices: () => Promise<NativeVoiceInfo[]>;
+  nativeTtsSpeak: (
+    text: string,
+    voiceName?: string,
+    rate?: number,
+    lang?: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  nativeTtsStop: () => Promise<boolean>;
+  // Permission requests (Chrome-style top bar bubble)
+  onPermissionRequest: (
+    callback: (event: null, request: PermissionRequest) => void
+  ) => () => void;
+  respondPermissionRequest: (
+    requestId: string,
+    allow: boolean,
+    remember?: boolean
+  ) => Promise<{ success: boolean; error?: string }>;
+  onBlockedSite: (
+    callback: (event: null, data: { url: string; reason: string }) => void
+  ) => () => void;
+  // App Locale / Language sync
+  setAppLanguage: (lang: string) => Promise<{ success: boolean; acceptLanguages: string }>;
+  // Microphone & Permissions
+  checkMicrophonePermission: () => Promise<{ status: 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'; canAsk: boolean; platform?: string }>;
+  requestMicrophonePermission: () => Promise<{ granted: boolean; status: string; platform?: string }>;
+  openSystemSettings: (pane?: string) => Promise<boolean>;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+
+  // Injected by the Vite build (`define` in vite.config.ts).
+  const __APP_VERSION__: string;
+}
+
+export {};
