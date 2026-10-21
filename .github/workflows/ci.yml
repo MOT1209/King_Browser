@@ -37,6 +37,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Lint
+        run: npm run lint
+
       # The pretest step builds the renderer (vite) and the Electron bundles.
       - name: Build and test
         run: npm test

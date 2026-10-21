@@ -4,7 +4,7 @@
 King Browser is an Electron + React + TypeScript web browser featuring:
 - **Main Process (`electron/main.ts`, `electron/main/*`, `electron/preload.ts`)**:
   - Privileged IPC dispatch with `isTrustedSender` sender frame validation.
-  - Session privacy pipelines (Adblocker engine via `@cliqz/adblocker-electron`, DNT/Sec-GPC header injection, CSP nosniff headers) across default and incognito sessions.
+  - Session privacy pipelines (Adblocker engine via `@ghostery/adblocker-electron`, DNT/Sec-GPC header injection, CSP nosniff headers) across default and incognito sessions.
   - Webview lifecycle management with `contextIsolation: true`, `nodeIntegration: false`, `webSecurity: true`, and strict sandbox settings.
   - Safe extension loading and native TTS execution.
 - **Renderer Process (`src/*`)**:

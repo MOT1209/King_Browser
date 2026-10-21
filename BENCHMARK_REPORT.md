@@ -11,7 +11,7 @@ King Browser is built on Electron 43, Chromium 134 (Blink), and Google V8. Becau
 King's design optimizations focus on reducing unnecessary overhead:
 - **Zero Background Telemetry**: No background telemetry beacons, crash reporters, or Google service pings running continuously.
 - **Background Tab Suspension**: Dormant tabs have their active rendering cycles paused, conserving CPU time and reducing inactive RAM footprint.
-- **In-Memory Network Filter**: Intercepts tracking and ad requests directly at the network session layer using `@cliqz/adblocker-electron` with EasyList filters.
+- **In-Memory Network Filter**: Intercepts tracking and ad requests directly at the network session layer using `@ghostery/adblocker-electron` with EasyList filters.
 - **Decoupled Heavy Chunks**: The on-device WebLLM neural engine (~6 MB) is code-split and loaded asynchronously on demand rather than evaluated at initial startup.
 
 ---

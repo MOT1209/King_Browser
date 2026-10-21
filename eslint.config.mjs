@@ -3,8 +3,7 @@ import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
-// King_Browser مشروع مستقل عن تطبيق الفيديو: له إعداده الخاص ولا يُفحص من إعداد الجذر.
-// يُشغَّل من الجذر: npx eslint -c King_Browser/eslint.config.mjs King_Browser
+// Run with: npm run lint
 export default [
   {
     ignores: [

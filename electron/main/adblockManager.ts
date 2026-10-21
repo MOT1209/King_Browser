@@ -2,8 +2,8 @@ import { app, session } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import fetch from 'cross-fetch';
-import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
-import { adsAndTrackingLists } from '@cliqz/adblocker';
+import { ElectronBlocker, parseFilter } from '@ghostery/adblocker-electron';
+import { adsAndTrackingLists } from '@ghostery/adblocker';
 
 let blocker: ElectronBlocker | null = null;
 let currentWhitelistFilters: any[] = [];

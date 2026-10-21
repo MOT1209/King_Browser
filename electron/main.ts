@@ -83,7 +83,7 @@ process.on('unhandledRejection', (reason) => {
   appendCrashLog(errorLog);
 });
 
-// Suppress known upstream third-party deprecation warnings (punycode, @cliqz/adblocker-electron session.getPreloads/setPreloads, etc.)
+// Suppress known upstream third-party deprecation warnings (punycode, adblocker session preload, etc.)
 process.on('warning', (warning) => {
   if (warning.name === 'DeprecationWarning') {
     const msg = warning.message || '';

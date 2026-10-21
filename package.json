@@ -134,11 +134,12 @@
   },
   "scripts": {
     "dev:web": "vite",
-    "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts electron/guest-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs",
+    "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts electron/guest-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@ghostery/adblocker-electron --external:@ghostery/adblocker --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs",
     "build": "tsc && vite build && npm run build:electron",
     "pretest": "node scripts/ensure-build-artifacts.cjs",
     "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs --external:electron --define:import.meta.env=\"{}\" && node dist-test/runAll.cjs",
     "test": "npm run test:e2e",
+    "lint": "eslint . --quiet",
     "benchmark": "esbuild tests/benchmark_suite.ts --bundle --platform=node --outfile=dist-test/benchmark_suite.cjs && node dist-test/benchmark_suite.cjs",
     "benchmark:speedometer": "esbuild scripts/speedometer_runner.ts --bundle --platform=node --outfile=dist-test/speedometer_runner.cjs --external:electron && electron dist-test/speedometer_runner.cjs",
     "pack:win": "npm run build && electron-builder --win",
@@ -155,7 +156,8 @@
     "dev": "npm run build:electron && concurrently \"vite\" \"electron .\""
   },
   "dependencies": {
-    "@cliqz/adblocker-electron": "^1.34.0",
+    "@ghostery/adblocker": "^2.20.1",
+    "@ghostery/adblocker-electron": "^2.20.1",
     "electron-updater": "^6.8.9",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.2",
@@ -164,6 +166,7 @@
   "devDependencies": {
     "@assistant-ui/react": "^0.15.21",
     "@electron/fuses": "^2.1.3",
+    "@eslint/js": "^9.39.5",
     "@huggingface/transformers": "^4.3.0",
     "@mlc-ai/web-llm": "^0.2.84",
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -189,8 +192,11 @@
     "electron": "^43.7.7",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "eventsource": "^4.1.0",
     "framer-motion": "^12.42.2",
+    "globals": "^17.13.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.469.0",
     "motion-dom": "^12.42.2",
@@ -208,6 +214,7 @@
     "tw-animate-css": "^1.4.0",
     "tw-shimmer": "^0.4.12",
     "typescript": "~5.6.2",
+    "typescript-eslint": "^8.72.0",
     "vite": "^6.0.5"
   },
   "overrides": {

@@ -306,8 +306,8 @@ export const SidePanel = React.memo(({
         {
           role: 'assistant',
           content: isTr
-            ? '### Açık Sekmeler\n1. [King Browser - Ana Sayfa](king://newtab)\n2. [Dokümantasyon](https://docs.king-browser.org)'
-            : '### Open Tabs\n1. [King Browser - Home](king://newtab)\n2. [Documentation](https://docs.king-browser.org)',
+            ? '### Açık Sekmeler\n1. [King Browser - Ana Sayfa](king://newtab)\n2. [GitHub](https://github.com/MOT1209/King_Browser)'
+            : '### Open Tabs\n1. [King Browser - Home](king://newtab)\n2. [GitHub](https://github.com/MOT1209/King_Browser)',
         },
       ];
     }

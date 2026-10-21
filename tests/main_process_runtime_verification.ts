@@ -57,7 +57,7 @@ async function verifyMainProcessRuntime() {
   // STEP 3: External Require Resolution Validation
   console.log('\n--- Step 3: Verifying Require Resolution for External Dependencies ---');
   const externalDependencies = [
-    '@cliqz/adblocker-electron',
+    '@ghostery/adblocker-electron',
     'cross-fetch',
     'express',
     '@modelcontextprotocol/sdk/package.json',
