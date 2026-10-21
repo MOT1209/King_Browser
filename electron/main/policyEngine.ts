@@ -119,6 +119,24 @@ const SHARE_PRIVATE_TEXT = /(share\b|share with|invite|send file|attach|forward|
 const PERMISSION_TEXT = /(allow|grant|authorize|authorise|permit|accept permissions|give access|السماح|اسمح|منح|تصريح|تفويض)/i;
 const DOWNLOAD_TEXT = /(download|install|save file|run installer|تحميل|نزّل|تثبيت)/i;
 
+// German and Turkish keywords. Kept apart from the Arabic/English patterns
+// above because `\b` is ASCII-only: these use a Unicode-aware start boundary
+// (stems may take suffixes) and `[iİıI]` because the `i` flag does not fold the
+// Turkish dotted capital İ.
+const i18n = (stems: string): RegExp => new RegExp(`(?<![\\p{L}])(?:${stems})`, 'iu');
+const PURCHASE_TEXT_I18N = i18n('kaufen|jetzt kaufen|bezahl|zahlung|zur kasse|kasse|bestellung abschlie|zahlungspflichtig|kostenpflichtig|spend|abonnier|satın al|öde|ödeme|sipariş|siparişi tamamla|bağış|abone ol');
+const SEND_TEXT_I18N = i18n('senden|absenden|abschicken|nachricht senden|antworten|gönder|yanıtla|mesaj gönder');
+const DELETE_TEXT_I18N = i18n('lösch|entfern|konto schlie|konto deaktiv|abo kündigen|kündig|s[iİıI]l(?![\\p{L}])|kald[iİıI]r|hesab[iİıI] kapat|hesab[iİıI] sil|abonel[iİıI]ği [iİıI]ptal|[iİıI]ptal et');
+const SECURITY_TEXT_I18N = i18n('passwort (ändern|zurücksetzen)|kennwort ändern|zwei.?faktor|sicherheitseinstellung|wiederherstellung|zugriff widerrufen|abmelden von allen|şifre(yi)? değiştir|parola(y[iİıI])? değiştir|[iİıI]ki ad[iİıI]ml[iİıI]|güvenlik ayarlar|kurtarma');
+const PUBLISH_TEXT_I18N = i18n('veröffentlich|posten|öffentlich teilen|yay[iİıI]nla|gönderi paylaş|herkese açık');
+const SHARE_PRIVATE_TEXT_I18N = i18n('teilen|einladen|weiterleiten|anhängen|paylaş|davet et|ilet(?![\\p{L}])|ekle(?![\\p{L}])');
+const PERMISSION_TEXT_I18N = i18n('erlauben|zulassen|zugriff gewähren|berechtigung|autorisieren|izin ver|eri[sş]im ver|yetkilendir|[iİıI]zin');
+const DOWNLOAD_TEXT_I18N = i18n('herunterladen|download|installieren|[iİıI]ndir|yükle(?![\\p{L}])|kur(?![\\p{L}])');
+
+function matchesAny(text: string, ...patterns: RegExp[]): boolean {
+  return patterns.some(pattern => pattern.test(text));
+}
+
 const PURCHASE_URL = /(checkout|\/pay(ment|ments)?\b|billing|\/purchase|\/cart|\/order|donat)/i;
 const SECURITY_URL = /(settings\/(security|privacy|password)|account\/security|\/recovery|two.?factor|2fa|\/permissions)/i;
 const DELETE_URL = /(delete|remove|deactivate|close.?account|unsubscribe)/i;
@@ -222,14 +240,14 @@ function classifyActingTool(input: PolicyInput, context: ClassificationContext):
   }
 
   if (toolName === 'browser_click') {
-    if (PURCHASE_TEXT.test(text)) addTrigger(context, 'purchase', `Button/link text suggests a purchase ("${text.slice(0, 60)}").`);
-    if (DELETE_TEXT.test(text)) addTrigger(context, 'delete', `Button/link text suggests deletion ("${text.slice(0, 60)}").`);
-    if (SECURITY_TEXT.test(text)) addTrigger(context, 'security_settings', `Button/link text suggests a security change ("${text.slice(0, 60)}").`);
-    if (PUBLISH_TEXT.test(text)) addTrigger(context, 'publish', `Button/link text suggests publishing ("${text.slice(0, 60)}").`);
-    else if (SEND_TEXT.test(text)) addTrigger(context, 'send', `Button/link text suggests sending ("${text.slice(0, 60)}").`);
-    if (SHARE_PRIVATE_TEXT.test(text)) addTrigger(context, 'share_private', `Button/link text suggests sharing ("${text.slice(0, 60)}").`);
-    if (PERMISSION_TEXT.test(text)) addTrigger(context, 'grant_permission', `Button/link text suggests granting access ("${text.slice(0, 60)}").`);
-    if (DOWNLOAD_TEXT.test(text)) addTrigger(context, 'dangerous_download', `Button/link text suggests a download ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, PURCHASE_TEXT, PURCHASE_TEXT_I18N)) addTrigger(context, 'purchase', `Button/link text suggests a purchase ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, DELETE_TEXT, DELETE_TEXT_I18N)) addTrigger(context, 'delete', `Button/link text suggests deletion ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, SECURITY_TEXT, SECURITY_TEXT_I18N)) addTrigger(context, 'security_settings', `Button/link text suggests a security change ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, PUBLISH_TEXT, PUBLISH_TEXT_I18N)) addTrigger(context, 'publish', `Button/link text suggests publishing ("${text.slice(0, 60)}").`);
+    else if (matchesAny(text, SEND_TEXT, SEND_TEXT_I18N)) addTrigger(context, 'send', `Button/link text suggests sending ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, SHARE_PRIVATE_TEXT, SHARE_PRIVATE_TEXT_I18N)) addTrigger(context, 'share_private', `Button/link text suggests sharing ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, PERMISSION_TEXT, PERMISSION_TEXT_I18N)) addTrigger(context, 'grant_permission', `Button/link text suggests granting access ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, DOWNLOAD_TEXT, DOWNLOAD_TEXT_I18N)) addTrigger(context, 'dangerous_download', `Button/link text suggests a download ("${text.slice(0, 60)}").`);
 
     const href = typeof args.url === 'string' ? args.url : '';
     if (href && DANGEROUS_FILE_URL.test(href)) {
@@ -239,7 +257,7 @@ function classifyActingTool(input: PolicyInput, context: ClassificationContext):
   }
 
   if (toolName === 'browser_select_option') {
-    if (PURCHASE_TEXT.test(text) || PURCHASE_TEXT.test(selector)) {
+    if (matchesAny(text, PURCHASE_TEXT, PURCHASE_TEXT_I18N) || matchesAny(selector, PURCHASE_TEXT, PURCHASE_TEXT_I18N)) {
       addTrigger(context, 'purchase', 'Selecting an option inside what looks like a purchase flow.');
     }
     return;
