@@ -85,7 +85,7 @@ const testUrls = [
   'https://facebook.com/tr/?id=123&ev=PageView',
   'https://c.amazon-adsystem.com/aax2/apstag.js',
   'https://cdn.segment.com/analytics.js/v1/key/analytics.min.js',
-  'https://api.github.com/repos/MOT1209/my-video',
+  'https://api.github.com/repos/MOT1209/King_Browser',
   'https://en.wikipedia.org/wiki/Web_browser',
   'https://news.ycombinator.com/item?id=123456',
   'https://docs.anthropic.com/en/docs/overview'

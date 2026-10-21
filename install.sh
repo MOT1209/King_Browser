@@ -7,7 +7,7 @@ echo ""
 OS=$(uname -s)
 ARCH=$(uname -m)
 
-RELEASES_API="https://api.github.com/repos/MOT1209/my-video/releases/latest"
+RELEASES_API="https://api.github.com/repos/MOT1209/King_Browser/releases/latest"
 CHECKSUMS_URL=""
 
 # Secure isolated temporary working directory via mktemp
@@ -66,7 +66,7 @@ verify_sha256() {
     echo "" >&2
     echo "The downloaded file does not match the official release." >&2
     echo "Do NOT install this binary. Please open an issue at:" >&2
-    echo "  https://github.com/MOT1209/my-video/issues" >&2
+    echo "  https://github.com/MOT1209/King_Browser/issues" >&2
     exit 1
   fi
 
@@ -82,7 +82,7 @@ if [ "$OS" = "Darwin" ]; then
     DMG_NAME="King-Browser-x64.dmg"
   fi
 
-  DOWNLOAD_URL="https://github.com/MOT1209/my-video/releases/latest/download/${DMG_NAME}"
+  DOWNLOAD_URL="https://github.com/MOT1209/King_Browser/releases/latest/download/${DMG_NAME}"
   DEST="${TMP_DIR}/${DMG_NAME}"
   CHECKSUMS_LOCAL="${TMP_DIR}/SHA256SUMS.txt"
 
@@ -138,7 +138,7 @@ if [ "$OS" = "Linux" ]; then
   fi
 
   APPIMAGE_NAME="King-Browser-${TARGET_ARCH}.AppImage"
-  DOWNLOAD_URL="https://github.com/MOT1209/my-video/releases/latest/download/${APPIMAGE_NAME}"
+  DOWNLOAD_URL="https://github.com/MOT1209/King_Browser/releases/latest/download/${APPIMAGE_NAME}"
   DEST="${HOME}/.local/bin/king-browser"
   DEST_TMP="${TMP_DIR}/${APPIMAGE_NAME}"
   CHECKSUMS_LOCAL="${TMP_DIR}/SHA256SUMS.txt"
@@ -189,5 +189,5 @@ fi
 
 echo "Error: Unsupported operating system: $OS" >&2
 echo "Please download King Browser manually from:" >&2
-echo "  https://github.com/MOT1209/my-video/releases" >&2
+echo "  https://github.com/MOT1209/King_Browser/releases" >&2
 exit 1

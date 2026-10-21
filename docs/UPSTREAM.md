@@ -25,7 +25,7 @@ The King Browser repository was scaffolded from the upstream commit above, inclu
 
 ## What was changed at scaffold time
 
-- `package.json`: name, description, author, version (0.1.0), license field, appId, productName, artifact names, shortcut names; removed upstream GitHub publish config.
+- `package.json`: name, description, author, version (0.0.1), license field, appId, productName, artifact names, shortcut names; GitHub publish config repointed to `MOT1209/King_Browser` (the updater only accepts releases from this repository).
 - Root `LICENSE` replaced with King Browser's MIT; upstream MIT text preserved at `licenses/nova-browser-LICENSE`.
 - Added `THIRD_PARTY_LICENSES.md`, `docs/UPSTREAM.md` (this file), `docs/research/*`.
 

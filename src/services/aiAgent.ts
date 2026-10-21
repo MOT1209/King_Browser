@@ -409,7 +409,7 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     }
   }
 
-  // 9. GitHub direct repo opening (e.g. "github MOT1209/my-video aç")
+  // 9. GitHub direct repo opening (e.g. "github MOT1209/King_Browser aç")
   const githubRepoMatch = normalized.match(/^github(?:['']?(?:da|de)|\s+da|\s+de)?\s+(?:aç|ac|a git|git)?\s*([a-z0-9_.-]+\/[a-z0-9_.-]+)(?:\s*(?:reposunu|reposu|projesini)?\s*(?:aç|ac|git)?)?$/i);
   if (githubRepoMatch && githubRepoMatch[1]) {
     const repo = githubRepoMatch[1];

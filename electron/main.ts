@@ -967,7 +967,7 @@ function setupApplicationMenu() {
         version: app.getVersion(),
         copyright: 'Copyright © 2026 King Browser. All rights reserved.',
         credits: 'Built with Electron, React, TypeScript, Web-LLM, and Model Context Protocol.',
-        website: 'https://github.com/MOT1209/my-video'
+        website: 'https://github.com/MOT1209/King_Browser'
       });
     } catch {}
   }
@@ -1257,13 +1257,13 @@ function setupApplicationMenu() {
         {
           label: 'Report an Issue / Feedback',
           click: async () => {
-            await shell.openExternal('https://github.com/MOT1209/my-video/issues');
+            await shell.openExternal('https://github.com/MOT1209/King_Browser/issues');
           }
         },
         {
           label: 'Visit King Browser GitHub',
           click: async () => {
-            await shell.openExternal('https://github.com/MOT1209/my-video');
+            await shell.openExternal('https://github.com/MOT1209/King_Browser');
           }
         },
         {
@@ -2685,7 +2685,7 @@ fi
     try {
       const isManualUpdateOnly = !app.isPackaged || process.platform === 'linux' || process.platform === 'darwin' || !!process.env.PORTABLE_EXECUTABLE_DIR;
       if (isManualUpdateOnly) {
-        const res = await fetch('https://api.github.com/repos/MOT1209/my-video/releases', {
+        const res = await fetch('https://api.github.com/repos/MOT1209/King_Browser/releases', {
           headers: { 'User-Agent': getStandardUserAgent() },
           signal: AbortSignal.timeout(10000)
         });
@@ -2733,7 +2733,7 @@ fi
     } catch (err: any) {
       console.warn('Check for updates failed via primary method, checking GitHub releases directly:', err?.message);
       try {
-        const res = await fetch('https://api.github.com/repos/MOT1209/my-video/releases', {
+        const res = await fetch('https://api.github.com/repos/MOT1209/King_Browser/releases', {
           headers: { 'User-Agent': getStandardUserAgent() },
           signal: AbortSignal.timeout(10000)
         });
@@ -2864,7 +2864,7 @@ fi
     // If no URL stored yet, query GitHub releases API directly
     if (!targetUrl) {
       try {
-        const res = await fetch('https://api.github.com/repos/MOT1209/my-video/releases', {
+        const res = await fetch('https://api.github.com/repos/MOT1209/King_Browser/releases', {
           headers: { 'User-Agent': getStandardUserAgent() },
           signal: AbortSignal.timeout(10_000)
         });
@@ -2898,15 +2898,15 @@ fi
       }
       // Security: Updates must strictly originate from the official repository
       if ((parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com') &&
-          !parsed.pathname.startsWith('/MOT1209/my-video/')) {
-        return { success: false, error: 'Untrusted update repository: updates must originate from MOT1209/my-video' };
+          !parsed.pathname.startsWith('/MOT1209/King_Browser/')) {
+        return { success: false, error: 'Untrusted update repository: updates must originate from MOT1209/King_Browser' };
       }
       if (customUrl && typeof customUrl === 'string') {
         const parsedCustom = new URL(customUrl.trim());
         if (parsedCustom.protocol !== 'https:' ||
             (parsedCustom.hostname !== 'github.com' && parsedCustom.hostname !== 'www.github.com') ||
-            !parsedCustom.pathname.startsWith('/MOT1209/my-video/')) {
-          return { success: false, error: 'Untrusted custom update URL: must originate from official MOT1209/my-video repository' };
+            !parsedCustom.pathname.startsWith('/MOT1209/King_Browser/')) {
+          return { success: false, error: 'Untrusted custom update URL: must originate from official MOT1209/King_Browser repository' };
         }
       }
       const isReleaseWebpage = parsed.pathname.includes('/releases/tag/') || parsed.pathname.endsWith('/releases/latest');
@@ -3136,7 +3136,7 @@ fi
         // unless it is an official release package from the verified King repository.
         const pathname = parsed.pathname.toLowerCase();
         const isOfficialRelease = (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com' || parsed.hostname === 'objects.githubusercontent.com') &&
-          (pathname.startsWith('/MOT1209/my-video/releases') || pathname.includes('/MOT1209/my-video/releases/'));
+          (pathname.startsWith('/MOT1209/King_Browser/releases') || pathname.includes('/MOT1209/King_Browser/releases/'));
 
         const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)($|\?|#)/i;
         const queryHasDangerousExt = Array.from(parsed.searchParams.values()).some(val => DANGEROUS_EXT_REGEX.test(val.toLowerCase())) ||
@@ -3192,7 +3192,7 @@ fi
 
     // 2. Fetch fresh releases from GitHub API
     try {
-      const res = await fetch('https://api.github.com/repos/MOT1209/my-video/releases?per_page=10', {
+      const res = await fetch('https://api.github.com/repos/MOT1209/King_Browser/releases?per_page=10', {
         headers: { 'User-Agent': getStandardUserAgent() },
         signal: AbortSignal.timeout(8000)
       });
@@ -3264,7 +3264,7 @@ fi
             const safePrev = String(prev.tag_name).trim();
             const safeCurr = String(tag).trim();
             if (/^[a-zA-Z0-9._-]+$/.test(safePrev) && /^[a-zA-Z0-9._-]+$/.test(safeCurr)) {
-              const compRes = await fetch(`https://api.github.com/repos/MOT1209/my-video/compare/${encodeURIComponent(safePrev)}...${encodeURIComponent(safeCurr)}`, {
+              const compRes = await fetch(`https://api.github.com/repos/MOT1209/King_Browser/compare/${encodeURIComponent(safePrev)}...${encodeURIComponent(safeCurr)}`, {
                 headers: { 'User-Agent': getStandardUserAgent() },
                 signal: AbortSignal.timeout(5000)
               });

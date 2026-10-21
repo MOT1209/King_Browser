@@ -10,17 +10,17 @@
   <br/>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-  [![Release](https://img.shields.io/badge/Release-v0.0.1-6366F1?style=for-the-badge)](https://github.com/MOT1209/my-video/releases)
+  [![Release](https://img.shields.io/badge/Release-v0.0.1-6366F1?style=for-the-badge)](https://github.com/MOT1209/King_Browser/releases)
   [![Electron](https://img.shields.io/badge/Electron-43.x-47848F?style=for-the-badge&logo=electron)](https://www.electronjs.org/)
   [![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
-  [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/MOT1209/my-video)
-  [![CI](https://github.com/MOT1209/my-video/actions/workflows/ci.yml/badge.svg)](https://github.com/MOT1209/my-video/actions/workflows/ci.yml)
-  [![CodeQL](https://github.com/MOT1209/my-video/actions/workflows/codeql.yml/badge.svg)](https://github.com/MOT1209/my-video/actions/workflows/codeql.yml)
-  [![Security Alerts](https://img.shields.io/badge/CodeQL%20Alerts-0%20Open-10B981?style=for-the-badge)](https://github.com/MOT1209/my-video/security/code-scanning)
-  [![Tests](https://img.shields.io/badge/Tests-1163%2B%20Passing-10B981?style=for-the-badge)](https://github.com/MOT1209/my-video)
-  [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/MOT1209/my-video)
+  [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/MOT1209/King_Browser)
+  [![CI](https://github.com/MOT1209/King_Browser/actions/workflows/ci.yml/badge.svg)](https://github.com/MOT1209/King_Browser/actions/workflows/ci.yml)
+  [![CodeQL](https://github.com/MOT1209/King_Browser/actions/workflows/codeql.yml/badge.svg)](https://github.com/MOT1209/King_Browser/actions/workflows/codeql.yml)
+  [![Security Alerts](https://img.shields.io/badge/CodeQL%20Alerts-0%20Open-10B981?style=for-the-badge)](https://github.com/MOT1209/King_Browser/security/code-scanning)
+  [![Tests](https://img.shields.io/badge/Tests-1163%2B%20Passing-10B981?style=for-the-badge)](https://github.com/MOT1209/King_Browser)
+  [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/MOT1209/King_Browser)
 
   <p align="center">
     <a href="#why-king">Why King?</a> •
@@ -413,7 +413,7 @@ King Browser features an entirely local-first neural execution architecture:
 ```
 
 - **Supported Neural Models**: Llama 3.2 3B (`Llama-3.2-3B-Instruct`), Phi 3.5 Vision (`Phi-3.5-vision-instruct`, Multimodal), and Qwen 2.5 0.5B (`Qwen2.5-0.5B-Instruct`, Ultra-Light).
-- **Natural Language Direct Intent Engine**: Automatically identifies direct browser actions (e.g. `"github MOT1209/my-video aç"`, `"duckduckgo'da webgpu ara"`, `"geçmişte react bul"`, `"açık sekmeleri listele"`, `"bu sayfayı özetle"`).
+- **Natural Language Direct Intent Engine**: Automatically identifies direct browser actions (e.g. `"github MOT1209/King_Browser aç"`, `"duckduckgo'da webgpu ara"`, `"geçmişte react bul"`, `"açık sekmeleri listele"`, `"bu sayfayı özetle"`).
 - **Persistent Info & Memory Vault**: Remembers user preferences (e.g. tone, language, dark theme) and automatically injects them into agent instructions.
 - **Task History Tracking**: Maintains a persistent chronological log of completed browser tasks and AI executions.
 
@@ -454,7 +454,7 @@ King Browser runs fully offline out of the box with zero required configuration.
 
 ### Option A: Download Official Release (Recommended)
 
-Download the latest prebuilt installer for your operating system directly from [GitHub Releases](https://github.com/MOT1209/my-video/releases):
+Download the latest prebuilt installer for your operating system directly from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
 - **macOS**: `King-Browser-arm64.dmg` (Apple Silicon) or `King-Browser-x64.dmg` (Intel)
 - **Windows**: `King-Browser-Setup-0.0.1-x64.exe` (64-bit NSIS Installer)
 - **Linux**: `King-Browser-x86_64.AppImage` or `King-Browser-amd64.deb`
@@ -467,8 +467,8 @@ Download the latest prebuilt installer for your operating system directly from [
 
 #### 1. Clone the repository
 ```bash
-git clone https://github.com/MOT1209/my-video.git
-cd my-video/King_Browser
+git clone https://github.com/MOT1209/King_Browser.git
+cd King_Browser
 ```
 
 #### 2. Install dependencies
@@ -718,11 +718,11 @@ $hash = Get-FileHash King-Browser-Setup-*.exe -Algorithm SHA256
 
 <div align="center">
 
-<a href="https://star-history.com/#MOT1209/my-video&Date">
+<a href="https://star-history.com/#MOT1209/King_Browser&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MOT1209/my-video&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MOT1209/my-video&type=Date" />
-   <img alt="King Browser Star History Chart" src="https://api.star-history.com/svg?repos=MOT1209/my-video&type=Date" width="750" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MOT1209/King_Browser&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MOT1209/King_Browser&type=Date" />
+   <img alt="King Browser Star History Chart" src="https://api.star-history.com/svg?repos=MOT1209/King_Browser&type=Date" width="750" />
  </picture>
 </a>
 
@@ -754,7 +754,7 @@ Before getting started:
 
 Distributed under the **MIT License**. See `LICENSE` for details.
 
-This project is a rebranded derivative of [King Browser](https://github.com/MOT1209/my-video) (MIT), with substantial modifications — see `docs/UPSTREAM.md` for the full provenance record.
+This project is a rebranded derivative of [King Browser](https://github.com/MOT1209/King_Browser) (MIT), with substantial modifications — see `docs/UPSTREAM.md` for the full provenance record.
 
 <br/>
 

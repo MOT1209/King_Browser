@@ -9,16 +9,16 @@
     <p>King Browser is an open-source sovereign desktop browser built with React and Electron. It features on-device AI integration via the Model Context Protocol (MCP), zero-telemetry offline Whisper voice transcription, client-side end-to-end encrypted sync, and native adblocking.</p>
   </description>
   <launchable type="desktop-id">king-browser.desktop</launchable>
-  <url type="homepage">https://github.com/MOT1209/my-video</url>
-  <url type="bugtracker">https://github.com/MOT1209/my-video/issues</url>
+  <url type="homepage">https://github.com/MOT1209/King_Browser</url>
+  <url type="bugtracker">https://github.com/MOT1209/King_Browser/issues</url>
   <screenshots>
     <screenshot type="default">
       <caption>King Browser main interface</caption>
-      <image>https://raw.githubusercontent.com/MOT1209/my-video/main/King_Browser/website/public/images/newtab.png</image>
+      <image>https://raw.githubusercontent.com/MOT1209/King_Browser/main/King_Browser/website/public/images/newtab.png</image>
     </screenshot>
     <screenshot>
       <caption>AI Assistant and split view</caption>
-      <image>https://raw.githubusercontent.com/MOT1209/my-video/main/King_Browser/website/public/images/assistant.png</image>
+      <image>https://raw.githubusercontent.com/MOT1209/King_Browser/main/King_Browser/website/public/images/assistant.png</image>
     </screenshot>
   </screenshots>
   <releases>

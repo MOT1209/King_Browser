@@ -5,7 +5,7 @@ console.log('\n--- Safe Navigation Comprehensive Suite ---');
 
 const VALID_HTTP_URLS = [
   'https://google.com',
-  'https://www.github.com/MOT1209/my-video',
+  'https://www.github.com/MOT1209/King_Browser',
   'http://localhost:3000/dashboard',
   'http://127.0.0.1:8080',
   'https://sub.domain.co.uk:8443/path?query=1&item=test#section',

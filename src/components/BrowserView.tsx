@@ -1358,7 +1358,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             className="w-full h-full flex-1 border-none bg-white absolute inset-0"
             webpreferences="contextIsolation=yes, nodeIntegration=no, webSecurity=yes, sandbox=yes"
           />
-        ) : isDemo && tab?.url === 'https://github.com/MOT1209/my-video' ? (
+        ) : isDemo && tab?.url === 'https://github.com/MOT1209/King_Browser' ? (
           <div className="w-full h-full bg-[#0d1117] text-[#c9d1d9] flex flex-col overflow-y-auto font-sans p-6 sm:p-8 select-none">
             <div className="max-w-3xl mx-auto w-full flex flex-col gap-6 my-auto">
               {/* GitHub Repo Header */}
@@ -1371,14 +1371,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                     <div className="flex items-center gap-2">
                       <span className="text-[#58a6ff] hover:underline font-semibold text-base cursor-pointer">MOT1209</span>
                       <span className="text-[#8b949e]">/</span>
-                      <span className="text-[#58a6ff] font-bold text-base cursor-pointer">my-video</span>
+                      <span className="text-[#58a6ff] font-bold text-base cursor-pointer">King_Browser</span>
                       <span className="text-[11px] px-2 py-0.5 rounded-full border border-[#30363d] text-[#8b949e] font-medium">Public</span>
                     </div>
                     <p className="text-xs text-[#8b949e] mt-0.5">An open source sovereign browser built with React and Electron</p>
                   </div>
                 </div>
                 <a
-                  href="https://github.com/MOT1209/my-video"
+                  href="https://github.com/MOT1209/King_Browser"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3.5 py-1.5 bg-[#238636] hover:bg-[#2ea043] text-white rounded-md text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm"

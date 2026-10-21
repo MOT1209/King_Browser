@@ -37,8 +37,8 @@ Please do not report security vulnerabilities via public GitHub issues or public
 
 ### Reporting Channels
 
-1. **GitHub Security Advisories (Preferred)**: Submit a private report via [GitHub Security Advisories](https://github.com/MOT1209/my-video/security/advisories/new).
-2. **Non-sensitive hardening reports**: Open a regular issue at [github.com/MOT1209/my-video/issues](https://github.com/MOT1209/my-video/issues). Do not include exploit details in public issues.
+1. **GitHub Security Advisories (Preferred)**: Submit a private report via [GitHub Security Advisories](https://github.com/MOT1209/King_Browser/security/advisories/new).
+2. **Non-sensitive hardening reports**: Open a regular issue at [github.com/MOT1209/King_Browser/issues](https://github.com/MOT1209/King_Browser/issues). Do not include exploit details in public issues.
 
 ### Information to Provide
 

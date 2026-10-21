@@ -219,7 +219,7 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
         body: 'Earlier builds rewrote the user-agent string to look like a different browser. That is a lie the network can see, and it is gone. Chromium now sends its own native user-agent and Client Hints, so a site reads exactly which browser you installed — nothing invented, nothing to explain away later.',
         points: [
           'Native Chromium user-agent and Client Hints, with no fabricated fingerprint layered on top.',
-          'Updater downloads are confined to official MOT1209/my-video releases, with redirect domains validated.',
+          'Updater downloads are confined to official MOT1209/King_Browser releases, with redirect domains validated.',
           'Context-menu media URLs, webview src protocols and download manager schemes are all sanitized.',
         ],
       },
@@ -261,7 +261,7 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
       },
       {
         category: 'security',
-        text: 'Confined updater download repository strictly to official MOT1209/my-video releases with redirect domain validation.',
+        text: 'Confined updater download repository strictly to official MOT1209/King_Browser releases with redirect domain validation.',
       },
       {
         category: 'security',

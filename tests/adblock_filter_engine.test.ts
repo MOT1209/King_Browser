@@ -65,7 +65,7 @@ assert.equal(shouldBlockRequest('https://www.facebook.net/tr?id=123'), true);
 assert.equal(shouldBlockRequest('https://c.amazon-adsystem.com/aax2/apstag.js'), true);
 
 // 2. Legitimate content allowance
-assert.equal(shouldBlockRequest('https://github.com/MOT1209/my-video'), false);
+assert.equal(shouldBlockRequest('https://github.com/MOT1209/King_Browser'), false);
 assert.equal(shouldBlockRequest('https://news.ycombinator.com/item?id=100'), false);
 assert.equal(shouldBlockRequest('https://en.wikipedia.org/wiki/Web_browser'), false);
 assert.equal(shouldBlockRequest('https://docs.anthropic.com/en/docs/overview'), false);

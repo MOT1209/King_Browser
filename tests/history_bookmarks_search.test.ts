@@ -45,7 +45,7 @@ function searchHistoryAndBookmarks(query: string, items: SearchableItem[]): Sear
 }
 
 const testCorpus: SearchableItem[] = [
-  { id: '1', title: 'GitHub - King Browser Repository', url: 'https://github.com/MOT1209/my-video', type: 'bookmark' },
+  { id: '1', title: 'GitHub - King Browser Repository', url: 'https://github.com/MOT1209/King_Browser', type: 'bookmark' },
   { id: '2', title: 'React Documentation', url: 'https://react.dev', type: 'bookmark' },
   { id: '3', title: 'Hacker News', url: 'https://news.ycombinator.com', type: 'history' },
   { id: '4', title: 'WebGPU Explainer', url: 'https://gpuweb.github.io/gpuweb/', type: 'history' },

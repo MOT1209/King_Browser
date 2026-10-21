@@ -10,7 +10,7 @@
  *
  * These tests pin the new order of trust (GitHub's per-asset `digest` first,
  * the body only as a strict fallback) and the "unverified" outcome. The digest
- * shapes below are copied from real `MOT1209/my-video` release payloads.
+ * shapes below are copied from real `MOT1209/King_Browser` release payloads.
  */
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/;

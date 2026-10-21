@@ -465,7 +465,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                     </p>
                     <div className="pt-1">
                       <a
-                        href="https://github.com/MOT1209/my-video/releases"
+                        href="https://github.com/MOT1209/King_Browser/releases"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
@@ -542,7 +542,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                       <span>What's New (Changelog)</span>
                     </button>
                     <a
-                      href="https://github.com/MOT1209/my-video"
+                      href="https://github.com/MOT1209/King_Browser"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs hover:opacity-90 transition-opacity shadow-sm cursor-pointer"
@@ -551,7 +551,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                       <span>GitHub Repository</span>
                     </a>
                     <a
-                      href="https://github.com/MOT1209/my-video/releases"
+                      href="https://github.com/MOT1209/King_Browser/releases"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-semibold text-xs transition-colors cursor-pointer"
@@ -561,7 +561,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                       <span>SHA-256 Checksums</span>
                     </a>
                     <a
-                      href="https://github.com/MOT1209/my-video/issues"
+                      href="https://github.com/MOT1209/King_Browser/issues"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors cursor-pointer border border-slate-200 dark:border-white/10"

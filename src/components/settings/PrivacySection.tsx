@@ -153,7 +153,7 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
             </div>
           </div>
           <a
-            href="https://github.com/MOT1209/my-video/releases"
+            href="https://github.com/MOT1209/King_Browser/releases"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-xs font-semibold shrink-0 transition-colors"

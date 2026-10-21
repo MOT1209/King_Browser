@@ -31,8 +31,8 @@ Before setting up the project locally, ensure you have the following installed:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/MOT1209/my-video.git
-cd my-video
+git clone https://github.com/MOT1209/King_Browser.git
+cd King_Browser
 ```
 
 ### 2. Install Dependencies

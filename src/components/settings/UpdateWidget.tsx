@@ -123,16 +123,16 @@ export const UpdateWidget = () => {
         }
         setStatus('error');
         setErrorMsg(res?.error || 'Download failed');
-        await openDownload(downloadUrl || 'https://github.com/MOT1209/my-video/releases/latest');
+        await openDownload(downloadUrl || 'https://github.com/MOT1209/King_Browser/releases/latest');
       } catch (err: any) {
         console.error('Download update error:', err);
         setStatus('error');
         setErrorMsg(err?.message || 'Download failed');
-        await openDownload(downloadUrl || 'https://github.com/MOT1209/my-video/releases/latest');
+        await openDownload(downloadUrl || 'https://github.com/MOT1209/King_Browser/releases/latest');
       }
     } else {
       setStatus('idle');
-      await openDownload(downloadUrl || 'https://github.com/MOT1209/my-video/releases/latest');
+      await openDownload(downloadUrl || 'https://github.com/MOT1209/King_Browser/releases/latest');
     }
   };
 
@@ -265,7 +265,7 @@ export const UpdateWidget = () => {
             </button>
           )}
           <button
-            onClick={() => openDownload(downloadUrl || `https://github.com/MOT1209/my-video/releases/tag/v${updateVersion || 'latest'}`)}
+            onClick={() => openDownload(downloadUrl || `https://github.com/MOT1209/King_Browser/releases/tag/v${updateVersion || 'latest'}`)}
             className="px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
             title="View release notes on GitHub"
           >
