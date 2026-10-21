@@ -10,22 +10,19 @@
   <br/>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-  [![Release](https://img.shields.io/badge/Release-v0.0.1-6366F1?style=for-the-badge)](https://github.com/MOT1209/King_Browser/releases)
+  [![Status](https://img.shields.io/badge/Status-pre--release%20v0.0.1-F59E0B?style=for-the-badge)](https://github.com/MOT1209/King_Browser)
   [![Electron](https://img.shields.io/badge/Electron-43.x-47848F?style=for-the-badge&logo=electron)](https://www.electronjs.org/)
   [![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/MOT1209/King_Browser)
   [![CI](https://github.com/MOT1209/King_Browser/actions/workflows/ci.yml/badge.svg)](https://github.com/MOT1209/King_Browser/actions/workflows/ci.yml)
-  [![CodeQL](https://github.com/MOT1209/King_Browser/actions/workflows/codeql.yml/badge.svg)](https://github.com/MOT1209/King_Browser/actions/workflows/codeql.yml)
-  [![Security Alerts](https://img.shields.io/badge/CodeQL%20Alerts-0%20Open-10B981?style=for-the-badge)](https://github.com/MOT1209/King_Browser/security/code-scanning)
-  [![Tests](https://img.shields.io/badge/Tests-1163%2B%20Passing-10B981?style=for-the-badge)](https://github.com/MOT1209/King_Browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/MOT1209/King_Browser)
 
   <p align="center">
     <a href="#why-king">Why King?</a> •
     <a href="#overview">Overview</a> •
-    <a href="#performance-benchmarks--browser-comparison">Benchmarks</a> •
+    <a href="#performance">Performance</a> •
     <a href="#screenshots">Screenshots</a> •
     <a href="#key-features">Key Features</a> •
     <a href="#mcp-model-context-protocol-guide">MCP Guide</a> •
@@ -46,11 +43,11 @@
 
 Rather than bloated cloud telemetry or generic hype, King focuses on concrete developer and power-user requirements:
 
-- **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server exposing 26 browser automation and inspection tools directly to coding agents (Claude Code, Cursor, Windsurf, Antigravity) with zero configuration.
+- **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server exposing 26 browser automation and inspection tools directly to coding agents (OpenCode, Claude Code, Cursor, Windsurf). Agents authenticate with a bearer token copied from Settings → MCP.
 - **On-Device Whisper Voice & Neural Execution**: Run multilingual speech-to-text locally via Transformers.js (`whisper-tiny`, ~41 MB) and on-device LLMs via WebGPU (Llama 3.2, Phi 3.5 Vision, Qwen 2.5). Exactly 0 KB of voice audio or model prompt data is transmitted to cloud servers.
-- **Zero-Telemetry Network-Level Privacy Shield**: Employs `@cliqz/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
+- **No Analytics SDK, Network-Level Privacy Shield**: Ships no analytics or crash-reporting SDK (see [Network connections](#network-connections) for the services King does contact). Employs `@cliqz/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
 - **Tab Hibernation & Memory Eviction**: Dormant background tabs automatically suspend active rendering execution via an LRU pool (capping live webviews to 6) while preserving complete navigation state, preventing Chromium process explosion regardless of tab count.
-- **Hardened Security Architecture**: Audited against CodeQL static analysis with 0 open security alerts, TOCTOU-safe file descriptor operations, strict context isolation, and SSRF/DNS rebinding defense.
+- **Hardened Security Architecture**: TOCTOU-safe file descriptor operations, strict context isolation, and SSRF/DNS rebinding defense. These controls are covered by the automated test suite; no independent security audit has been performed yet.
 
 ---
 
@@ -60,44 +57,26 @@ Rather than bloated cloud telemetry or generic hype, King focuses on concrete de
 
 ---
 
-## Performance Benchmarks & Browser Comparison
+## Performance
 
-> **Architecture & Engine Parity Note:** King Browser is powered by modern Chromium (Blink) and Google V8 via Electron 43. Core JavaScript loop execution, HTML parsing, and DOM rendering performance are on par with Google Chrome (engine parity). King's distinct speed and efficiency advantages come from architectural design: zero background Google telemetry/account sync services, an aggressive idle tab hibernation engine, network-level ad/tracker interception, and an on-demand decoupled bundle structure.
+King renders pages with the Chromium build bundled in Electron 43, so page-level JavaScript and rendering performance follow that Chromium version. King has **not** been benchmarked against Chrome, Brave or Safari; earlier comparison tables inherited from the upstream project were removed because they were not measured for this codebase.
 
-### Head-to-Head Feature Matrix
+What King changes on top of Chromium: idle-tab hibernation (at most 6 live webviews), network-level ad/tracker blocking, and lazily loaded AI runtimes. `npm run benchmark` runs internal micro-benchmarks of these code paths; see [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md). They measure isolated functions in Node, not user-visible page-load speed.
 
-| Architectural Feature | King Browser | Google Chrome | Brave Browser | Apple Safari 18 |
-| :--- | :--- | :--- | :--- | :--- |
-| **Core Engine** | **Chromium 134 / Blink** | Chromium 134 / Blink | Chromium 134 / Blink | WebKit |
-| **AI Assistant** | **100% On-Device WebGPU (0 KB Sent)** | Cloud Gemini (Account required) | Cloud Leo (Paid tier) | Apple Intelligence |
-| **Voice / Speech-to-Text** | **Local Whisper ONNX (0 KB Sent)** | Google Cloud Speech API | Not built-in | Siri Dictation |
-| **Model Context Protocol (MCP)** | **Native 26-Tool Server (Port 3020)** | Not available | Not available | Not available |
-| **Ad & Tracker Protection** | **Built-in Session Engine (EasyList)** | Not built-in (Extensions needed) | Brave Shields | Content Blockers |
-| **Background Tab Strategy** | **Background Activity Suspension** | Memory Saver (Tab Discard) | Sleeping Tabs | OS Memory Management |
-| **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)** | Google Account required | Sync Chain | iCloud Keychain |
-| **Split View Browsing** | **Native Dual Synchronized Canvas** | Not built-in | Not built-in | macOS Split View |
-| **Telemetry & Analytics** | **Zero Telemetry (0 KB)** | Extensive telemetry | Opt-out required | Telemetry enabled |
-| **Security Auditing** | **CodeQL Static Analysis (0 Alerts)** | Chromium Security & Bug Bounty | Internal Security & Bug Bounty | Apple Security Engineering |
-| **Source Code & License** | **100% Open Source (MIT)** | Proprietary Core | MPL 2.0 | Proprietary Core |
+### Network connections
 
----
+King has no telemetry endpoint, but these built-in features contact third-party services:
 
-### Empirical Microbenchmark Measurements
-
-*Internal micro-benchmarks measuring React state dispatch, V8 heap allocation, and JS bundle budgets (`npm run benchmark`):*
-
-| Benchmark Suite | Metric | Measured Value | Unit | Architectural Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **Tab State Operations** | 100 Tabs Creation Latency | **~0.08** | ms | Instantaneous state tracking and virtualized tab allocation |
-| **Tab Allocation** | Throughput | **1,200,000+** | ops/sec | Number of virtual tab structures instantiated per second |
-| **Tab Hibernation State**| Inactive Tabs Hibernation | **~0.02** | ms | State transition setting isSuspended: true for pool eviction |
-| **Network Filter Decision**| Fast Hash Lookup Latency | **~0.44** | µs / request | In-memory tracker domain hash set lookup latency |
-| **Network Filter Decision**| Lookup Throughput | **2,200,000+** | checks/sec | Fast-path domain classification queries per second |
-| **V8 Heap Memory** | Node Test Process Heap | **~5.5** | MB | Core JavaScript runtime heap allocation in microbenchmark |
-| **Startup JS Bundle** | Core Entry Chunk | **~435** | KB | Lightweight initial JS evaluated at browser launch |
-| **WebLLM Isolation** | Engine Chunk | **Decoupled (0 KB at start)** | - | 6 MB neural runtime loaded asynchronously on demand |
-
-> **Full Benchmark Methodology & Reproduction Guide:** See [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) for internal V8 benchmark reproduction commands and architecture analysis.
+| Feature | Service | When |
+| :--- | :--- | :--- |
+| Update check & release notes | `api.github.com`, `github.com` | Shortly after start and every 4 hours |
+| Search suggestions | `suggestqueries.google.com` (or the selected engine) | While typing in the omnibox |
+| New-tab wallpapers | `images.unsplash.com`, `api.unsplash.com` | When an Unsplash wallpaper is shown |
+| Page translation | `translate.googleapis.com` | When the user translates a page |
+| Local AI / Whisper model download | `huggingface.co`, `hf.co` | First use of a local model |
+| Ad-block filter lists | Filter-list hosts | Start-up / list refresh |
+| King Sync (opt-in) | Your Supabase project | Only after sign-in; data is end-to-end encrypted |
+| Fonts | `fonts.googleapis.com`, `fonts.gstatic.com` | UI start-up |
 
 ---
 
@@ -423,7 +402,7 @@ King Browser features an entirely local-first neural execution architecture:
 
 | Component | Technology | Description |
 | :--- | :--- | :--- |
-| **Runtime Shell** | [Electron 43](https://www.electronjs.org/) | Chromium 134 + Node.js 22 runtime |
+| **Runtime Shell** | [Electron 43](https://www.electronjs.org/) | Bundled Chromium + Node.js runtime |
 | **Frontend Framework** | [React 18](https://react.dev/) + [TypeScript 5](https://www.typescriptlang.org/) | Declarative component architecture |
 | **Bundler & Build Tool** | [Vite 6](https://vitejs.dev/) + [esbuild](https://esbuild.github.io/) | Sub-second HMR and optimized production bundles |
 | **Styling & Motion** | [TailwindCSS 3](https://tailwindcss.com/) + [Framer Motion](https://www.framer.com/motion/) | Utility styling and GPU-accelerated micro-interactions |
@@ -452,9 +431,11 @@ King Browser runs fully offline out of the box with zero required configuration.
 
 ## Quick Start
 
-### Option A: Download Official Release (Recommended)
+### Option A: Download a Release
 
-Download the latest prebuilt installer for your operating system directly from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
+> **No release has been published yet.** Until then, use Option B. Builds are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen will warn about them.
+
+Once published, installers will be available from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
 - **macOS**: `King-Browser-arm64.dmg` (Apple Silicon) or `King-Browser-x64.dmg` (Intel)
 - **Windows**: `King-Browser-Setup-0.0.1-x64.exe` (64-bit NSIS Installer)
 - **Linux**: `King-Browser-x86_64.AppImage` or `King-Browser-amd64.deb`
@@ -675,7 +656,6 @@ flowchart TB
 
 ## Completed Milestones & Roadmap
 
-- [x] Zero CodeQL Security Alerts & Full Static Analysis Hardening
 - [x] On-Device Whisper Voice Navigation & Speech Recognition
 - [x] Modern UI with Vertical Tabs & Workspaces
 - [x] Native MCP Autonomous AI Agent Protocol (26 Built-in Tools) & Virtual Glowing Cursor
