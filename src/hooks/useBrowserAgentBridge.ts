@@ -1,3 +1,5 @@
+import { SENSITIVE_FIELD_PATTERN } from '../utils/sensitiveField';
+import { resolveLoginCredential, buildLoginFillScript, describeLoginResult, LOGIN_REQUIRED_PROBE } from '../utils/agentLogin';
 import { useEffect, useRef, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import type { Bookmark, HistoryItem, Tab, UserSettings } from '../types/browser';
 import { aiAgent } from '../services/aiAgent';
@@ -60,6 +62,9 @@ export interface UseBrowserAgentBridgeOptions {
  * Configures browser control capabilities for aiAgent and handles
  * incoming MCP tool execution requests from the Electron main process.
  */
+/** How long the cursor is shown on its target before the action lands. */
+const AGENT_CURSOR_LEAD_MS = 350;
+
 export function useBrowserAgentBridge({
   activeTabId,
   tabs,
@@ -173,6 +178,34 @@ export function useBrowserAgentBridge({
       const { activeTabId, tabs } = browserDataRef.current;
       const activeWebview = guardedGuest(canExecute);
 
+      // Show the human where the agent is about to act, then give them a beat to
+      // see it before the click/keystroke lands.
+      const previewTarget = async (selector: string): Promise<boolean> => {
+        if (!activeWebview || !activeWebview.executeJavaScript) return true;
+        let target: { x: number; y: number; sensitive?: boolean } | null = null;
+        try {
+          target = await activeWebview.executeJavaScript(`
+            (() => {
+              try {
+                const el = document.querySelector(${JSON.stringify(selector)});
+                if (!el) return null;
+                el.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+                const r = el.getBoundingClientRect();
+                return { x: r.left + r.width / 2, y: r.top + r.height / 2, sensitive: el.type === 'password' };
+              } catch (_) { return null; }
+            })()
+          `);
+        } catch (_) { return canExecute(); }
+        if (target) {
+          const bounds = activeWebview.getBoundingClientRect();
+          window.dispatchEvent(new CustomEvent('ai-cursor', {
+            detail: { x: bounds.left + target.x, y: bounds.top + target.y, action: 'move' }
+          }));
+          await new Promise(resolve => setTimeout(resolve, AGENT_CURSOR_LEAD_MS));
+        }
+        return canExecute();
+      };
+
       switch (toolName) {
         case 'browser_navigate': {
           if (!safeArgs.url || typeof safeArgs.url !== 'string') return "Error: Missing or invalid 'url' parameter";
@@ -199,7 +232,8 @@ export function useBrowserAgentBridge({
               (() => {
                 let text = (document.body?.innerText || document.documentElement?.innerText || '');
                 const links = Array.from(document.querySelectorAll('a')).map(a => a.href).filter(Boolean);
-                return JSON.stringify({ text: text.substring(0, 10000), links: links.slice(0, 50) });
+                const loginRequired = ${LOGIN_REQUIRED_PROBE};
+                return JSON.stringify({ text: text.substring(0, 10000), links: links.slice(0, 50), loginRequired });
               })();
             `);
           }
@@ -208,6 +242,7 @@ export function useBrowserAgentBridge({
         case 'browser_click':
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
+            if (!await previewTarget(safeArgs.selector)) return "Error: MCP action was cancelled or expired.";
             const result = await activeWebview.executeJavaScript(`
               (() => {
                 try {
@@ -238,6 +273,7 @@ export function useBrowserAgentBridge({
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           const textToType = typeof safeArgs.text === 'string' ? safeArgs.text : String(safeArgs.text ?? '');
           if (activeWebview && activeWebview.executeJavaScript) {
+            if (!await previewTarget(safeArgs.selector)) return "Error: MCP action was cancelled or expired.";
             const result = await activeWebview.executeJavaScript(`
               (() => {
                 try {
@@ -251,7 +287,7 @@ export function useBrowserAgentBridge({
                       const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
                       el.dispatchEvent(enterEvent);
                     }
-                    return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                    return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, sensitive: el.type === 'password' };
                   }
                   return { success: false, error: "Element not found with selector: " + ${JSON.stringify(safeArgs.selector)} };
                 } catch (err) {
@@ -261,8 +297,9 @@ export function useBrowserAgentBridge({
             `);
             if (result && result.success) {
               const bounds = activeWebview.getBoundingClientRect();
+              const masked = Boolean(result.sensitive) || SENSITIVE_FIELD_PATTERN.test(safeArgs.selector);
               window.dispatchEvent(new CustomEvent('ai-cursor', {
-                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'type', text: textToType }
+                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'type', text: masked ? '••••••••' : textToType.slice(0, 80), masked }
               }));
               return "Successfully typed text.";
             }
@@ -421,6 +458,34 @@ export function useBrowserAgentBridge({
             `);
           }
           return "Error: No active webview.";
+
+        case 'browser_login': {
+          if (!activeWebview || !activeWebview.executeJavaScript) return "Error: No active webview.";
+          const api = (window as any).electronAPI;
+          if (!api?.secureStoreGet) return "Error: Saved accounts are not available.";
+          let records: any[] = [];
+          try {
+            const raw = await api.secureStoreGet('passwords');
+            const parsedRecords = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(parsedRecords)) records = parsedRecords;
+          } catch (_) { return "Error: Could not read saved accounts."; }
+          let pageUrl = '';
+          try { pageUrl = activeWebview.getURL(); } catch (_) {}
+          const resolution = resolveLoginCredential(
+            records,
+            pageUrl,
+            typeof safeArgs.username === 'string' ? safeArgs.username : undefined,
+            typeof safeArgs.expectedOrigin === 'string' ? safeArgs.expectedOrigin : undefined
+          );
+          if (!resolution.ok) return resolution.error;
+          if (!canExecute()) return "Error: MCP action was cancelled or expired.";
+          const fillResult = await activeWebview.executeJavaScript(buildLoginFillScript(resolution.username, resolution.password));
+          if (fillResult && fillResult.success) {
+            const bounds = activeWebview.getBoundingClientRect();
+            window.dispatchEvent(new CustomEvent('ai-cursor', { detail: { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, action: 'type', text: '••••••••', masked: true } }));
+          }
+          return describeLoginResult(fillResult, resolution.username);
+        }
 
         case 'browser_select_option':
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";

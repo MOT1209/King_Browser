@@ -9,7 +9,8 @@
  * §12 approval triggers implemented:
  *   send, purchase, delete, security_settings, publish, share_private,
  *   grant_permission, dangerous_download, plus sensitive_input and
- *   consequential_form for concrete form submissions.
+ *   consequential_form for concrete form submissions, and `login` for the
+ *   agent signing in with a saved account.
  *
  * Also provides:
  *   - domain extraction for the approval screen ("website domain")
@@ -38,7 +39,8 @@ export type ApprovalTrigger =
   | 'dangerous_download'
   | 'sensitive_input'
   | 'consequential_form'
-  | 'arbitrary_code';
+  | 'arbitrary_code'
+  | 'login';
 
 export interface PolicyInput {
   toolName: string;
@@ -106,7 +108,9 @@ const ENGINE_CONTROL_TOOLS = new Set([
   'browser_stop'
 ]);
 
-const SENSITIVE_SELECTOR_PATTERNS = /pass(word|wd|phrase)?|passwd|\bpwd\b|\bpin\b|cvv|cvc|card.?number|credit.?card|cc.?number|ssn|social.?security|secret|token|api.?key|recovery|otp|one.?time|verification.?code|mfa|2fa/i;
+// Same pattern as src/utils/sensitiveField.ts (the cursor overlay masks with it).
+// Duplicated on purpose: this module must stay import-free; a test pins them equal.
+export const SENSITIVE_SELECTOR_PATTERNS = /pass(word|wd|phrase)?|passwd|\bpwd\b|\bpin\b|cvv|cvc|card.?number|credit.?card|cc.?number|ssn|social.?security|secret|token|api.?key|recovery|otp|one.?time|verification.?code|mfa|2fa/i;
 
 const REDACTED_VALUE = '••••••••';
 
@@ -299,6 +303,8 @@ export function classifyAction(input: PolicyInput): PolicyDecision {
     }
   } else if (toolName === 'browser_run_js') {
     addTrigger(context, 'arbitrary_code', 'Executing arbitrary JavaScript in the page context.');
+  } else if (toolName === 'browser_login') {
+    addTrigger(context, 'login', 'Signing in to this site with a saved account.');
   } else if (toolName === 'browser_go_back' || toolName === 'browser_go_forward' || toolName === 'browser_reload') {
     return { risk: 'safe', triggers: [], reasons: ['History control is not an approval trigger.'], domain, redactedArgs };
   } else {
@@ -333,7 +339,8 @@ const TRIGGER_CONSEQUENCES: Record<ApprovalTrigger, string> = {
   dangerous_download: 'This downloads or executes a potentially dangerous file.',
   sensitive_input: 'This enters sensitive information such as a password, card number, or secret.',
   consequential_form: 'This submits a form or performs an action with lasting consequences.',
-  arbitrary_code: 'This executes arbitrary code inside the page with full page privileges.'
+  arbitrary_code: 'This executes arbitrary code inside the page with full page privileges.',
+  login: 'This signs in to the site with a saved account. The password is filled by the browser and is never shown to the agent.'
 };
 
 const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
@@ -347,7 +354,8 @@ const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
   dangerous_download: 'Download or execute a file',
   sensitive_input: 'Enter sensitive information',
   consequential_form: 'Consequential form submission',
-  arbitrary_code: 'Execute arbitrary code'
+  arbitrary_code: 'Execute arbitrary code',
+  login: 'Sign in with a saved account'
 };
 
 export function buildApprovalSummary(input: PolicyInput, decision: PolicyDecision): ApprovalSummary {

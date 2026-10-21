@@ -1,3 +1,4 @@
+import { matchSavedCredentials } from '../utils/passwordMatch';
 import React, { useRef, useEffect, useState, useCallback, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, Zap, Key } from 'lucide-react';
@@ -806,26 +807,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           if (!raw) return;
           try {
             const all = JSON.parse(raw);
-            const matching = all.filter((p: any) => {
-              if (!p.username || !p.password) return false;
-              // 1. Exact origin match
-              if (p.origin) {
-                return p.origin === actualOrigin;
-              }
-              // 2. Legacy record without origin:
-              // Strictly refuse releasing HTTPS-saved credentials to plain HTTP
-              if (actualOrigin.startsWith('http://')) return false;
-              // Only offer on standard HTTPS (port 443) on that hostname
-              if (actualOrigin.startsWith('https://') && p.hostname === actualHostname) {
-                try {
-                  const parsedOrigin = new URL(actualOrigin);
-                  if (!parsedOrigin.port || parsedOrigin.port === '443') {
-                    return true;
-                  }
-                } catch (_) {}
-              }
-              return false;
-            });
+            const matching = matchSavedCredentials<{ username: string; password: string; origin?: string; hostname?: string }>(all, actualOrigin, actualHostname);
 
             if (matching.length > 0) {
               setAutofillMenu({

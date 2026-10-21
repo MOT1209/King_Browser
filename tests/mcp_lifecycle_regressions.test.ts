@@ -1,3 +1,5 @@
+import * as sensitiveFieldModule from '../src/utils/sensitiveField';
+import * as agentLoginModule from '../src/utils/agentLogin';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -59,7 +61,9 @@ async function run() {
     } },
     '../utils/safeNavigation': { isSafeAgentNavigationUrl: (url: string) => url === 'king://newtab' || url.startsWith('https://') },
     '../utils/mcpActionTiming': mcpActionTiming,
-    '../utils/searchHistoryBookmarks': { searchHistoryAndBookmarks: () => [] }
+    '../utils/searchHistoryBookmarks': { searchHistoryAndBookmarks: () => [] },
+    '../utils/sensitiveField': sensitiveFieldModule,
+    '../utils/agentLogin': agentLoginModule
   });
   hook.useBrowserAgentBridge({ activeTabId: 'tab', tabs: [], history: [], bookmarks: [], settingsRef,
     activeWorkspaceIdRef: { current: 'default' }, setActiveWorkspaceId: () => {}, setActiveTabId: () => {}, setTabs: () => {},
