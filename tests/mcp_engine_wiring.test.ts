@@ -161,6 +161,31 @@ async function run() {
     assert.equal(out, 'ok:browser_type');
   }
 
+  // 6b) browser_login: never without approval enforcement; origin pinned by the
+  // main process; a rejected approval never reaches the renderer.
+  {
+    const server = makeServer();
+    const before = forwarded.length;
+    await assert.rejects(server.executeTool('browser_login', {}), /policy to be enforced/, 'no sign-in without enforcement');
+    assert.equal(forwarded.length, before, 'unenforced sign-in never reaches the renderer');
+
+    server.setPolicyEnforcement(true);
+    dialogResponse = 1;
+    await assert.rejects(server.executeTool('browser_login', {}), /./, 'rejected sign-in fails');
+    assert.equal(forwarded.length, before, 'rejected sign-in never reaches the renderer');
+
+    dialogResponse = 0;
+    await server.executeTool('browser_login', { expectedOrigin: 'https://evil.example' });
+    const sent = forwarded[forwarded.length - 1];
+    assert.equal(sent.tool, 'browser_login');
+    assert.equal(sent.args.expectedOrigin, 'https://example.com', 'origin comes from the inspected page, not from the agent');
+
+    pageContext = null;
+    await assert.rejects(server.executeTool('browser_login', {}), /could not be inspected/, 'fails closed without page context');
+    pageContext = { url: 'https://example.com/', elementText: '' };
+    console.log('[PASS] Wiring — browser_login is gated, origin-pinned and fail-closed');
+  }
+
   // 7) STOP NOW: queue/execution blocked until an explicit resume
   {
     const server = makeServer();

@@ -193,6 +193,16 @@ const TOOLS: McpTool[] = [
     }
   },
   {
+    name: 'browser_login',
+    description: 'Signs in to the current site with an account the user saved in King Browser. Requires the user\'s approval every time. The password is filled by the browser and is never returned to you; the result only says whether the form was submitted. Use when browser_read_page reports loginRequired.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        username: { type: 'string', description: 'Optional: which saved account to use when several exist for this site (as listed by a previous error).' }
+      }
+    }
+  },
+  {
     name: 'browser_press_key',
     description: 'Simulates pressing a keyboard key on the active page (e.g., Enter, Tab, Escape, ArrowDown).',
     inputSchema: {
@@ -387,7 +397,7 @@ const TOOL_ALIASES: Record<string, string> = {
 };
 
 // Tools whose approval decision depends on the current page and target element.
-const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_select_option', 'browser_press_key']);
+const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_select_option', 'browser_press_key', 'browser_login']);
 
 // Tool permission levels
 export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
@@ -425,6 +435,7 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
 
   browser_press_key: 'sensitive',
   browser_select_option: 'sensitive',
+  browser_login: 'sensitive',
   // §9 engine-control tools stay 'safe' so STOP NOW / Pause can never be locked
   // out by a settings toggle.
   browser_status: 'safe',
@@ -1024,6 +1035,10 @@ export class BrowserMCPServer {
     // §11/§12: when enforcement is enabled the action is classified and queued
     // through the execution engine (sensitive decisions get an approval dialog
     // first); otherwise the pre-existing direct-forward path is kept.
+    // Signing in is never allowed to bypass the approval engine.
+    if (canonicalTool === 'browser_login' && !this.policyEnforced) {
+      throw new Error('browser_login requires the approval policy to be enforced.');
+    }
     if (!this.policyEnforced) {
       const result = await requestRendererMcpAction(this.mainWindow, canonicalTool, args);
       return typeof result === 'string' ? result : JSON.stringify(result);
@@ -1039,6 +1054,17 @@ export class BrowserMCPServer {
       pageContext = context
         ? { currentUrl: context.url, elementText: context.elementText }
         : { contextUnavailable: true };
+    }
+    // Pin the sign-in to the page the human is shown in the approval. The
+    // renderer refuses if the live origin differs (navigation after approval).
+    // Set here, never taken from the agent's own arguments.
+    if (canonicalTool === 'browser_login') {
+      let expectedOrigin = '';
+      try { expectedOrigin = new URL(pageContext.currentUrl ?? '').origin; } catch (_) {}
+      if (!expectedOrigin || expectedOrigin === 'null') {
+        throw new Error('Cannot sign in: the current page could not be inspected.');
+      }
+      args = { ...args, expectedOrigin };
     }
     const decision = classifyAction({ toolName: canonicalTool, args, ...pageContext });
     const approvalSummary = decision.risk === 'sensitive'

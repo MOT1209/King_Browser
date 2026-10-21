@@ -1,3 +1,5 @@
+import * as sensitiveFieldModule from '../src/utils/sensitiveField';
+import * as agentLoginModule from '../src/utils/agentLogin';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -45,7 +47,9 @@ async function run() {
     '../services/agentOrchestrator': { orchestrator },
     '../utils/safeNavigation': { isSafeAgentNavigationUrl },
     '../utils/mcpActionTiming': mcpActionTiming,
-    '../utils/searchHistoryBookmarks': { searchHistoryAndBookmarks: () => [] }
+    '../utils/searchHistoryBookmarks': { searchHistoryAndBookmarks: () => [] },
+    '../utils/sensitiveField': sensitiveFieldModule,
+    '../utils/agentLogin': agentLoginModule
   };
   const module: any = { exports: {} };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/hooks/useBrowserAgentBridge.ts', 'utf8'), {

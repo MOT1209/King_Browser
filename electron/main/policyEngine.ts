@@ -9,7 +9,8 @@
  * §12 approval triggers implemented:
  *   send, purchase, delete, security_settings, publish, share_private,
  *   grant_permission, dangerous_download, plus sensitive_input and
- *   consequential_form for concrete form submissions.
+ *   consequential_form for concrete form submissions, and `login` for the
+ *   agent signing in with a saved account.
  *
  * Also provides:
  *   - domain extraction for the approval screen ("website domain")
@@ -38,7 +39,8 @@ export type ApprovalTrigger =
   | 'dangerous_download'
   | 'sensitive_input'
   | 'consequential_form'
-  | 'arbitrary_code';
+  | 'arbitrary_code'
+  | 'login';
 
 export interface PolicyInput {
   toolName: string;
@@ -106,7 +108,9 @@ const ENGINE_CONTROL_TOOLS = new Set([
   'browser_stop'
 ]);
 
-const SENSITIVE_SELECTOR_PATTERNS = /pass(word|wd|phrase)?|passwd|\bpwd\b|\bpin\b|cvv|cvc|card.?number|credit.?card|cc.?number|ssn|social.?security|secret|token|api.?key|recovery|otp|one.?time|verification.?code|mfa|2fa/i;
+// Same pattern as src/utils/sensitiveField.ts (the cursor overlay masks with it).
+// Duplicated on purpose: this module must stay import-free; a test pins them equal.
+export const SENSITIVE_SELECTOR_PATTERNS = /pass(word|wd|phrase)?|passwd|\bpwd\b|\bpin\b|cvv|cvc|card.?number|credit.?card|cc.?number|ssn|social.?security|secret|token|api.?key|recovery|otp|one.?time|verification.?code|mfa|2fa/i;
 
 const REDACTED_VALUE = '••••••••';
 
@@ -118,6 +122,24 @@ const PUBLISH_TEXT = /(publish|post\b|tweet|share publicly|make public|new post|
 const SHARE_PRIVATE_TEXT = /(share\b|share with|invite|send file|attach|forward|مشاركة|شارك|دعوة)/i;
 const PERMISSION_TEXT = /(allow|grant|authorize|authorise|permit|accept permissions|give access|السماح|اسمح|منح|تصريح|تفويض)/i;
 const DOWNLOAD_TEXT = /(download|install|save file|run installer|تحميل|نزّل|تثبيت)/i;
+
+// German and Turkish keywords. Kept apart from the Arabic/English patterns
+// above because `\b` is ASCII-only: these use a Unicode-aware start boundary
+// (stems may take suffixes) and `[iİıI]` because the `i` flag does not fold the
+// Turkish dotted capital İ.
+const i18n = (stems: string): RegExp => new RegExp(`(?<![\\p{L}])(?:${stems})`, 'iu');
+const PURCHASE_TEXT_I18N = i18n('kaufen|jetzt kaufen|bezahl|zahlung|zur kasse|kasse|bestellung abschlie|zahlungspflichtig|kostenpflichtig|spend|abonnier|satın al|öde|ödeme|sipariş|siparişi tamamla|bağış|abone ol');
+const SEND_TEXT_I18N = i18n('senden|absenden|abschicken|nachricht senden|antworten|gönder|yanıtla|mesaj gönder');
+const DELETE_TEXT_I18N = i18n('lösch|entfern|konto schlie|konto deaktiv|abo kündigen|kündig|s[iİıI]l(?![\\p{L}])|kald[iİıI]r|hesab[iİıI] kapat|hesab[iİıI] sil|abonel[iİıI]ği [iİıI]ptal|[iİıI]ptal et');
+const SECURITY_TEXT_I18N = i18n('passwort (ändern|zurücksetzen)|kennwort ändern|zwei.?faktor|sicherheitseinstellung|wiederherstellung|zugriff widerrufen|abmelden von allen|şifre(yi)? değiştir|parola(y[iİıI])? değiştir|[iİıI]ki ad[iİıI]ml[iİıI]|güvenlik ayarlar|kurtarma');
+const PUBLISH_TEXT_I18N = i18n('veröffentlich|posten|öffentlich teilen|yay[iİıI]nla|gönderi paylaş|herkese açık');
+const SHARE_PRIVATE_TEXT_I18N = i18n('teilen|einladen|weiterleiten|anhängen|paylaş|davet et|ilet(?![\\p{L}])|ekle(?![\\p{L}])');
+const PERMISSION_TEXT_I18N = i18n('erlauben|zulassen|zugriff gewähren|berechtigung|autorisieren|izin ver|eri[sş]im ver|yetkilendir|[iİıI]zin');
+const DOWNLOAD_TEXT_I18N = i18n('herunterladen|download|installieren|[iİıI]ndir|yükle(?![\\p{L}])|kur(?![\\p{L}])');
+
+function matchesAny(text: string, ...patterns: RegExp[]): boolean {
+  return patterns.some(pattern => pattern.test(text));
+}
 
 const PURCHASE_URL = /(checkout|\/pay(ment|ments)?\b|billing|\/purchase|\/cart|\/order|donat)/i;
 const SECURITY_URL = /(settings\/(security|privacy|password)|account\/security|\/recovery|two.?factor|2fa|\/permissions)/i;
@@ -222,14 +244,14 @@ function classifyActingTool(input: PolicyInput, context: ClassificationContext):
   }
 
   if (toolName === 'browser_click') {
-    if (PURCHASE_TEXT.test(text)) addTrigger(context, 'purchase', `Button/link text suggests a purchase ("${text.slice(0, 60)}").`);
-    if (DELETE_TEXT.test(text)) addTrigger(context, 'delete', `Button/link text suggests deletion ("${text.slice(0, 60)}").`);
-    if (SECURITY_TEXT.test(text)) addTrigger(context, 'security_settings', `Button/link text suggests a security change ("${text.slice(0, 60)}").`);
-    if (PUBLISH_TEXT.test(text)) addTrigger(context, 'publish', `Button/link text suggests publishing ("${text.slice(0, 60)}").`);
-    else if (SEND_TEXT.test(text)) addTrigger(context, 'send', `Button/link text suggests sending ("${text.slice(0, 60)}").`);
-    if (SHARE_PRIVATE_TEXT.test(text)) addTrigger(context, 'share_private', `Button/link text suggests sharing ("${text.slice(0, 60)}").`);
-    if (PERMISSION_TEXT.test(text)) addTrigger(context, 'grant_permission', `Button/link text suggests granting access ("${text.slice(0, 60)}").`);
-    if (DOWNLOAD_TEXT.test(text)) addTrigger(context, 'dangerous_download', `Button/link text suggests a download ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, PURCHASE_TEXT, PURCHASE_TEXT_I18N)) addTrigger(context, 'purchase', `Button/link text suggests a purchase ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, DELETE_TEXT, DELETE_TEXT_I18N)) addTrigger(context, 'delete', `Button/link text suggests deletion ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, SECURITY_TEXT, SECURITY_TEXT_I18N)) addTrigger(context, 'security_settings', `Button/link text suggests a security change ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, PUBLISH_TEXT, PUBLISH_TEXT_I18N)) addTrigger(context, 'publish', `Button/link text suggests publishing ("${text.slice(0, 60)}").`);
+    else if (matchesAny(text, SEND_TEXT, SEND_TEXT_I18N)) addTrigger(context, 'send', `Button/link text suggests sending ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, SHARE_PRIVATE_TEXT, SHARE_PRIVATE_TEXT_I18N)) addTrigger(context, 'share_private', `Button/link text suggests sharing ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, PERMISSION_TEXT, PERMISSION_TEXT_I18N)) addTrigger(context, 'grant_permission', `Button/link text suggests granting access ("${text.slice(0, 60)}").`);
+    if (matchesAny(text, DOWNLOAD_TEXT, DOWNLOAD_TEXT_I18N)) addTrigger(context, 'dangerous_download', `Button/link text suggests a download ("${text.slice(0, 60)}").`);
 
     const href = typeof args.url === 'string' ? args.url : '';
     if (href && DANGEROUS_FILE_URL.test(href)) {
@@ -239,7 +261,7 @@ function classifyActingTool(input: PolicyInput, context: ClassificationContext):
   }
 
   if (toolName === 'browser_select_option') {
-    if (PURCHASE_TEXT.test(text) || PURCHASE_TEXT.test(selector)) {
+    if (matchesAny(text, PURCHASE_TEXT, PURCHASE_TEXT_I18N) || matchesAny(selector, PURCHASE_TEXT, PURCHASE_TEXT_I18N)) {
       addTrigger(context, 'purchase', 'Selecting an option inside what looks like a purchase flow.');
     }
     return;
@@ -281,6 +303,8 @@ export function classifyAction(input: PolicyInput): PolicyDecision {
     }
   } else if (toolName === 'browser_run_js') {
     addTrigger(context, 'arbitrary_code', 'Executing arbitrary JavaScript in the page context.');
+  } else if (toolName === 'browser_login') {
+    addTrigger(context, 'login', 'Signing in to this site with a saved account.');
   } else if (toolName === 'browser_go_back' || toolName === 'browser_go_forward' || toolName === 'browser_reload') {
     return { risk: 'safe', triggers: [], reasons: ['History control is not an approval trigger.'], domain, redactedArgs };
   } else {
@@ -315,7 +339,8 @@ const TRIGGER_CONSEQUENCES: Record<ApprovalTrigger, string> = {
   dangerous_download: 'This downloads or executes a potentially dangerous file.',
   sensitive_input: 'This enters sensitive information such as a password, card number, or secret.',
   consequential_form: 'This submits a form or performs an action with lasting consequences.',
-  arbitrary_code: 'This executes arbitrary code inside the page with full page privileges.'
+  arbitrary_code: 'This executes arbitrary code inside the page with full page privileges.',
+  login: 'This signs in to the site with a saved account. The password is filled by the browser and is never shown to the agent.'
 };
 
 const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
@@ -329,7 +354,8 @@ const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
   dangerous_download: 'Download or execute a file',
   sensitive_input: 'Enter sensitive information',
   consequential_form: 'Consequential form submission',
-  arbitrary_code: 'Execute arbitrary code'
+  arbitrary_code: 'Execute arbitrary code',
+  login: 'Sign in with a saved account'
 };
 
 export function buildApprovalSummary(input: PolicyInput, decision: PolicyDecision): ApprovalSummary {

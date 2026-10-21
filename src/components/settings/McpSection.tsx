@@ -41,6 +41,7 @@ const MCP_TOOLS = [
   { name: 'browser_type', desc: 'Type text into an input', level: 'sensitive' },
   { name: 'browser_press_key', desc: 'Simulate a keyboard key press', level: 'sensitive' },
   { name: 'browser_select_option', desc: 'Select a dropdown option', level: 'sensitive' },
+  { name: 'browser_login', desc: 'Sign in with a saved account (always asks you first)', level: 'sensitive' },
 
   // §9 agent interface (levels mirror electron/mcpServer.ts TOOL_PERMISSIONS).
   // Engine controls stay 'safe' so STOP NOW / Pause can never be locked out.

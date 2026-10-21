@@ -114,6 +114,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // live event stream forwarded by the main process ('mcp-engine-event').
   getEngineStatus: () => ipcRenderer.invoke('mcp-engine-status'),
   getEngineHistory: () => ipcRenderer.invoke('mcp-engine-history'),
+  exportEngineLog: (format?: 'json' | 'csv') => ipcRenderer.invoke('mcp-engine-export-log', format),
   sendEngineCommand: (command: string, payload?: unknown) => ipcRenderer.invoke('mcp-engine-command', command, payload),
   respondEngineApproval: (actionId: string, approved: boolean) => ipcRenderer.invoke('mcp-engine-approval', actionId, approved),
   onEngineEvent: (callback: (event: any) => void) => {

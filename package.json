@@ -136,6 +136,7 @@
     "dev:web": "vite",
     "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts electron/guest-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@ghostery/adblocker-electron --external:@ghostery/adblocker --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs",
     "build": "tsc && vite build && npm run build:electron",
+    "test:integration": "node tests/integration/agent_e2e.mjs",
     "pretest": "node scripts/ensure-build-artifacts.cjs",
     "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs --external:electron --define:import.meta.env=\"{}\" && node dist-test/runAll.cjs",
     "test": "npm run test:e2e",

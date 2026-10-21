@@ -9,6 +9,7 @@
  */
 
 import type { ExecutionEngine } from './executionEngine.js';
+import { exportActivityLog } from './activityLog.js';
 
 export interface EngineIpcHost {
   handle: (channel: string, listener: (event: unknown, ...args: unknown[]) => unknown) => void;
@@ -24,6 +25,7 @@ export interface EngineIpcHost {
 export const ENGINE_IPC_CHANNELS = [
   'mcp-engine-status',
   'mcp-engine-history',
+  'mcp-engine-export-log',
   'mcp-engine-command',
   'mcp-engine-approval'
 ] as const;
@@ -79,6 +81,11 @@ export function registerEngineIpc(host: EngineIpcHost): void {
   host.handle('mcp-engine-history', (event) => {
     assertTrusted(event);
     return requireEngine().getHistory();
+  });
+
+  host.handle('mcp-engine-export-log', (event, format) => {
+    assertTrusted(event);
+    return exportActivityLog(requireEngine().getHistory(), format === 'csv' ? 'csv' : 'json');
   });
 
   host.handle('mcp-engine-command', (event, command, payload) => {

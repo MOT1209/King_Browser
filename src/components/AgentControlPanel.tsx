@@ -238,10 +238,12 @@ export function AgentControlPanel() {
               <div className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
                   <AlertTriangle size={13} />
-                  {t('agentPanel.approvalTitle')}
+                  {pending.toolName === 'browser_login' ? t('agentPanel.loginTitle') : t('agentPanel.approvalTitle')}
                 </div>
                 <div className="text-xs text-gray-700 dark:text-gray-300">
-                  {t('agentPanel.approvalTool', { tool: pending.toolName })}
+                  {pending.toolName === 'browser_login'
+                    ? t('agentPanel.loginMessage')
+                    : t('agentPanel.approvalTool', { tool: pending.toolName })}
                   {pending.domain && (
                     <span className="block text-gray-500 dark:text-gray-400">
                       {t('agentPanel.approvalDomain', { domain: pending.domain })}
@@ -255,14 +257,14 @@ export function AgentControlPanel() {
                     onClick={() => void respondApproval(pending.actionId, true)}
                     className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-1.5"
                   >
-                    {t('agentPanel.approve')}
+                    {pending.toolName === 'browser_login' ? t('agentPanel.loginYes') : t('agentPanel.approve')}
                   </button>
                   <button
                     type="button"
                     onClick={() => void respondApproval(pending.actionId, false)}
                     className="flex-1 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 text-xs font-semibold py-1.5"
                   >
-                    {t('agentPanel.reject')}
+                    {pending.toolName === 'browser_login' ? t('agentPanel.loginNo') : t('agentPanel.reject')}
                   </button>
                 </div>
               </div>

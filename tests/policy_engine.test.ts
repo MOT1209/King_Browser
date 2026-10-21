@@ -302,6 +302,41 @@ async function run() {
     console.log('[PASS] Policy — field description reveals sensitive input');
   }
 
+  // German and Turkish button text is detected.
+  {
+    const cases: Array<[string, string]> = [
+      ['Jetzt kaufen', 'purchase'],
+      ['Zahlungspflichtig bestellen', 'purchase'],
+      ['Konto löschen', 'delete'],
+      ['Nachricht senden', 'send'],
+      ['Passwort ändern', 'security_settings'],
+      ['Beitrag veröffentlichen', 'publish'],
+      ['Satın al', 'purchase'],
+      ['HESABI SİL', 'delete'],
+      ['Mesaj gönder', 'send'],
+      ['Şifreyi değiştir', 'security_settings'],
+      ['İzin ver', 'grant_permission'],
+      ['Yayınla', 'publish']
+    ];
+    for (const [label, trigger] of cases) {
+      const d = classifyAction({
+        toolName: 'browser_click',
+        args: { selector: 'button.primary' },
+        currentUrl: 'https://example.com/page',
+        elementText: label
+      });
+      assert.ok(d.triggers.includes(trigger as never), `"${label}" should trigger ${trigger}, got ${d.triggers.join(',')}`);
+    }
+    const harmless = classifyAction({
+      toolName: 'browser_click',
+      args: { selector: 'a.nav' },
+      currentUrl: 'https://example.com/page',
+      elementText: 'Startseite Silvester Ana sayfa'
+    });
+    assert.equal(harmless.risk, 'safe', 'neutral German/Turkish text stays safe');
+    console.log('[PASS] Policy — German and Turkish text detected');
+  }
+
   console.log('[PASS] Policy Engine suite complete');
 }
 
