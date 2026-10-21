@@ -96,6 +96,11 @@ async function main() {
     }
   });
 
+  // Sensitive tools wait for the user's approval in King Browser (up to
+  // MCP_APPROVAL_WINDOW_MS + MCP_ACTION_TIMEOUT_MS in src/utils/mcpActionTiming.ts).
+  // The SDK's default 60s request timeout would cut that short.
+  const TOOL_CALL_TIMEOUT_MS = 180_000;
+
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
       const response = await client.callTool(request.params, undefined, { timeout: TOOL_CALL_TIMEOUT_MS });

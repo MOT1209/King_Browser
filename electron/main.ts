@@ -847,9 +847,13 @@ function createWindow() {
     // wait up to ~60s (200 x 300ms). Plain `electron .` keeps the fast fallback.
     const startedByNpmDev = process.env.npm_lifecycle_event === 'dev';
     const maxAttempts = startedByNpmDev ? 200 : (fs.existsSync(distHtmlPath) ? 2 : 20);
+    // Bumped when a retry loop is restarted, so a stale loop stops.
+    let loadGeneration = 0;
     const loadDev = () => {
       attempts++;
+      const generation = loadGeneration;
       mainWindow?.loadURL(devUrl).catch(() => {
+        if (generation !== loadGeneration) return;
         if (attempts >= maxAttempts) {
           // Fix: terminate the retry loop after maxAttempts REGARDLESS of dist existence,
           // otherwise a missing dist/index.html causes infinite retries.
@@ -865,6 +869,24 @@ function createWindow() {
       });
     };
     loadDev();
+
+    // Under memory pressure Chromium's network service can be killed while the
+    // dev UI is still loading ("Network service crashed ... restarting"). The
+    // pending load then never recovers and the window stays blank, so restart
+    // the retry loop once the service comes back.
+    const onChildProcessGone = (_event: Electron.Event, details: Electron.Details) => {
+      const service = `${details.serviceName ?? ''} ${details.name ?? ''}`;
+      if (details.type !== 'Utility' || !/network/i.test(service)) return;
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      const wc = mainWindow.webContents;
+      if (wc.getURL().startsWith(devUrl) && !wc.isLoading()) return;
+      console.warn('[Main] Network service restarted while loading the dev UI; retrying.');
+      loadGeneration++;
+      attempts = 0;
+      setTimeout(loadDev, 1000);
+    };
+    app.on('child-process-gone', onChildProcessGone);
+    mainWindow.once('closed', () => app.removeListener('child-process-gone', onChildProcessGone));
   }
 
 
