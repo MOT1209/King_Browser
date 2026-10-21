@@ -70,6 +70,10 @@ async function run() {
     assert.equal(snapshot.pendingApproval, null, 'no pending approval initially');
     const history = (await call('mcp-engine-history')) as unknown[];
     assert.deepEqual(history, [], 'history starts empty');
+    const exported = JSON.parse((await call('mcp-engine-export-log')) as string) as { count: number };
+    assert.equal(exported.count, 0, 'empty history exports an empty log');
+    const csv = (await call('mcp-engine-export-log', 'csv')) as string;
+    assert.ok(csv.startsWith('requestedAt,tool,'), 'csv export starts with the header');
     console.log('[PASS] Engine IPC — status & history');
   }
 

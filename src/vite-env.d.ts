@@ -268,6 +268,7 @@ export interface ElectronAPI {
   // §10 execution control panel (engine bridge)
   getEngineStatus: () => Promise<ElectronEngineStatus>;
   getEngineHistory: () => Promise<ElectronEngineActionRecord[]>;
+  exportEngineLog: (format?: 'json' | 'csv') => Promise<string>;
   sendEngineCommand: (command: string, payload?: unknown) => Promise<ElectronEngineCommandResult>;
   respondEngineApproval: (
     actionId: string,
