@@ -144,6 +144,7 @@ import { BrowserMCPServer } from './mcpServer.js';
 import { registerEngineIpc } from './main/engineIpc.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
+import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
@@ -1931,6 +1932,11 @@ app.whenReady().then(async () => {
       const keys = permissionKeys(permission, [(details as any)?.mediaType]);
       if (!keys) return false;
 
+      // Embedded sign-in frames call document.hasStorageAccess(). Third-party
+      // cookies already work in this browser, so answering "no" here only broke
+      // those widgets; Chromium still enforces its own rules for the request.
+      if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(requestingOrigin)) return true;
+
       // Fail-closed permission checking:
       // Internal pages: Permit microphone (audio) checks only if remembered/granted.
       // All other app-origin permission checks remain strictly denied.
@@ -3469,8 +3475,10 @@ app.on('web-contents-created', (_event, contents) => {
     popupHistory.delete(contents.id);
   });
 
-  // Security: Block arbitrary window popups, rate-limit rapid bursts, and route valid HTTP/HTTPS URLs to our secure tab system
-  contents.setWindowOpenHandler(({ url }) => {
+  // Security: rate-limit rapid bursts; sign-in popups (window.open with
+  // features) get a hardened child window that keeps window.opener and the
+  // opener's session; other http(s) links open as tabs (windowOpenPolicy).
+  contents.setWindowOpenHandler(({ url, disposition }) => {
     try {
       const now = Date.now();
       const id = contents.id;
@@ -3483,6 +3491,22 @@ app.on('web-contents-created', (_event, contents) => {
       history.push(now);
       popupHistory.set(id, history);
 
+      if (shouldOpenAsPopupWindow(url, disposition)) {
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 520,
+            height: 720,
+            autoHideMenuBar: true,
+            webPreferences: {
+              nodeIntegration: false,
+              contextIsolation: true,
+              sandbox: true,
+              webSecurity: true
+            }
+          }
+        };
+      }
       const parsed = new URL(url);
       const isHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
       const isExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) && !parsed.username && !parsed.password;
