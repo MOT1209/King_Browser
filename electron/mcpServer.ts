@@ -7,7 +7,7 @@ import path from 'path';
 // Security: browser_* tools are forwarded to the renderer over a
 // sender-gated IPC round-trip instead of executing JS in the main window.
 // Imported from main/mcpBridge (not main.ts) to avoid a circular import.
-import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseListener } from './main/mcpBridge.js';
+import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseListener, requestPolicyContext } from './main/mcpBridge.js';
 // §11 execution engine + §12 policy engine: agent-facing actions are classified
 // and queued through these dependency-free modules instead of going straight to
 // the renderer bridge. Only types and the engine/classifier values are imported.
@@ -385,6 +385,9 @@ const TOOL_ALIASES: Record<string, string> = {
   browser_get_page_summary: 'browser_read_page',
   browser_select: 'browser_select_option',
 };
+
+// Tools whose approval decision depends on the current page and target element.
+const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_select_option', 'browser_press_key']);
 
 // Tool permission levels
 export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
@@ -1026,7 +1029,18 @@ export class BrowserMCPServer {
       return typeof result === 'string' ? result : JSON.stringify(result);
     }
 
-    const decision = classifyAction({ toolName: canonicalTool, args });
+    // §12: page actions are classified against the page they land on. The
+    // selector alone is chosen by the agent, so "#btn-3" could be a
+    // "Delete account" button; the renderer describes the real element.
+    let pageContext: { currentUrl?: string; elementText?: string; contextUnavailable?: boolean } = {};
+    if (PAGE_CONTEXT_TOOLS.has(canonicalTool)) {
+      const selector = canonicalTool !== 'browser_press_key' && typeof args.selector === 'string' ? args.selector : undefined;
+      const context = await requestPolicyContext(this.mainWindow, selector);
+      pageContext = context
+        ? { currentUrl: context.url, elementText: context.elementText }
+        : { contextUnavailable: true };
+    }
+    const decision = classifyAction({ toolName: canonicalTool, args, ...pageContext });
     const approvalSummary = decision.risk === 'sensitive'
       ? buildApprovalSummary({ toolName: canonicalTool, args }, decision)
       : null;

@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron';
 import { randomBytes } from 'crypto';
 import {
   MCP_ACTION_TIMEOUT_MS,
+  MCP_POLICY_CONTEXT_ACTION,
   isMcpActionPhase,
   windowForMcpActionPhase,
   type McpActionPhase
@@ -162,4 +163,32 @@ export function requestRendererMcpAction(win: BrowserWindow | null, toolName: st
       reject(err instanceof Error ? err : new Error(String(err)));
     }
   });
+}
+
+export interface PolicyPageContext {
+  url: string;
+  /** Present when a selector was given and the element could be described. */
+  elementText?: string;
+}
+
+const MAX_POLICY_ELEMENT_TEXT = 300;
+
+/**
+ * Asks the renderer for the active tab URL and, when `selector` is given, a
+ * short description of that element. Resolves to null when the context cannot
+ * be read (no window, no tab, guarded page, invalid selector or reply), so the
+ * caller can fail closed.
+ */
+export async function requestPolicyContext(win: BrowserWindow | null, selector?: string): Promise<PolicyPageContext | null> {
+  try {
+    const reply = await requestRendererMcpAction(win, MCP_POLICY_CONTEXT_ACTION, selector ? { selector } : {});
+    if (!reply || typeof reply !== 'object') return null;
+    const { url, elementText } = reply as { url?: unknown; elementText?: unknown };
+    if (typeof url !== 'string' || !url) return null;
+    if (!selector) return { url };
+    if (typeof elementText !== 'string') return null;
+    return { url, elementText: elementText.slice(0, MAX_POLICY_ELEMENT_TEXT) };
+  } catch (_) {
+    return null;
+  }
 }

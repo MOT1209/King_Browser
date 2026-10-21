@@ -46,6 +46,11 @@ export interface PolicyInput {
   currentUrl?: string;
   pageTitle?: string;
   elementText?: string;
+  /**
+   * Set when the page URL or target element could not be read. Acting tools
+   * are then classified `sensitive`: the heuristics below need that context.
+   */
+  contextUnavailable?: boolean;
 }
 
 export interface PolicyDecision {
@@ -205,7 +210,9 @@ function classifyActingTool(input: PolicyInput, context: ClassificationContext):
   const text = `${typeof args.text === 'string' ? args.text : ''} ${input.elementText ?? ''} ${selector}`.trim();
 
   if (toolName === 'browser_type') {
-    if (SENSITIVE_SELECTOR_PATTERNS.test(selector)) {
+    // elementText describes the field itself (type, name, autocomplete, label),
+    // which catches password inputs addressed by a neutral selector.
+    if (SENSITIVE_SELECTOR_PATTERNS.test(selector) || SENSITIVE_SELECTOR_PATTERNS.test(input.elementText ?? '')) {
       addTrigger(context, 'sensitive_input', `Typing into a field that looks sensitive (${selector.slice(0, 80)}).`);
     }
     if (PERMISSION_TEXT.test(text) || PERMISSION_TEXT.test(selector)) {
@@ -281,6 +288,9 @@ export function classifyAction(input: PolicyInput): PolicyDecision {
       toolName === 'browser_click' || toolName === 'browser_type' ||
       toolName === 'browser_select_option' || toolName === 'browser_press_key'
     ) {
+      if (input.contextUnavailable) {
+        addTrigger(context, 'consequential_form', 'The page or target element could not be inspected, so the action cannot be checked automatically.');
+      }
       classifyActingTool(input, context);
       classifyUrlContext(input.currentUrl, toolName, context);
     } else {

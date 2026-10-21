@@ -23,3 +23,11 @@ export function isMcpActionPhase(value: unknown): value is McpActionPhase {
 export function windowForMcpActionPhase(phase: McpActionPhase): number {
   return phase === 'awaiting-approval' ? MCP_APPROVAL_WINDOW_MS : MCP_ACTION_TIMEOUT_MS;
 }
+
+/**
+ * Internal renderer action (not an MCP tool) that returns the active tab URL
+ * and a short description of the element an action targets, for the
+ * main-process approval policy. The MCP server only accepts registered tool
+ * names from clients, so agents cannot call it.
+ */
+export const MCP_POLICY_CONTEXT_ACTION = '__king_policy_context';

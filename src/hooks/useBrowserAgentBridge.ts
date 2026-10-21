@@ -6,7 +6,7 @@ import { orchestrator } from '../services/agentOrchestrator';
 // navigation one: agent-supplied URLs are untrusted, and the general predicate
 // deliberately permits loopback/private hosts for real user navigation.
 import { isSafeAgentNavigationUrl } from '../utils/safeNavigation';
-import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS } from '../utils/mcpActionTiming';
+import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS, MCP_POLICY_CONTEXT_ACTION } from '../utils/mcpActionTiming';
 
 /**
  * Full agent-boundary check: the synchronous renderer policy plus a
@@ -355,6 +355,33 @@ export function useBrowserAgentBridge({
         case 'browser_get_url': {
           const activeTab = tabs.find(t => t.id === activeTabId);
           return activeTab?.url || "Error: Could not get URL";
+        }
+
+        case MCP_POLICY_CONTEXT_ACTION: {
+          // Page context for the main-process approval policy. Throwing makes
+          // the main process treat the action as sensitive (fail closed).
+          const url = tabs.find(t => t.id === activeTabId)?.url;
+          if (!url) throw new Error('No active tab');
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return { url };
+          if (!activeWebview || !activeWebview.executeJavaScript) throw new Error('No active webview');
+          // Text plus the attributes that name a control. The value attribute
+          // is read only for buttons, never for fields that can hold user input.
+          const elementText = await activeWebview.executeJavaScript(`
+            (() => {
+              const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+              if (!el) return '';
+              const type = (el.getAttribute('type') || '').toLowerCase();
+              const isButton = el.tagName === 'BUTTON' || ['submit', 'button', 'reset'].includes(type);
+              const labels = el.labels ? Array.from(el.labels).map(label => label.innerText) : [];
+              const parts = [el.innerText || el.textContent || '', ...labels,
+                el.getAttribute('aria-label'), el.getAttribute('title'), el.getAttribute('alt'),
+                el.getAttribute('placeholder'), el.getAttribute('name'), el.getAttribute('autocomplete'),
+                type, isButton ? el.getAttribute('value') : ''];
+              return parts.filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().slice(0, 300);
+            })()
+          `);
+          if (typeof elementText !== 'string') throw new Error('Element could not be described');
+          return { url, elementText };
         }
 
         case 'browser_hover':
@@ -771,13 +798,15 @@ export function useBrowserAgentBridge({
           if (pending.timer) clearTimeout(pending.timer);
           pendingActions.delete(id);
         };
-        // Security (G-2): Harmless metadata tools execute directly.
-        // Sensitive content inspection tools require user approval.
+        // Security (G-2): Harmless metadata tools execute directly. Everything
+        // else is recorded in the orchestrator queue and still goes through the
+        // cancellation, deadline, settings and target re-checks below.
         const safeMetadataTools = new Set([
           'king_browser_info',
           'browser_list_tabs',
           'browser_get_url',
-          'browser_wait'
+          'browser_wait',
+          MCP_POLICY_CONTEXT_ACTION
         ]);
 
         const runAction = () => {
@@ -804,7 +833,12 @@ export function useBrowserAgentBridge({
         } else {
           armDeadline(Date.now() + MCP_APPROVAL_WINDOW_MS);
           electronAPI.reportMcpActionPhase?.(id, 'awaiting-approval');
-          const { id: approvalId, done } = orchestrator.enqueueAction(toolName, args);
+          // The main-process execution engine is the single approval authority
+          // for MCP actions: it classifies each call and shows the approval
+          // dialog for sensitive ones before the request is sent here. No UI
+          // renders the renderer queue, so asking it to approve again left
+          // every non-metadata tool pending until the approval window expired.
+          const { id: approvalId, done } = orchestrator.enqueueAction(toolName, args, true);
           pending.approvalId = approvalId;
           done.then(approved => {
             if (approved) {

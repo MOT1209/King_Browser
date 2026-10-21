@@ -279,6 +279,29 @@ async function run() {
     console.log('[PASS] Policy — messaging compose escalates to send');
   }
 
+  // Page context: missing context fails closed for acting tools only.
+  {
+    const click = classifyAction({ toolName: 'browser_click', args: { selector: '#btn-3' }, contextUnavailable: true });
+    assert.equal(click.risk, 'sensitive', 'click without page context needs approval');
+    assert.ok(click.triggers.includes('consequential_form'));
+    const read = classifyAction({ toolName: 'browser_read_page', args: {}, contextUnavailable: true });
+    assert.equal(read.risk, 'safe', 'read-only tools do not depend on page context');
+    console.log('[PASS] Policy — missing page context fails closed for acting tools');
+  }
+
+  // Page context: a password field addressed by a neutral selector.
+  {
+    const d = classifyAction({
+      toolName: 'browser_type',
+      args: { selector: '#f1', text: 'hunter2' },
+      currentUrl: 'https://example.com/login',
+      elementText: 'password current-password'
+    });
+    assert.equal(d.risk, 'sensitive', 'typing into a described password field is sensitive');
+    assert.ok(d.triggers.includes('sensitive_input'));
+    console.log('[PASS] Policy — field description reveals sensitive input');
+  }
+
   console.log('[PASS] Policy Engine suite complete');
 }
 

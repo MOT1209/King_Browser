@@ -25,6 +25,9 @@ async function run() {
   let holdRenderer = false;
   let releaseRenderer: (() => void) | null = null;
   let rejectRenderer: ((err: Error) => void) | null = null;
+  // What the renderer reports for the active page; null = context unreadable.
+  let pageContext: { url: string; elementText: string } | null = { url: 'https://example.com/', elementText: '' };
+  const contextRequests: Array<string | undefined> = [];
 
   const executionEngineModule = loadSource('electron/main/executionEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
@@ -40,6 +43,11 @@ async function run() {
     crypto, os, fs, path,
     './main/mcpBridge.js': {
       setMcpActionPhaseListener: () => {},
+      requestPolicyContext: async (_win: any, selector?: string) => {
+        contextRequests.push(selector);
+        if (!pageContext) return null;
+        return selector ? pageContext : { url: pageContext.url };
+      },
       requestRendererMcpAction: async (_win: any, tool: string, args: any) => {
         forwarded.push({ tool, args });
         if (holdRenderer) {
@@ -228,7 +236,40 @@ async function run() {
     holdRenderer = false;
   }
 
-  console.log('[PASS] MCP engine wiring: status, engine controls, aliases, approvals, STOP NOW, UI-stop abort parity');
+  // 10) page context drives approval: the agent's selector is neutral, the
+  // element and page are not. Missing context fails closed.
+  {
+    const server = makeServer();
+    server.firstUseApproved = true;
+    server.setPolicyEnforcement(true);
+    const clickNeedsApproval = async (label: string) => {
+      dialogResponse = 1;
+      const dialogsBefore = dialogCalls;
+      const forwardedBefore = forwarded.length;
+      await assert.rejects(server.executeTool('browser_click', { selector: '#btn-3' }), /./, `${label}: rejected click must fail`);
+      assert.equal(dialogCalls, dialogsBefore + 1, `${label}: approval dialog shown`);
+      assert.equal(forwarded.length, forwardedBefore, `${label}: rejected click never reaches the renderer`);
+    };
+
+    pageContext = { url: 'https://example.com/settings', elementText: 'Delete account' };
+    await clickNeedsApproval('destructive element text');
+    assert.equal(contextRequests[contextRequests.length - 1], '#btn-3', 'the target selector is described by the renderer');
+
+    pageContext = { url: 'https://shop.example.com/checkout', elementText: 'Continue' };
+    await clickNeedsApproval('checkout page');
+
+    pageContext = null;
+    await clickNeedsApproval('unreadable context');
+
+    pageContext = { url: 'https://example.com/blog', elementText: 'Read more' };
+    const dialogsBefore = dialogCalls;
+    const out = await server.executeTool('browser_click', { selector: '#btn-3' });
+    assert.equal(out, 'ok:browser_click', 'an ordinary click runs without a dialog');
+    assert.equal(dialogCalls, dialogsBefore, 'no approval prompt for an ordinary click');
+    dialogResponse = 0;
+  }
+
+  console.log('[PASS] MCP engine wiring: status, engine controls, aliases, approvals, STOP NOW, UI-stop abort parity, page-context approvals');
 }
 
 run().catch(err => {
