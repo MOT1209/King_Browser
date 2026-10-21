@@ -496,6 +496,18 @@ npm run benchmark
 
 ---
 
+## Signing in to websites
+
+- Email/password, GitHub and other sign-ins run in the tab like in Chrome. Sign-in popups
+  ("Sign in with GitHub" and similar) open as a real small window that reports back to the
+  site and closes itself; ordinary links still open as tabs.
+- **Google accounts:** Google refuses sign-in inside embedded browsers such as King Browser
+  ("This browser or app may not be secure"). King does not try to hide from that check. When
+  the rejection page appears, King offers **Open in Default Browser**; you can also right-click
+  any page and choose **Open Page in Default Browser**.
+
+---
+
 ## Platform Support
 
 | Operating System | Architecture | Target Status | Hardware Acceleration | Package Format |
