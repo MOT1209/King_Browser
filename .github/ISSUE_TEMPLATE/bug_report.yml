@@ -1,17 +1,17 @@
 name: Bug Report
-description: Report an issue or unexpected behavior in Nova Browser
+description: Report an issue or unexpected behavior in King Browser
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting an issue with Nova Browser. Please search existing issues before filing a duplicate. For security vulnerabilities, please refer to our [Security Policy](https://github.com/unitybtw/nova-browser/security/policy).
+        Thank you for reporting an issue with King Browser. Please search existing issues before filing a duplicate. For security vulnerabilities, please refer to our [Security Policy](https://github.com/MOT1209/King_Browser/security/policy).
   - type: dropdown
     id: os
     attributes:
       label: Operating System
-      description: What operating system are you running Nova Browser on?
+      description: What operating system are you running King Browser on?
       options:
         - macOS (Apple Silicon / M-series)
         - macOS (Intel)
@@ -22,9 +22,9 @@ body:
   - type: input
     id: version
     attributes:
-      label: Nova Browser Version
-      description: The version of Nova Browser you are using (e.g. 1.5.0)
-      placeholder: "1.5.0"
+      label: King Browser Version
+      description: The version of King Browser you are using (e.g. 0.0.1)
+      placeholder: "0.0.1"
     validations:
       required: true
   - type: textarea
@@ -40,7 +40,7 @@ body:
       label: Steps to Reproduce
       description: Detailed step-by-step instructions to reproduce the issue.
       placeholder: |
-        1. Launch Nova Browser
+        1. Launch King Browser
         2. Navigate to '...'
         3. Trigger '...'
         4. Observe unexpected behavior
