@@ -99,7 +99,7 @@ export const Clock: React.FC<ClockProps> = React.memo(({
   return (
     <motion.div
       variants={variants}
-      className={`nova-clock flex flex-col items-center justify-center text-center mb-2 select-none relative ${hasWallpaper ? "nova-wallpaper-surface rounded-2xl px-10 py-6" : ""}`}
+      className={`king-clock flex flex-col items-center justify-center text-center mb-2 select-none relative ${hasWallpaper ? "king-wallpaper-surface rounded-2xl px-10 py-6" : ""}`}
     >
       <p className={`mb-3 text-sm ${useDarkCanvasStyle ? 'text-white/75' : 'text-slate-500'}`}>
         {dateStr}
@@ -726,7 +726,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         // A dark fallback keeps glass surfaces readable while a photo loads.
         backgroundColor: hasWallpaper ? '#101820' : 'var(--nova-frame-bg)'
       }}
-      className={`nova-newtab ${isCleanBackground ? "nova-newtab-clean" : ""} w-full h-full relative overflow-x-hidden overflow-y-auto p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
+      className={`king-newtab ${isCleanBackground ? "king-newtab-clean" : ""} w-full h-full relative overflow-x-hidden overflow-y-auto p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
     >
 
       {/* Unsplash Background */}
@@ -746,7 +746,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
           {/* Daily 4K Wallpaper Credit & Shuffle Button */}
           {unsplashPhoto && (
-            <div className="nova-newtab-glass absolute bottom-4 left-6 z-20 flex items-center gap-2.5 bg-black/25 hover:bg-black/45 px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-all duration-300 pointer-events-auto group select-none ring-1 ring-inset ring-white/[0.05]">
+            <div className="king-newtab-glass absolute bottom-4 left-6 z-20 flex items-center gap-2.5 bg-black/25 hover:bg-black/45 px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-all duration-300 pointer-events-auto group select-none ring-1 ring-inset ring-white/[0.05]">
               <span className="px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase font-mono bg-white/[0.08] group-hover:bg-white/[0.14] text-white/75 group-hover:text-white/95 rounded border border-white/10 transition-colors">
                 4K UHD
               </span>
@@ -1031,7 +1031,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         </div>
       )}
 
-      <div className="nova-newtab-layout">
+      <div className="king-newtab-layout">
       {/* Main Content Area */}
       <motion.div
         variants={shouldAnimate ? containerVariants : undefined}
@@ -1049,7 +1049,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
         {/* Omnibox / Search Form */}
         <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full relative z-30" ref={searchContainerRef}>
-          <form onSubmit={handleSearch} className="nova-newtab-glass relative group rounded-xl">
+          <form onSubmit={handleSearch} className="king-newtab-glass relative group rounded-xl">
             <div className="absolute inset-y-0 start-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
               <Search className="w-5 h-5" />
             </div>
@@ -1164,7 +1164,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 <button
                   onClick={(e) => handleSpeedDialClick(e, dial.url)}
                   onAuxClick={(e) => { if (e.button === 1) handleSpeedDialClick(e, dial.url); }}
-                  className={`nova-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-3 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer group select-none ${hasWallpaper ? "nova-wallpaper-surface" : "hover:bg-slate-100 dark:hover:bg-white/5"}`}
+                  className={`king-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-3 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer group select-none ${hasWallpaper ? "king-wallpaper-surface" : "hover:bg-slate-100 dark:hover:bg-white/5"}`}
                   title={dial.name}
                 >
                   <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden p-2 shrink-0 border border-slate-200 dark:border-white/10">
@@ -1215,7 +1215,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     setUrlError('');
                     setIsEditModalOpen(true);
                   }}
-                  className={`nova-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-3 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer ${hasWallpaper ? "nova-wallpaper-surface text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-accent"}`}
+                  className={`king-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-3 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer ${hasWallpaper ? "king-wallpaper-surface text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-accent"}`}
                   style={hasWallpaper ? { color: "white", textShadow: "0 1px 4px #000" } : undefined}
                 >
                   <Plus className="w-6 h-6" />
@@ -1233,7 +1233,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         initial={shouldAnimate ? { opacity: 0, y: 15 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={shouldAnimate ? { duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: 0.1 } : { duration: 0 }}
-        className="nova-tasks-widget relative z-10 w-full max-w-72 justify-self-center rounded-xl overflow-hidden flex flex-col shadow-sm border bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700/60"
+        className="king-tasks-widget relative z-10 w-full max-w-72 justify-self-center rounded-xl overflow-hidden flex flex-col shadow-sm border bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700/60"
         style={{ maxHeight: '380px' }}
       >
         <div className="px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center border-slate-200/80 dark:border-slate-700/50 text-slate-800 dark:text-white">

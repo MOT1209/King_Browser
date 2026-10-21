@@ -11,7 +11,7 @@ export interface UseThemeLanguageOptions {
  * Tema + dil efektleri (App.tsx'ten birebir taşındı).
  *
  * - Tema efekti: settings.theme -> document.documentElement `dark` class,
- *   accent/browserColor paletlerini `:root` + `#nova-accent-style` üzerinden
+ *   accent/browserColor paletlerini `:root` + `#king-accent-style` üzerinden
  *   uygular, `getElectronAPI().setTheme` IPC'sini aynen çağırır, `system`
  *   modunda matchMedia dinleyicisi kurar.
  * - Dil efekti: settings.language -> `setLanguage()` (lang/dir + listener notify).
@@ -522,10 +522,10 @@ export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
       rootStyle.setProperty(key, value);
     }
 
-    let accentStyleEl = document.getElementById('nova-accent-style');
+    let accentStyleEl = document.getElementById('king-accent-style');
     if (!accentStyleEl) {
       accentStyleEl = document.createElement('style');
-      accentStyleEl.id = 'nova-accent-style';
+      accentStyleEl.id = 'king-accent-style';
       document.head.appendChild(accentStyleEl);
     }
 

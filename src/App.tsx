@@ -152,7 +152,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         } catch (_) {
           return;
         }
-        if (e.data && e.data.type === 'NOVA_THEME_CHANGE') {
+        if (e.data && e.data.type === 'KING_THEME_CHANGE') {
           const newTheme = e.data.theme === 'light' ? 'light' : 'dark';
           setSettings(s => ({ ...s, theme: newTheme }));
         }
@@ -2140,7 +2140,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         )}
       </React.Suspense>
 
-      {/* NOVA ACCOUNT & CLOUD SYNC MODAL */}
+      {/* KING ACCOUNT & CLOUD SYNC MODAL */}
       <React.Suspense fallback={null}>
         {isAccountModalOpen && (
           <AccountModal

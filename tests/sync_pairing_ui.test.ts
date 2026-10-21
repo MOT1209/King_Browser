@@ -5,7 +5,7 @@
  * a second device cannot read an invitation by `token_hash` and so cannot reach
  * the owner's vault. `generateSyncChainCode`/`joinSyncChain` therefore throw, and
  * the buttons that called them only ever surfaced that error. The UI is now
- * gated on `NovaSyncService.PAIRING_AVAILABLE` so no dead affordance is shown.
+ * gated on `KingSyncService.PAIRING_AVAILABLE` so no dead affordance is shown.
  *
  * These assertions render the real component, so flipping the flag to `true`
  * without finishing the backend is caught here rather than in front of a user.
@@ -15,7 +15,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { SyncSection } from '../src/components/settings/SyncSection';
 import { AccountModal } from '../src/components/AccountModal';
-import { NovaSyncService } from '../src/services/syncService';
+import { KingSyncService } from '../src/services/syncService';
 
 console.log('--- Sync Section (pairing affordances) ---');
 let passed = 0;
@@ -39,7 +39,7 @@ const DEAD_AFFORDANCES = [
 
 check(
   'the pairing flag is off in this build',
-  NovaSyncService.PAIRING_AVAILABLE === false
+  KingSyncService.PAIRING_AVAILABLE === false
 );
 for (const label of DEAD_AFFORDANCES) {
   check(`no dead affordance: "${label}"`, !html.includes(label));
@@ -84,7 +84,7 @@ check(
   const rejects = async (fn: () => Promise<unknown>) => {
     try { await fn(); return false; } catch { return true; }
   };
-  const svc = new NovaSyncService();
+  const svc = new KingSyncService();
   check(
     'generateSyncChainCode rejects instead of returning a fake code',
     await rejects(() => svc.generateSyncChainCode({}))

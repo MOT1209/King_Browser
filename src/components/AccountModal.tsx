@@ -19,7 +19,7 @@ import {
   Laptop,
   ArrowRight
 } from 'lucide-react';
-import { syncService, NovaSyncService, SyncStatus, SyncPreferences } from '../services/syncService';
+import { syncService, KingSyncService, SyncStatus, SyncPreferences } from '../services/syncService';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useSafeTimeout } from '../hooks/useSafeTimeout';
@@ -245,7 +245,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 /* ACTIVE SYNC CHAIN VIEW */
                 <div className="space-y-5">
                   {/* Sync Code Card - hidden until the pairing join flow exists */}
-                  {NovaSyncService.PAIRING_AVAILABLE && (
+                  {KingSyncService.PAIRING_AVAILABLE && (
                   <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-500/5 to-blue-500/5 border border-cyan-500/20 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
@@ -350,7 +350,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     </div>
                   </div>
                 </div>
-              ) : NovaSyncService.PAIRING_AVAILABLE ? (
+              ) : KingSyncService.PAIRING_AVAILABLE ? (
                 /* PAIRING SETUP (NO EMAIL / NO PASSWORD NEEDED) */
                 <div className="space-y-5">
                   {/* Option 1: Enter Code from another device */}

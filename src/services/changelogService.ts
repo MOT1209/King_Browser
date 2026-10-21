@@ -14,7 +14,7 @@ const REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 const BACKGROUND_REFRESH_DELAY_MS = 1000;
 
 /** Window event carrying the result of a completed background refresh. */
-const CHANGELOG_REFRESH_EVENT = 'nova-changelog-refreshed';
+const CHANGELOG_REFRESH_EVENT = 'king-changelog-refreshed';
 
 export interface ChangelogResult {
   releases: ReleaseVersion[];

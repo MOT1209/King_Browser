@@ -43,7 +43,7 @@ const HARDENED_PROD_CSP = [
 
 function hardenCspForProduction(): Plugin {
   return {
-    name: 'nova-harden-csp-production',
+    name: 'king-harden-csp-production',
     apply: 'build',
     transformIndexHtml(html) {
       return html.replace(
@@ -80,7 +80,7 @@ const ORT_FILES = [
 function provideLocalOnnxWasm(): Plugin {
   const ortDir = () => path.join(process.cwd(), 'node_modules/onnxruntime-web/dist');
   return {
-    name: 'nova-local-onnx-wasm',
+    name: 'king-local-onnx-wasm',
     // Dev: the dev server has no `public/ort/` to fall back on any more, so
     // serve the same two files from node_modules. One source of truth for both
     // dev and build.

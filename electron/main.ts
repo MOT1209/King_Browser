@@ -886,7 +886,7 @@ function createWindow() {
       if (message.includes('ERR_ABORTED')) return;
 
       // Sanitize any sensitive tokens, passwords or credential payloads from terminal logs
-      if (message && (message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message))) {
+      if (message && (message.includes('KING_SAVE_PW') || /password|token|secret|apiKey/i.test(message))) {
         console.log(`[Renderer] [${level}] [REDACTED_SENSITIVE_LOG] (${sourceId}:${line})`);
         return;
       }

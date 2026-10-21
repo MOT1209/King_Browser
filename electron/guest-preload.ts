@@ -297,7 +297,7 @@ if (protocol === 'https:' || protocol === 'http:') {
         hoverTimer = setTimeout(() => {
           const rect = a.getBoundingClientRect();
           try {
-            ipcRenderer.sendToHost('nova-link-hover', {
+            ipcRenderer.sendToHost('king-link-hover', {
               url: a.href,
               x: rect.left + rect.width / 2,
               y: rect.top + rect.height / 2
@@ -313,7 +313,7 @@ if (protocol === 'https:' || protocol === 'http:') {
         clearTimeout(hoverTimer);
         if (currentHoveredLink === a) currentHoveredLink = null;
         try {
-          ipcRenderer.sendToHost('nova-link-hover-out');
+          ipcRenderer.sendToHost('king-link-hover-out');
         } catch (_) {}
       }
     }, true);
@@ -322,7 +322,7 @@ if (protocol === 'https:' || protocol === 'http:') {
       clearTimeout(hoverTimer);
       currentHoveredLink = null;
       try {
-        ipcRenderer.sendToHost('nova-link-hover-out');
+        ipcRenderer.sendToHost('king-link-hover-out');
       } catch (_) {}
     }, true);
   };

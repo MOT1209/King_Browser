@@ -115,7 +115,7 @@ function configureOnnxRuntime(env: any) {
     // Report this loudly, because leaving it silent is the difference between a
     // five-second fix and an afternoon. Without wasmPaths the runtime falls back
     // to its built-in `new URL('./ort-wasm-simd-threaded.asyncify.<hash>.wasm',
-    // import.meta.url)` — and `nova-drop-duplicate-onnx-wasm` in vite.config.ts
+    // import.meta.url)` — and `king-drop-duplicate-onnx-wasm` in vite.config.ts
     // DELETES that hashed asset from the bundle, so model loading dies on a bare
     // 404 inside ort's own loader with nothing pointing at the cause. The usual
     // trigger is an onnxruntime-web/transformers upgrade that renames or moves
@@ -124,7 +124,7 @@ function configureOnnxRuntime(env: any) {
       'env.backends.onnx.wasm is missing, so the ORT wasm path was NOT configured. ' +
         'Model loading is expected to fail with a 404 for ' +
         'ort-wasm-simd-threaded.asyncify.<hash>.wasm, since the build deletes that ' +
-        'hashed asset (see the nova-drop-duplicate-onnx-wasm plugin in vite.config.ts) ' +
+        'hashed asset (see the king-drop-duplicate-onnx-wasm plugin in vite.config.ts) ' +
         'and public/ort/ is then never pointed at. This usually means onnxruntime-web ' +
         'renamed or moved env.backends.onnx.'
     );

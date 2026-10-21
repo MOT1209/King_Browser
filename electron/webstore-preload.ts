@@ -21,7 +21,7 @@ const isWebStoreOrigin = (origin: string): boolean =>
 // Chrome Web Store extension IDs are exactly 32 characters drawn from a–p. Held
 // as a pattern *source* so the identical anchored pattern can be interpolated
 // into the main-world script below: the page-side check on incoming
-// NOVA_INSTALL_EXTENSION messages and the injected `chrome.webstore.install`
+// KING_INSTALL_EXTENSION messages and the injected `chrome.webstore.install`
 // shim must not be able to drift apart, or a crafted URL such as
 // '/x?y=aaaa…dddd' resolves to a different real extension than the page meant.
 const EXTENSION_ID_SOURCE = '^[a-p]{32}$';
@@ -81,11 +81,11 @@ if ((window as any).__novaPreloadInjected) {
 
   // 1. Setup the IPC bridge in the isolated world
   const showNovaToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    const existing = document.getElementById('nova-extension-toast');
+    const existing = document.getElementById('king-extension-toast');
     if (existing) existing.remove();
 
     const toast = document.createElement('div');
-    toast.id = 'nova-extension-toast';
+    toast.id = 'king-extension-toast';
 
     let bgColor = '#3b82f6';
     if (type === 'success') bgColor = '#10b981';
@@ -141,7 +141,7 @@ if ((window as any).__novaPreloadInjected) {
     if (!isWebStoreHost(host)) return;
     if (event.source !== window ||
         !isWebStoreOrigin(event.origin) ||
-        !event.data || event.data.type !== 'NOVA_INSTALL_EXTENSION') return;
+        !event.data || event.data.type !== 'KING_INSTALL_EXTENSION') return;
 
     const extensionId = event.data.extensionId;
     if (typeof extensionId !== 'string' || !EXTENSION_ID_RE.test(extensionId)) {
@@ -155,17 +155,17 @@ if ((window as any).__novaPreloadInjected) {
         loadingToast.remove();
         if (result.error) {
           showNovaToast('Installation error: ' + result.error, 'error');
-          window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: result.error }, window.location.origin);
+          window.postMessage({ type: 'KING_INSTALL_RESULT', success: false, error: result.error }, window.location.origin);
         } else {
           showNovaToast('Extension installed successfully!', 'success');
-          window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: true }, window.location.origin);
+          window.postMessage({ type: 'KING_INSTALL_RESULT', success: true }, window.location.origin);
           setTimeout(() => window.location.reload(), 1500);
         }
       })
       .catch(err => {
         loadingToast.remove();
         showNovaToast('Installation error: ' + err.message, 'error');
-        window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: err.message }, window.location.origin);
+        window.postMessage({ type: 'KING_INSTALL_RESULT', success: false, error: err.message }, window.location.origin);
       });
   });
 
@@ -241,7 +241,7 @@ if ((window as any).__novaPreloadInjected) {
     window.chrome = window.chrome || {};
 
     // Same anchored pattern source as the isolated-world preload uses to vet
-    // incoming NOVA_INSTALL_EXTENSION messages, so the two validators can never
+    // incoming KING_INSTALL_EXTENSION messages, so the two validators can never
     // diverge. The shim used an unanchored /[a-p]{32}/ search, which let a
     // crafted URL such as '/x?y=aaaa…dddd' match a 32-character run anywhere in
     // the string and install a different real extension than the page intended.
@@ -267,7 +267,7 @@ if ((window as any).__novaPreloadInjected) {
         }
 
         const listener = (event) => {
-          if (event.source !== window || event.origin !== window.location.origin || !event.data || event.data.type !== 'NOVA_INSTALL_RESULT') return;
+          if (event.source !== window || event.origin !== window.location.origin || !event.data || event.data.type !== 'KING_INSTALL_RESULT') return;
           window.removeEventListener('message', listener);
 
           if (event.data.success) {
@@ -278,7 +278,7 @@ if ((window as any).__novaPreloadInjected) {
         };
         window.addEventListener('message', listener);
 
-        window.postMessage({ type: 'NOVA_INSTALL_EXTENSION', extensionId }, window.location.origin);
+        window.postMessage({ type: 'KING_INSTALL_EXTENSION', extensionId }, window.location.origin);
       }
     };
 
@@ -320,7 +320,7 @@ if ((window as any).__novaPreloadInjected) {
     const host = window.location.hostname.toLowerCase();
     const isStoreOrigin = isWebStoreHost(host) && window.location.protocol === 'https:';
     if (!isStoreOrigin) {
-      const existingBanner = document.getElementById('nova-extension-banner');
+      const existingBanner = document.getElementById('king-extension-banner');
       if (existingBanner) {
         existingBanner.remove();
         document.body.style.marginTop = '0px';
@@ -329,11 +329,11 @@ if ((window as any).__novaPreloadInjected) {
     }
 
     if (window.location.pathname.includes('/detail/')) {
-      const existingBanner = document.getElementById('nova-extension-banner');
+      const existingBanner = document.getElementById('king-extension-banner');
       if (existingBanner) return;
 
       const banner = document.createElement('div');
-      banner.id = 'nova-extension-banner';
+      banner.id = 'king-extension-banner';
       banner.style.cssText = "position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(90deg, #3b82f6, #8b5cf6); color: white; padding: 12px 24px; z-index: 9999999; display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);";
 
       const leftContainer = document.createElement('div');
@@ -360,7 +360,7 @@ if ((window as any).__novaPreloadInjected) {
       leftContainer.appendChild(textWrap);
 
       const btn = document.createElement('button');
-      btn.id = 'nova-install-btn';
+      btn.id = 'king-install-btn';
       btn.style.cssText = "background: white; color: #4f46e5; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
       btn.textContent = "Add to King";
 
@@ -378,7 +378,7 @@ if ((window as any).__novaPreloadInjected) {
           btn.textContent = "Installing...";
 
           const cleanupListener = (e: MessageEvent) => {
-            if (e.source !== window || e.origin !== window.location.origin || !e.data || e.data.type !== 'NOVA_INSTALL_RESULT') return;
+            if (e.source !== window || e.origin !== window.location.origin || !e.data || e.data.type !== 'KING_INSTALL_RESULT') return;
             window.removeEventListener('message', cleanupListener);
             if (e.data.success) {
               btn.textContent = "Installed!";
@@ -393,13 +393,13 @@ if ((window as any).__novaPreloadInjected) {
           window.addEventListener('message', cleanupListener);
 
           window.postMessage({
-            type: 'NOVA_INSTALL_EXTENSION',
+            type: 'KING_INSTALL_EXTENSION',
             extensionId
           }, `https://${host}`);
         }
       });
     } else {
-      const existingBanner = document.getElementById('nova-extension-banner');
+      const existingBanner = document.getElementById('king-extension-banner');
       if (existingBanner) {
         existingBanner.remove();
         document.body.style.marginTop = '0px';

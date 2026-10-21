@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cloud, Check, ShieldAlert, ShieldCheck, RefreshCw, Link2, Laptop, Bookmark, Key, Settings, FolderTree, Sparkles } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
-import { syncService, NovaSyncService, SyncStatus, SyncPreferences } from '../../services/syncService';
+import { syncService, KingSyncService, SyncStatus, SyncPreferences } from '../../services/syncService';
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from '../../utils/safeStorage';
 import { getLocale } from '../../services/i18n';
 import { copyTextToClipboard } from '../../utils/clipboard';
@@ -186,7 +186,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
             </div>
 
             {/* Pair Another Device Card - hidden until the pairing join flow exists */}
-            {NovaSyncService.PAIRING_AVAILABLE && (
+            {KingSyncService.PAIRING_AVAILABLE && (
             <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-3 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -289,7 +289,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
               </div>
             </div>
           </div>
-        ) : NovaSyncService.PAIRING_AVAILABLE ? (
+        ) : KingSyncService.PAIRING_AVAILABLE ? (
           /* PAIRING SETUP (NO EMAIL / NO PASSWORD) */
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Option 1: Enter Code */}

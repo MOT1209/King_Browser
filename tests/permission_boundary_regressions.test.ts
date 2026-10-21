@@ -10,7 +10,7 @@ import { encryptDataWithFallback, decryptDataWithFallback } from '../electron/ma
 // Execute the actual main-process permission handlers, not a duplicate policy.
 const source = fs.readFileSync(path.resolve('electron/main.ts'), 'utf8');
 const block = source.slice(source.indexOf('  // --- CHROME-STYLE PERMISSION SYSTEM'), source.indexOf('  // IPC: reset all remembered site permissions'));
-const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-permission-audit-'));
+const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'king-permission-audit-'));
 const handlers = new Map<string, Function>();
 const prompts: any[] = [];
 const timers = new Set<ReturnType<typeof setTimeout>>();

@@ -3,17 +3,17 @@ import { ArrowDown, ArrowDownRight, ArrowRight, ArrowUpRight, Code2, Command, Do
 import { copy } from './content'
 import { useSiteMotion } from './useSiteMotion'
 
-const REPO = 'https://github.com/unitybtw/nova-browser'
-const RELEASE = `${REPO}/releases/download/v1.5.1/`
+const REPO = 'https://github.com/MOT1209/King_Browser'
+const RELEASE = `${REPO}/releases/latest/download/`
 const platforms = [
-  { name: 'macOS', icon: Command, choices: [{ name: 'Apple Silicon', file: 'Nova-Browser-arm64.dmg', type: '.dmg' }, { name: 'Intel', file: 'Nova-Browser-x64.dmg', type: '.dmg' }] },
-  { name: 'Windows', icon: Monitor, choices: [{ name: 'Setup · x64', file: 'Nova-Browser-Setup-1.5.1-x64.exe', type: '.exe' }, { name: 'Portable · x64', file: 'Nova-Browser-1.5.1-x64.exe', type: '.exe' }] },
-  { name: 'Linux', icon: Terminal, choices: [{ name: 'AppImage · x64', file: 'Nova-Browser-x86_64.AppImage', type: '.AppImage' }, { name: 'Debian / Ubuntu', file: 'Nova-Browser-amd64.deb', type: '.deb' }] },
+  { name: 'macOS', icon: Command, choices: [{ name: 'Apple Silicon', file: 'King-Browser-arm64.dmg', type: '.dmg' }, { name: 'Intel', file: 'King-Browser-x64.dmg', type: '.dmg' }] },
+  { name: 'Windows', icon: Monitor, choices: [{ name: 'Setup · x64', file: 'King-Browser-Setup-0.0.1-x64.exe', type: '.exe' }, { name: 'Portable · x64', file: 'King-Browser-0.0.1-x64.exe', type: '.exe' }] },
+  { name: 'Linux', icon: Terminal, choices: [{ name: 'AppImage · x64', file: 'King-Browser-x86_64.AppImage', type: '.AppImage' }, { name: 'Debian / Ubuntu', file: 'King-Browser-amd64.deb', type: '.deb' }] },
 ]
 
 export default function App() {
   useSiteMotion()
-  const [lang, setLang] = useState<'en' | 'tr'>(() => { try { return localStorage.getItem('nova-language') === 'tr' ? 'tr' : 'en' } catch { return 'en' } })
+  const [lang, setLang] = useState<'en' | 'tr'>(() => { try { return localStorage.getItem('king-language') === 'tr' ? 'tr' : 'en' } catch { return 'en' } })
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [platform, setPlatform] = useState(0)
@@ -28,8 +28,8 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.lang = lang
-    document.title = lang === 'en' ? 'Nova — A little more space.' : 'Nova — Biraz daha alan.'
-    try { localStorage.setItem('nova-language', lang) } catch { /* Storage may be disabled. */ }
+    document.title = lang === 'en' ? 'King — A little more space.' : 'King — Biraz daha alan.'
+    try { localStorage.setItem('king-language', lang) } catch { /* Storage may be disabled. */ }
   }, [lang])
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function App() {
     <a className="skip-link" href="#main">{t.skip}</a>
     <header ref={header} className="site-header">
       <div className="nav-wrap container">
-        <a href="#main" onClick={(e) => { e.preventDefault(); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="brand" aria-label="Nova home"><img src="/images/nova-icon.svg" width="34" height="34" alt="" /><span>nova<span className="brand-period">.</span></span></a>
+        <a href="#main" onClick={(e) => { e.preventDefault(); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="brand" aria-label="King home"><img src="/images/king-icon.svg" width="34" height="34" alt="" /><span>king<span className="brand-period">.</span></span></a>
         <nav className={`main-nav ${menuOpen ? 'is-open' : ''}`} id="main-navigation" aria-label={lang === 'en' ? 'Main navigation' : 'Ana menü'}>
           {['experience', 'features', 'open-source'].map((id, i) => <a href={`#${id}`} key={id} onClick={() => setMenuOpen(false)}>{t.nav[i]}</a>)}
           <a href="#download" className="mobile-menu-cta" onClick={() => setMenuOpen(false)}><span>{t.get}</span><ArrowDown size={14} aria-hidden="true" /></a>
@@ -111,7 +111,7 @@ export default function App() {
     <main id="main" tabIndex={-1}>
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy container">
-          <a className="release-note" href={`${REPO}/releases/tag/v1.5.1`} target="_blank" rel="noopener noreferrer"><span className="status-dot" />Nova 1.5.1<span className="release-divider" />{t.releaseBadge}<ArrowUpRight size={13} aria-hidden="true" /></a>
+          <a className="release-note" href={`${REPO}/releases`} target="_blank" rel="noopener noreferrer"><span className="status-dot" />King 0.0.1<span className="release-divider" />{t.releaseBadge}<ArrowUpRight size={13} aria-hidden="true" /></a>
           <h1 id="hero-title"><span className="hero-line"><span>{t.hero[0]}</span></span><span className="hero-line"><span>{t.hero[1]}</span></span></h1>
           <p className="hero-intro">{t.intro}</p>
           <div className="hero-actions"><a href="#download" className="button button-blue">{t.download}<ArrowDown size={18} /></a><button ref={watchButton} className="watch-button" onClick={openVideo}><span className="play-icon"><Play size={11} fill="currentColor" /></span>{t.watch}</button></div>
@@ -144,22 +144,22 @@ export default function App() {
             <div className="feature-copy"><h3>{t.privacyTitle}</h3><p>{t.privacyText}</p><a className="text-link" href={`${REPO}#security--privacy-commitment`} target="_blank" rel="noopener noreferrer">{t.privacyLink}<ArrowUpRight size={17} /></a></div>
           </article>
           <article className="ai-feature">
-            <div className="ai-art" aria-hidden="true"><div className="ai-light" /><div className="ai-chip"><div className="chip-label">NOVA</div><Sparkles size={45} strokeWidth={1.2} /><div className="chip-bottom">LOCAL AI</div></div><div className="ai-art-label"><LockKeyhole size={12} aria-hidden="true" />{t.aiChipBadge}</div></div>
+            <div className="ai-art" aria-hidden="true"><div className="ai-light" /><div className="ai-chip"><div className="chip-label">KING</div><Sparkles size={45} strokeWidth={1.2} /><div className="chip-bottom">LOCAL AI</div></div><div className="ai-art-label"><LockKeyhole size={12} aria-hidden="true" />{t.aiChipBadge}</div></div>
             <div className="feature-copy"><h3>{t.aiTitle}</h3><p>{t.aiText}</p><span className="feature-note">{t.aiNote}</span></div>
           </article>
         </div>
         <div className="small-features">{[Puzzle, Layers3, Terminal].map((Icon, i) => <article key={i}><Icon size={24} strokeWidth={1.4} aria-hidden="true" /><h3>{t.detailTitles[i]}</h3><p>{t.detailTexts[i]}</p></article>)}</div>
       </section>
 
-      <section className="open-source" id="open-source" aria-labelledby="source-title"><div className="container source-inner"><div className="source-symbol" aria-hidden="true"><span>{'{'}</span><img src="/images/nova-mark.svg" alt="" width="120" height="120" /><span>{'}'}</span></div><div className="source-copy"><h2 id="source-title">{t.sourceTitle[0]}<br /><span>{t.sourceTitle[1]}</span></h2><p>{t.sourceText}</p><a className="button button-dark" href={REPO} target="_blank" rel="noopener noreferrer"><Github size={18} />{t.sourceLink}<ArrowUpRight size={16} /></a><span className="source-note">{t.sourceNote}</span></div></div></section>
+      <section className="open-source" id="open-source" aria-labelledby="source-title"><div className="container source-inner"><div className="source-symbol" aria-hidden="true"><span>{'{'}</span><img src="/images/king-mark.svg" alt="" width="120" height="120" /><span>{'}'}</span></div><div className="source-copy"><h2 id="source-title">{t.sourceTitle[0]}<br /><span>{t.sourceTitle[1]}</span></h2><p>{t.sourceText}</p><a className="button button-dark" href={REPO} target="_blank" rel="noopener noreferrer"><Github size={18} />{t.sourceLink}<ArrowUpRight size={16} /></a><span className="source-note">{t.sourceNote}</span></div></div></section>
 
-      <section className="faq section container" aria-labelledby="faq-title"><h2 id="faq-title">{t.faqTitle}</h2><div className="faq-list">{t.faq.map(([q, a], i) => <details key={i} name="nova-faq"><summary>{q}<Plus size={19} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
+      <section className="faq section container" aria-labelledby="faq-title"><h2 id="faq-title">{t.faqTitle}</h2><div className="faq-list">{t.faq.map(([q, a], i) => <details key={i} name="king-faq"><summary>{q}<Plus size={19} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
 
-      <section className="download-section container" id="download" aria-labelledby="download-title"><div className="download-heading"><img src="/images/nova-icon.svg" width="64" height="64" alt="" /><h2 id="download-title">{t.downloadTitle[0]}<br /><span>{t.downloadTitle[1]}</span></h2><p>{t.downloadText}</p></div><div className="download-picker"><div className="download-picker-header"><span>{t.installer}</span><span className="version-label"><span className="status-dot" />v1.5.1</span></div><div className="platform-tabs" role="tablist" aria-label={t.installer}>{platforms.map(({ name, icon: Icon }, i) => <button key={name} id={`platform-tab-${i}`} role="tab" aria-selected={platform === i} aria-controls="platform-panel" tabIndex={platform === i ? 0 : -1} onClick={() => setPlatform(i)} onKeyDown={e => moveTab(e, 'platform', i)}><Icon size={20} aria-hidden="true" />{name}</button>)}</div><div id="platform-panel" role="tabpanel" aria-labelledby={`platform-tab-${platform}`} className="platform-files"><span className="platform-file-list" key={platform}>{platforms[platform].choices.map(choice => <a key={choice.file} className="download-file" href={`${RELEASE}${choice.file}`} aria-label={`${t.download}: ${choice.name} (${choice.type})`}><span><strong>{choice.name}</strong><small>{choice.type}</small></span><Download size={18} aria-hidden="true" /></a>)}</span></div><a className="all-releases" href={`${REPO}/releases/latest`} target="_blank" rel="noopener noreferrer">{t.allReleases}<ArrowUpRight size={14} /></a><p className="desktop-note">{t.desktopNote}</p></div></section>
+      <section className="download-section container" id="download" aria-labelledby="download-title"><div className="download-heading"><img src="/images/king-icon.svg" width="64" height="64" alt="" /><h2 id="download-title">{t.downloadTitle[0]}<br /><span>{t.downloadTitle[1]}</span></h2><p>{t.downloadText}</p></div><div className="download-picker"><div className="download-picker-header"><span>{t.installer}</span><span className="version-label"><span className="status-dot" />v1.5.1</span></div><div className="platform-tabs" role="tablist" aria-label={t.installer}>{platforms.map(({ name, icon: Icon }, i) => <button key={name} id={`platform-tab-${i}`} role="tab" aria-selected={platform === i} aria-controls="platform-panel" tabIndex={platform === i ? 0 : -1} onClick={() => setPlatform(i)} onKeyDown={e => moveTab(e, 'platform', i)}><Icon size={20} aria-hidden="true" />{name}</button>)}</div><div id="platform-panel" role="tabpanel" aria-labelledby={`platform-tab-${platform}`} className="platform-files"><span className="platform-file-list" key={platform}>{platforms[platform].choices.map(choice => <a key={choice.file} className="download-file" href={`${RELEASE}${choice.file}`} aria-label={`${t.download}: ${choice.name} (${choice.type})`}><span><strong>{choice.name}</strong><small>{choice.type}</small></span><Download size={18} aria-hidden="true" /></a>)}</span></div><a className="all-releases" href={`${REPO}/releases/latest`} target="_blank" rel="noopener noreferrer">{t.allReleases}<ArrowUpRight size={14} /></a><p className="desktop-note">{t.desktopNote}</p></div></section>
     </main>
 
-    <footer className="footer container"><div className="footer-top"><p>{t.footerLine}</p><nav aria-label="Footer">{[REPO, `${REPO}/releases`, `${REPO}/issues`].map((url, i) => <a key={url} href={url} target="_blank" rel="noopener noreferrer">{t.footerLinks[i]}<ArrowUpRight size={14} /></a>)}</nav></div><div className="footer-wordmark" aria-hidden="true">nova<span className="brand-period">.</span></div><div className="footer-bottom"><span>© {new Date().getFullYear()} Nova Browser</span><span>{t.footerBottom}</span><a href="#main" onClick={(e) => { e.preventDefault(); typeof window.scrollTo === 'function' && window.scrollTo({ top: 0, behavior: 'smooth' }); }} aria-label={t.backToTop}>{t.backToTop}<ArrowRight size={15} aria-hidden="true" /></a></div></footer>
+    <footer className="footer container"><div className="footer-top"><p>{t.footerLine}</p><nav aria-label="Footer">{[REPO, `${REPO}/releases`, `${REPO}/issues`].map((url, i) => <a key={url} href={url} target="_blank" rel="noopener noreferrer">{t.footerLinks[i]}<ArrowUpRight size={14} /></a>)}</nav></div><div className="footer-wordmark" aria-hidden="true">king<span className="brand-period">.</span></div><div className="footer-bottom"><span>© {new Date().getFullYear()} King Browser</span><span>{t.footerBottom}</span><a href="#main" onClick={(e) => { e.preventDefault(); typeof window.scrollTo === 'function' && window.scrollTo({ top: 0, behavior: 'smooth' }); }} aria-label={t.backToTop}>{t.backToTop}<ArrowRight size={15} aria-hidden="true" /></a></div></footer>
 
-    <dialog ref={dialog} className="video-dialog" aria-labelledby="video-title" aria-describedby="video-description" onCancel={closeVideo} onClose={onVideoClosed} onClick={e => { if (e.target === e.currentTarget) closeVideo() }}><div className="video-dialog-inner"><div className="video-heading"><h2 id="video-title">{t.videoTitle}</h2><button className="icon-button" onClick={closeVideo} aria-label={t.close} autoFocus><X size={21} /></button></div><video ref={video} key={lang} src="/images/nova-tour.mp4" poster="/images/nova-tour.poster.jpg" controls playsInline preload="none" onError={() => setVideoError(true)}><track kind="captions" src="/images/nova-tour.en.vtt" srcLang="en" label="English" default={lang === 'en'} /><track kind="captions" src="/images/nova-tour.tr.vtt" srcLang="tr" label="Türkçe" default={lang === 'tr'} /></video>{videoError && <div className="video-error" role="alert"><p>{t.videoError}</p><button className="button button-small button-dark" onClick={() => { setVideoError(false); video.current?.load() }}>{t.retryVideo}</button></div>}<p id="video-description">{t.videoDescription}</p></div></dialog>
+    <dialog ref={dialog} className="video-dialog" aria-labelledby="video-title" aria-describedby="video-description" onCancel={closeVideo} onClose={onVideoClosed} onClick={e => { if (e.target === e.currentTarget) closeVideo() }}><div className="video-dialog-inner"><div className="video-heading"><h2 id="video-title">{t.videoTitle}</h2><button className="icon-button" onClick={closeVideo} aria-label={t.close} autoFocus><X size={21} /></button></div><video ref={video} key={lang} src="/images/king-tour.mp4" poster="/images/king-tour.poster.jpg" controls playsInline preload="none" onError={() => setVideoError(true)}><track kind="captions" src="/images/king-tour.en.vtt" srcLang="en" label="English" default={lang === 'en'} /><track kind="captions" src="/images/king-tour.tr.vtt" srcLang="tr" label="Türkçe" default={lang === 'tr'} /></video>{videoError && <div className="video-error" role="alert"><p>{t.videoError}</p><button className="button button-small button-dark" onClick={() => { setVideoError(false); video.current?.load() }}>{t.retryVideo}</button></div>}<p id="video-description">{t.videoDescription}</p></div></dialog>
   </>
 }

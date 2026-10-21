@@ -117,7 +117,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <GeneralSection settings={settings} onUpdateSettings={onUpdateSettings} onClearHistory={onClearHistory} />
           )}
 
-          {/* NOVA ACCOUNT & SYNC */}
+          {/* KING ACCOUNT & SYNC */}
           {activeTab === 'account' && (
             <SyncSection settings={settings} onPerformSync={onPerformSync} />
           )}

@@ -26,7 +26,7 @@ import { logger } from '../utils/logger';
 import { getElectronAPI, type ElectronAPI } from '../utils/electronBridge';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 
-export interface NovaUser {
+export interface KingUser {
   id: string;
   email: string;
   displayName: string;
@@ -47,7 +47,7 @@ export interface SyncPreferences {
 
 export interface SyncStatus {
   isLoggedIn: boolean;
-  user: NovaUser | null;
+  user: KingUser | null;
   lastSyncedAt: number | null;
   isSyncing: boolean;
   syncError: string | null;
@@ -84,7 +84,7 @@ export interface SyncDataBundle {
  * registered before the migration.
  */
 interface LocalRegistryEntry {
-  user: NovaUser;
+  user: KingUser;
   passwordHash: string;
   syncKeySalt?: string;
 }
@@ -1489,8 +1489,8 @@ export interface SyncResult {
   };
 }
 
-export class NovaSyncService {
-  private currentUser: NovaUser | null = null;
+export class KingSyncService {
+  private currentUser: KingUser | null = null;
   private token: string | null = null;
   private isSyncing = false;
   private syncQueue: Promise<any> = Promise.resolve();
@@ -1612,7 +1612,7 @@ export class NovaSyncService {
   }
 
   /** Read user profile from OS keychain / secureStore with session + legacy fallbacks. */
-  private async readStoredUser(): Promise<NovaUser | null> {
+  private async readStoredUser(): Promise<KingUser | null> {
     const secure = await this.readSecureStore(STORAGE_KEYS.USER);
     if (secure) {
       try {
@@ -1661,7 +1661,7 @@ export class NovaSyncService {
   }
 
   /** Write user profile to OS keychain / secureStore; session-only on web, scrubbing plaintext localStorage. */
-  private async writeStoredUser(user: NovaUser | null): Promise<void> {
+  private async writeStoredUser(user: KingUser | null): Promise<void> {
     if (!user) {
       await this.deleteSecureStore(STORAGE_KEYS.USER);
       this.removeSessionValue(STORAGE_KEYS.USER);
@@ -2174,7 +2174,7 @@ export class NovaSyncService {
 
   // --- STANDARD 1-CLICK AUTHENTICATION ---
 
-  public async register(email: string, password: string, displayName?: string): Promise<NovaUser> {
+  public async register(email: string, password: string, displayName?: string): Promise<KingUser> {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
       throw new Error('Email and password are required');
@@ -2203,7 +2203,7 @@ export class NovaSyncService {
         if (error) throw error;
         if (!data.user) throw new Error('Registration failed');
 
-        const newUser: NovaUser = {
+        const newUser: KingUser = {
           id: data.user.id,
           email: normalizedEmail,
           displayName: finalName,
@@ -2260,7 +2260,7 @@ export class NovaSyncService {
     const syncKeySalt = bytesToBase64(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
 
     const userId = generateId('usr');
-    const newUser: NovaUser = {
+    const newUser: KingUser = {
       id: userId,
       email: normalizedEmail,
       displayName: finalName,
@@ -2286,7 +2286,7 @@ export class NovaSyncService {
     return newUser;
   }
 
-  public async login(email: string, password: string): Promise<NovaUser> {
+  public async login(email: string, password: string): Promise<KingUser> {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
       throw new Error('Email and password are required');
@@ -2312,7 +2312,7 @@ export class NovaSyncService {
         if (!data.user) throw new Error('Login failed');
 
         const userMeta = data.user.user_metadata || {};
-        const loggedUser: NovaUser = {
+        const loggedUser: KingUser = {
           id: data.user.id,
           email: normalizedEmail,
           displayName: userMeta.display_name || normalizedEmail.split('@')[0],
@@ -2944,11 +2944,11 @@ export class NovaSyncService {
   public static formatSyncCode = formatSyncCode;
 
   public async generateSyncChainCode(_currentData?: Partial<SyncDataBundle>): Promise<string> {
-    throw new Error(NovaSyncService.PAIRING_UNAVAILABLE);
+    throw new Error(KingSyncService.PAIRING_UNAVAILABLE);
   }
 
   public async joinSyncChain(_code: string): Promise<boolean> {
-    throw new Error(NovaSyncService.PAIRING_UNAVAILABLE);
+    throw new Error(KingSyncService.PAIRING_UNAVAILABLE);
   }
 
   public getSettingsTimestamps(): Record<string, number> {
@@ -2986,4 +2986,4 @@ export class NovaSyncService {
   }
 }
 
-export const syncService = new NovaSyncService();
+export const syncService = new KingSyncService();

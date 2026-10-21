@@ -56,7 +56,7 @@ import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, D
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getLanguage, getLocale } from '../services/i18n';
 import { AdBlockerPopover } from './AdBlockerPopover';
-import { NovaAssistantIcon } from './ui/NovaAssistantIcon';
+import { KingAssistantIcon } from './ui/KingAssistantIcon';
 import { logger } from '../utils/logger';
 import { syncService, SyncStatus } from '../services/syncService';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
@@ -1453,7 +1453,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             }`}
             title={isMac ? "King AI Assistant (⌘I)" : "King AI Assistant (Ctrl+I)"}
           >
-            <NovaAssistantIcon size={15} active={isAIAssistantOpen} />
+            <KingAssistantIcon size={15} active={isAIAssistantOpen} />
             <span className="font-medium text-[11px]">
               AI
             </span>

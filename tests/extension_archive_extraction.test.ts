@@ -18,7 +18,7 @@ import { loadSafeCrxZip, extractSafeCrxZip } from '../electron/main/crxInstaller
 
 console.log('\n--- Extension Archive Extraction (real loadSafeCrxZip) ---');
 
-const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-crx-'));
+const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'king-crx-'));
 
 function makeTarget(name: string): string {
   const dir = path.join(tmpRoot, name);

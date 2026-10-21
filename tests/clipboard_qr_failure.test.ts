@@ -68,8 +68,8 @@ async function clipboardSuite() {
   // 1. A confirmed modern write is the only thing that reports success.
   const written: string[] = [];
   setGlobals({ clipboard: { writeText: async (t: string) => { written.push(t); } } }, undefined);
-  check('a successful writeText resolves true', (await copyTextToClipboard('nova-secret-code')) === true);
-  check('the text actually reached the clipboard', written[0] === 'nova-secret-code', `=> ${written[0]}`);
+  check('a successful writeText resolves true', (await copyTextToClipboard('king-secret-code')) === true);
+  check('the text actually reached the clipboard', written[0] === 'king-secret-code', `=> ${written[0]}`);
 
   // 2. The insecure-context case that AccountModal regressed on: writeText
   //    exists but throws. The helper must fall through to execCommand.

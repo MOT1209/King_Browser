@@ -844,7 +844,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           setAutofillMenu(prev => (prev?.isOpen ? { ...prev, isOpen: false } : null));
           autofillBlurTimerRef.current = null;
         }, 300);
-      } else if (e.channel === 'nova-link-hover' && e.args?.[0]) {
+      } else if (e.channel === 'king-link-hover' && e.args?.[0]) {
         if (latestSettingsRef.current?.aiLinkPreviewEnabled === false || !latestIsActiveRef.current) return;
         const data = e.args[0];
         if (typeof data.url === 'string' && data.url.startsWith('https://')) {
@@ -864,7 +864,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             y: Number(data.y) || 0
           });
         }
-      } else if (e.channel === 'nova-link-hover-out') {
+      } else if (e.channel === 'king-link-hover-out') {
         setAiPreview(prev => (prev.isOpen ? { ...prev, isOpen: false } : prev));
       }
     };

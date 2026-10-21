@@ -311,7 +311,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       <div className="w-full relative">
         <form
           onSubmit={handleSearchSubmit}
-          className="nova-omnibox-form relative group w-full"
+          className="king-omnibox-form relative group w-full"
           style={{ position: 'relative' }}
         >
           {/* This is a real control - it opens the site information and
@@ -478,7 +478,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             </div>
           )}
           <div
-            className="nova-omnibox-actions absolute inset-y-0 right-2 flex items-center gap-1 z-10"
+            className="king-omnibox-actions absolute inset-y-0 right-2 flex items-center gap-1 z-10"
             style={{
               position: 'absolute',
               top: 0,

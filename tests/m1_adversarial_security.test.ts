@@ -331,7 +331,7 @@ const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
   },
   // Section 7: console redaction (electron/main.ts:763).
   {
-    needle: "message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message)",
+    needle: "message.includes('KING_SAVE_PW') || /password|token|secret|apiKey/i.test(message)",
     desc: 'renderer console output is redacted for the password dump marker and credential keywords',
   },
   // Section 3.6: the language table the old test could never reach.

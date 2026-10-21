@@ -189,7 +189,7 @@ export function useAppSync({
         }
       }
     } catch (err) {
-      console.error('[NovaSync] Sync execution failed:', err);
+      console.error('[KingSync] Sync execution failed:', err);
       throw err;
     }
   }, [bookmarkRows, folderRows, history, settings, workspaceRows, setBookmarks, setFolders, setHistory, setSettings, setWorkspaces]);
@@ -230,10 +230,10 @@ export function useAppSync({
   useEffect(() => {
     const unsubscribe = syncService.onRemoteChange(() => {
       if (syncService.getStatus().isSyncing) {
-        logger.debug('NovaSync', 'Skipping remote change pull: sync already in progress');
+        logger.debug('KingSync', 'Skipping remote change pull: sync already in progress');
         return;
       }
-      logger.debug('NovaSync', 'Triggering background pull for remote changes');
+      logger.debug('KingSync', 'Triggering background pull for remote changes');
       handlePerformSyncRef.current().catch(() => {});
     });
     return () => { unsubscribe(); };

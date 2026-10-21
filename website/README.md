@@ -1,6 +1,6 @@
-# Nova website v2
+# King website v2
 
-The production, responsive English/Turkish marketing website for Nova Browser. Built with React, TypeScript, Vite, locally served Manrope, and Lucide icons.
+The production, responsive English/Turkish marketing website for King Browser. Built with React, TypeScript, Vite, locally served Manrope, and Lucide icons.
 
 ## Run
 
@@ -16,7 +16,7 @@ Open http://127.0.0.1:5174. To produce a static site, run `npm run build`; deplo
 
 - English/Turkish copy with a remembered language preference
 - Responsive navigation, keyboard-operable product tabs, and platform selector
-- Real Nova screenshots and a 27-second 1080p product film with original music, bilingual captions, and keyboard dismissal
+- Real King screenshots and a 27-second 1080p product film with original music, bilingual captions, and keyboard dismissal
 - Expandable FAQ, official GitHub links, and direct release downloads
 - Authored entrances, tour transitions, desktop depth, and reduced-motion support
 - Local fonts and assets, no analytics or third-party scripts

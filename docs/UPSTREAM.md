@@ -34,4 +34,9 @@ The King Browser repository was scaffolded from the upstream commit above, inclu
 1. **No automatic merges from upstream.** Pull upstream changes deliberately, review diffs, re-verify build + tests.
 2. If a sync happens, update this file with the new base commit and date.
 3. Never remove or alter `licenses/nova-browser-LICENSE` or upstream copyright notices.
-4. Upstream rebranding in progress: internal identifiers containing "nova" remain in code until the rename pass (tracked as a task); the legal attribution above always applies regardless of internal naming.
+4. Rebranding is done for user-visible text, the website, code identifiers, CSS names, IPC/event names and assets. These upstream identifiers are **kept on purpose** because they are stored data formats; renaming them would lose local data or make encrypted sync vaults undecryptable:
+   - `nova_*` localStorage / secure-store keys (e.g. `nova_session_tabs`, `nova_e2ee_master_key`)
+   - the `nova-secure-salt` key-derivation salt
+   - the Supabase tables `nova_sync_vaults`, `nova_pairing_invitations` and the function `consume_nova_pairing_invitation`
+   - the legacy `nova-` / `nova:` sync-code prefixes accepted by `normalizeSyncCode`
+   The website tour video and its captions still narrate "Nova"; they need a new recording. The legal attribution above applies regardless of naming.

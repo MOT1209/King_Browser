@@ -1,4 +1,4 @@
-# Nova Browser - Search & AI Bot Access Policy
+# King Browser - Search & AI Bot Access Policy
 User-agent: *
 Allow: /
 
@@ -31,5 +31,3 @@ User-agent: OAI-SearchBot
 Allow: /
 
 # Sitemaps & Structured LLM Context
-Sitemap: https://nova-browser.org/sitemap.xml
-# LLM Context: https://nova-browser.org/llms.txt

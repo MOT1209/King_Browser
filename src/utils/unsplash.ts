@@ -548,7 +548,7 @@ function broadcastWallpaperSync(photo: WallpaperPhoto, pool: WallpaperPhoto[], i
 
   if (typeof window !== 'undefined') {
     try {
-      window.dispatchEvent(new CustomEvent('nova-wallpaper-sync', {
+      window.dispatchEvent(new CustomEvent('king-wallpaper-sync', {
         detail: { photo, pool, isUserOverride }
       }));
     } catch (e) {}
@@ -790,12 +790,12 @@ export function useLiveUnsplashPhoto(enabled = true) {
         }
       }
     };
-    window.addEventListener('nova-wallpaper-sync', handleCustomSync);
+    window.addEventListener('king-wallpaper-sync', handleCustomSync);
 
     return () => {
       subscribers.delete(listener);
       window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('nova-wallpaper-sync', handleCustomSync);
+      window.removeEventListener('king-wallpaper-sync', handleCustomSync);
     };
   }, []);
 
