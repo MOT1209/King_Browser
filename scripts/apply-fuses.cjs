@@ -38,7 +38,10 @@ function getElectronBinaryPath(context) {
     case 'win32':
       return path.join(context.appOutDir, `${productName}.exe`);
     case 'linux':
-      return path.join(context.appOutDir, productName);
+      // The Linux executable is named after executableName ("king-browser"),
+      // not the product name ("King Browser"). Using the product name made the
+      // existence check below fail and silently skipped every fuse.
+      return path.join(context.appOutDir, context.packager.executableName || productName);
     default:
       return null;
   }
