@@ -18,6 +18,7 @@
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/MOT1209/King_Browser)
   [![CI](https://github.com/MOT1209/King_Browser/actions/workflows/ci.yml/badge.svg)](https://github.com/MOT1209/King_Browser/actions/workflows/ci.yml)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/MOT1209/King_Browser)
+  [![Website](https://img.shields.io/badge/Website-king--browser.vercel.app-000000?style=for-the-badge&logo=vercel)](https://king-browser.vercel.app)
 
   <p align="center">
     <a href="#why-king">Why King?</a> •
@@ -431,9 +432,11 @@ King Browser runs fully offline out of the box with zero required configuration.
 
 ## Quick Start
 
+Project website: <https://king-browser.vercel.app> (deployed from `website/` on every push to `main`).
+
 ### Option A: Download a Release
 
-> **No release has been published yet.** Until then, use Option B. Builds are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen will warn about them.
+> **No release has been published yet.** Until then, use Option B. Builds are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen will warn about them. Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed; signing turns on once the certificate secrets are configured (see the header of that file).
 
 Once published, installers will be available from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
 - **macOS**: `King-Browser-arm64.dmg` (Apple Silicon) or `King-Browser-x64.dmg` (Intel)
