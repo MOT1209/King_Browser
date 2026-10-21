@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { encryptDataWithFallback, decryptDataWithFallback } from '../electron/main/proxySecurity';
+import { isStorageAccessPermission } from '../electron/main/windowOpenPolicy';
 
 // Execute the actual main-process permission handlers, not a duplicate policy.
 const source = fs.readFileSync(path.resolve('electron/main.ts'), 'utf8');
@@ -22,6 +23,7 @@ const context: any = {
   ipcMain: { handle: (name: string, fn: Function) => handlers.set(name, fn) },
   isTrustedSender: () => true,
   isTrustedAppOrigin: () => false,
+  isStorageAccessPermission,
   mainWindow: { isDestroyed: () => false, webContents: { send: (_name: string, prompt: any) => prompts.push(prompt) } },
   setTimeout: (fn: Function, ms: number) => { const timer = setTimeout(fn as any, ms); timers.add(timer); return timer; },
   clearTimeout: (timer: ReturnType<typeof setTimeout>) => { clearTimeout(timer); timers.delete(timer); },

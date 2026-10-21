@@ -431,6 +431,16 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     [isNewTab, isSettingsTab, isHistoryTab, isDownloadsTab, isChangelogTab]
   );
 
+  // The <webview> src is set once per mounted element. Electron reloads the
+  // guest (as a GET) whenever the src attribute changes, and the navigation
+  // handlers below rewrite tab.url before a navigation commits, so binding src
+  // to tab.url aborted login form POSTs, replayed OAuth redirects and reloaded
+  // SPA sign-in steps. Later navigations go through the loadURL effect.
+  const webviewSrc = React.useMemo(
+    () => getSafeUrl(tab?.url),
+    [tab?.id, rendersWebview, tab?.isSuspended]
+  );
+
   const latestTabRef = useRef(tab);
   // Latest-settings ref: the main webview effect intentionally does NOT depend
   // on `settings` (re-running would re-attach 18 listeners and reset webview
@@ -509,7 +519,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             isPlayingAudio: false
           };
           setCrashInfo({ crashed: false });
-          if (targetUrl && targetUrl !== 'about:blank') {
+          // In-page (pushState/hash) navigations are reported by
+          // did-navigate-in-page; updating the URL here as well is redundant.
+          if (targetUrl && targetUrl !== 'about:blank' && !e?.isInPlace) {
             lastLoadedUrl.current = targetUrl;
             updates.url = targetUrl;
           }
@@ -1354,7 +1366,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             ref={webviewRef}
             data-tab-id={tab.id}
             partition={isIncognito && tab?.id ? `incognito-${tab.id}` : undefined}
-            src={getSafeUrl(tab.url)}
+            src={webviewSrc}
+            // Lets sign-in popups (window.open) reach setWindowOpenHandler in
+            // main. React drops a boolean `true` on this element, so pass a string.
+            allowpopups={'true' as any}
             className="w-full h-full flex-1 border-none bg-white absolute inset-0"
             webpreferences="contextIsolation=yes, nodeIntegration=no, webSecurity=yes, sandbox=yes"
           />
