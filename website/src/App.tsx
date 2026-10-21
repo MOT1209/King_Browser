@@ -7,9 +7,10 @@ const REPO = 'https://github.com/MOT1209/King_Browser'
 /** Keep in step with package.json "version": Windows installers carry it in their file names. */
 const VERSION = '0.0.1'
 const RELEASE = `${REPO}/releases/latest/download/`
+// Windows first and selected by default: it is the platform released first.
 const platforms = [
-  { name: 'macOS', icon: Command, choices: [{ name: 'Apple Silicon', file: 'King-Browser-arm64.dmg', type: '.dmg' }, { name: 'Intel', file: 'King-Browser-x64.dmg', type: '.dmg' }] },
   { name: 'Windows', icon: Monitor, choices: [{ name: 'Setup · x64', file: `King-Browser-Setup-${VERSION}-x64.exe`, type: '.exe' }, { name: 'Portable · x64', file: `King-Browser-${VERSION}-x64.exe`, type: '.exe' }] },
+  { name: 'macOS', icon: Command, choices: [{ name: 'Apple Silicon', file: 'King-Browser-arm64.dmg', type: '.dmg' }, { name: 'Intel', file: 'King-Browser-x64.dmg', type: '.dmg' }] },
   { name: 'Linux', icon: Terminal, choices: [{ name: 'AppImage · x64', file: 'King-Browser-x86_64.AppImage', type: '.AppImage' }, { name: 'Debian / Ubuntu', file: 'King-Browser-amd64.deb', type: '.deb' }] },
 ]
 
