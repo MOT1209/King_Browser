@@ -42,7 +42,17 @@ jobs:
       - run: npm ci --no-audit --no-fund
 
       - name: Build installers
-        run: npm run ${{ matrix.script }} -- --publish never
+        shell: bash
+        # Signing is opt-in. An unset secret reaches the job as an empty string,
+        # and electron-builder reads an empty CSC_LINK as a file path (the
+        # project directory) and fails with "not a file". Drop the variables
+        # entirely when there is no certificate and build unsigned.
+        run: |
+          if [ -z "$CSC_LINK" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          npm run ${{ matrix.script }} -- --publish never
         env:
           CSC_LINK: ${{ matrix.os == 'windows-latest' && secrets.WIN_CSC_LINK || secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ matrix.os == 'windows-latest' && secrets.WIN_CSC_KEY_PASSWORD || secrets.CSC_KEY_PASSWORD }}

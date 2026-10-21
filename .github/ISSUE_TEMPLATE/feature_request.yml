@@ -1,12 +1,12 @@
 name: Feature Request
-description: Propose an idea, feature, or enhancement for Nova Browser
+description: Propose an idea, feature, or enhancement for King Browser
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for suggesting an enhancement for Nova Browser. Please check existing issues to ensure the idea has not already been submitted.
+        Thank you for suggesting an enhancement for King Browser. Please check existing issues to ensure the idea has not already been submitted.
   - type: textarea
     id: problem
     attributes:
@@ -32,7 +32,7 @@ body:
     id: area
     attributes:
       label: Component Area
-      description: Which subsystem of Nova Browser does this proposal primarily affect?
+      description: Which subsystem of King Browser does this proposal primarily affect?
       options:
         - Core Browser & Webview
         - Model Context Protocol (MCP) Server
