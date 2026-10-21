@@ -7,12 +7,6 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import os from "os";
 import path from "path";
 import fs from "fs";
-// The SDK's default 60s request timeout is shorter than the approval window
-// (120s) plus execution window (15s) in src/utils/mcpActionTiming.ts, so a slow
-// human approval would surface to the agent as a failure while the action can
-// still run afterwards. Wait longer than both windows combined.
-const TOOL_CALL_TIMEOUT_MS = 150_000;
-
 function getUserDataPath() {
   const home = os.homedir();
   if (process.platform === "darwin") {
