@@ -30,9 +30,12 @@ async function run() {
   assert.equal(document.activeElement?.id, 'tour-tab-2')
   assert.equal(document.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby'), 'tour-tab-2')
   references()
-  await click(document.getElementById('platform-tab-1'))
+  assert.equal(document.getElementById('platform-tab-0')?.textContent, 'Windows', 'Windows is listed first')
+  assert.equal(document.getElementById('platform-tab-0')?.getAttribute('aria-selected'), 'true', 'Windows is selected by default')
   const downloadLinks = [...document.querySelectorAll('.download-file')]
   assert.equal(downloadLinks.length, 2, 'Windows platform must offer both Setup and Portable choices')
+  await click(document.getElementById('platform-tab-1'))
+  assert.equal(document.getElementById('platform-tab-1')?.textContent, 'macOS')
   await click(document.getElementById('platform-tab-2'))
   references()
   const menu = document.querySelector('.menu-button')!
