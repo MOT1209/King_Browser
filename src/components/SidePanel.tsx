@@ -28,6 +28,7 @@ import { tts } from '../services/tts';
 import { getLocale } from '../services/i18n';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { copyTextToClipboard } from '../utils/clipboard';
+import { AssistantApprovalCard } from './AssistantApprovalCard';
 import { useSafeTimeout } from '../hooks/useSafeTimeout';
 import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import { PromptInput } from './ui/ai-chat-input';
@@ -950,6 +951,7 @@ export const SidePanel = React.memo(({
           </div>
         )}
 
+        <AssistantApprovalCard />
         <div ref={messagesEndRef} />
         {showScrollButton && (
           <button

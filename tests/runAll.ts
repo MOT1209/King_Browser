@@ -95,6 +95,7 @@ import './execution_engine.test';
 import './policy_engine.test';
 import './mcp_engine_wiring.test';
 import './mcp_single_approval_authority.test';
+import './assistant_approval_card.test';
 import './engine_ipc.test';
 import './runtime_error_fixes.test';
 // Renders the §10 control panel in jsdom with its own window/document globals.
