@@ -80,6 +80,7 @@ import './clipboard_qr_failure.test';
 import './download_open_policy.test';
 import './renderer_recovery.test';
 import './trusted_sender_policy.test';
+import './host_policy.test';
 
 import './permission_boundary_regressions.test';
 import './mcp_lifecycle_regressions.test';

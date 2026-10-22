@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativ
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createTrustedSenderPolicy } from './security/trustedSender';
+import { isLocalOrIntranetHost } from './main/hostPolicy';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import http from 'http';
@@ -151,6 +152,7 @@ import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
 import { isPrivateIP } from './main/ipAddress.js';
+export { isLocalOrIntranetHost } from './main/hostPolicy';
 import { enforceModelCacheBudget, MAX_MODEL_CACHE_FILE_BYTES } from './main/modelCacheQuota.js';
 import { isAgentNavigationHostPublic } from './main/agentNavigationGuard.js';
 import { shouldReloadAfterRendererGone, markQuitting } from './main/rendererRecovery.js';
@@ -186,24 +188,7 @@ function isSafeMediaDownloadUrl(urlStr: string, allowedTypes: ('image' | 'video'
   }
 }
 
-// Reusable helper: check if hostname belongs to localhost, intranet, or private networks
-export function isLocalOrIntranetHost(hostname: string): boolean {
-  if (!hostname) return false;
-  const host = hostname.toLowerCase().replace(/\.+$/, '');
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan')) {
-    return true;
-  }
-  if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1' || host === '[::1]') {
-    return true;
-  }
-  // K-1: isPrivateIP fails closed for unknown values (isIP === 0). If host is a domain
-  // (e.g. google.com), isIP is 0, so calling isPrivateIP returned true, breaking HTTPS upgrade!
-  const bareV6 = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
-  if (isIP(bareV6) !== 0) {
-    return isPrivateIP(bareV6);
-  }
-  return false;
-}
+
 
 
 
