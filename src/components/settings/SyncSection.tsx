@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Cloud, Check, ShieldAlert, ShieldCheck, RefreshCw, Link2, Laptop, Bookmark, Key, Settings, FolderTree, Sparkles } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { syncService, KingSyncService, SyncStatus, SyncPreferences } from '../../services/syncService';
+import { KingCloudAuthForm } from '../KingCloudAuthForm';
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from '../../utils/safeStorage';
 import { getLocale } from '../../services/i18n';
 import { copyTextToClipboard } from '../../utils/clipboard';
@@ -391,18 +392,26 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
           </div>
         ) : (
           /* Pairing is not built yet: offering a code that can never be redeemed
-             is worse than saying so, so this states the one route that works. */
-          <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-8 flex flex-col items-center text-center gap-3 shadow-sm">
-            <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-              <Laptop className="w-6 h-6" />
+             is worse than saying so, so this offers the one route that works. */
+          <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 shadow-sm">
+            <div className="flex flex-col items-center text-center gap-3 mb-4">
+              <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                <Laptop className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                Sign in to sync this browser
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+                Your bookmarks, history, tabs and workspaces sync through your King Cloud
+                account. Pairing a second device with a sync code is not available yet.
+              </p>
             </div>
-            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-              Sign in to sync this browser
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
-              Your bookmarks, history, tabs and workspaces sync through your King Cloud
-              account. Pairing a second device with a sync code is not available yet.
-            </p>
+            <KingCloudAuthForm
+              onAuthenticated={() => {
+                // The service notifies subscribers, which updates this card via
+                // the subscription above. Nothing else to do here.
+              }}
+            />
           </div>
         )}
       </section>

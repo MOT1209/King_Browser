@@ -20,6 +20,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { syncService, KingSyncService, SyncStatus, SyncPreferences } from '../services/syncService';
+import { KingCloudAuthForm } from './KingCloudAuthForm';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useSafeTimeout } from '../hooks/useSafeTimeout';
@@ -438,19 +439,18 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 </div>
               ) : (
                 /* Pairing is not built yet: say so instead of offering a code
-                   that can never be redeemed. */
-                <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 space-y-2.5 text-center">
-                  <div className="flex justify-center">
-                    <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                      <Laptop className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                    Sign in to sync this browser
-                  </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Your bookmarks, history, tabs and workspaces sync through your King Cloud
-                    account. Pairing a second device with a sync code is not available yet.
+                   that can never be redeemed, and give the user the route that
+                   actually works — a King Cloud (or local-vault) sign-in. */
+                <div className="space-y-3">
+                  <KingCloudAuthForm
+                    compact
+                    onAuthenticated={async () => {
+                      if (onPerformSync) await onPerformSync();
+                    }}
+                  />
+                  <p className="px-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed text-center">
+                    Sign in with your King Cloud account to sync bookmarks, history, tabs and
+                    workspaces. Pairing a second device with a sync code is not available yet.
                   </p>
                 </div>
               )}
