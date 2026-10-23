@@ -331,7 +331,15 @@ nativeTheme.on('updated', () => {
 });
 
 
-function getAcceptLanguagesForLocale(_localeOrLang?: string): string {
+/**
+ * Maps an interface language (or a system locale) to an Accept-Language
+ * header. English stays the fallback so sites without Arabic or German
+ * translations still resolve predictably.
+ */
+function getAcceptLanguagesForLocale(localeOrLang?: string): string {
+  const base = String(localeOrLang || 'en').trim().toLowerCase().split(/[-_]/)[0];
+  if (base === 'ar') return 'ar,ar-SA;q=0.9,en-US;q=0.8,en;q=0.7';
+  if (base === 'de') return 'de,de-DE;q=0.9,en-US;q=0.8,en;q=0.7';
   return 'en-US,en;q=0.9';
 }
 

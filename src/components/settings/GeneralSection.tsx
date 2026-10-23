@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
+import { useTranslation } from '../../services/i18n';
+import { normalizeLanguage } from '../../services/language';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
 import { UpdateWidget } from './UpdateWidget';
@@ -16,6 +18,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
   onUpdateSettings,
   onClearHistory,
 }) => {
+  const { t } = useTranslation();
   const [appVersion, setAppVersion] = useState<string>(() => {
     return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.0';
   });
@@ -44,6 +47,39 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      <section>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{t('settings.selectLanguage')}</h2>
+        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('settings.languageDesc')}</p>
+          <div role="radiogroup" aria-label={t('settings.selectLanguage')} className="flex flex-col sm:flex-row gap-2">
+            {([
+              { id: 'en', label: 'English' },
+              { id: 'ar', label: 'العربية' },
+              { id: 'de', label: 'Deutsch' }
+            ] as const).map(option => {
+              const active = normalizeLanguage(settings.language) === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  dir={option.id === 'ar' ? 'rtl' : 'ltr'}
+                  onClick={() => onUpdateSettings({ language: option.id })}
+                  className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
+                    active
+                      ? 'bg-slate-900 text-white shadow-md dark:bg-blue-600 dark:text-white'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       <section>
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">About King</h2>

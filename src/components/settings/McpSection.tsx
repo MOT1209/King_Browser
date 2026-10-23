@@ -72,6 +72,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
   const [mcpCopied, setMcpCopied] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [logExporting, setLogExporting] = useState(false);
   const { setSafeTimeout } = useSafeTimeout();
 
   const fetchMcpStatus = useCallback(async () => {
@@ -173,6 +174,33 @@ export const McpSection: React.FC<McpSectionProps> = ({
     }
   }
 }`;
+
+  const handleExportLog = async (format: 'json' | 'csv') => {
+    if (logExporting) return;
+    setLogExporting(true);
+    try {
+      const api = (window as any).electronAPI;
+      if (api?.exportEngineLog) {
+        const content = await api.exportEngineLog(format);
+        if (typeof content === 'string' && content) {
+          const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          const ts = new Date().toISOString().replace(/[:.]/g, '-');
+          a.href = url;
+          a.download = `king-activity-${ts}.${format}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to export activity log', e);
+    } finally {
+      setLogExporting(false);
+    }
+  };
 
   const handleCopyConfig = async () => {
     // Main builds the config with the real token — prefer IPC over the
@@ -291,6 +319,34 @@ export const McpSection: React.FC<McpSectionProps> = ({
           </button>
         </div>
         <p className="text-xs text-slate-500">This token is required for all MCP clients to connect securely.</p>
+      </div>
+
+      {/* Activity Log */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-slate-800 dark:text-slate-100">Agent Activity Log</p>
+            <p className="text-xs text-slate-500 mt-0.5">Export every executed/declined action with reason (JSON or CSV). Stored in memory.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleExportLog('json')}
+              disabled={logExporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              {logExporting ? 'Exporting…' : 'Export JSON'}
+            </button>
+            <button
+              onClick={() => handleExportLog('csv')}
+              disabled={logExporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              {logExporting ? 'Exporting…' : 'Export CSV'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Config snippet */}

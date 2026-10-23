@@ -1,3 +1,5 @@
+import { normalizeLanguage } from '../services/language';
+
 export interface Tab {
   id: string;
   url: string;
@@ -128,7 +130,27 @@ export interface UserSettings {
   language?: 'en' | 'tr' | 'ar' | 'de';
 }
 
+/**
+ * Best-effort interface-language detection for a first launch. Only the three
+ * shipped languages are returned; every other system language, including
+ * Turkish, starts in English.
+ */
 export function detectSystemLanguage(): 'en' | 'tr' | 'ar' | 'de' {
+  try {
+    if (typeof navigator !== 'undefined') {
+      const candidates = [
+        navigator.language,
+        ...(Array.isArray(navigator.languages) ? navigator.languages : [])
+      ];
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+        const base = candidate.toLowerCase().split(/[-_]/)[0];
+        if (base === 'ar' || base === 'de' || base === 'en') return normalizeLanguage(candidate);
+      }
+    }
+  } catch (_) {
+    // Fall through to English when the environment has no navigator.
+  }
   return 'en';
 }
 

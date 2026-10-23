@@ -125,6 +125,7 @@ Current English interface in Clean Minimalist mode with the light theme.
 - **End-to-End Encryption (AES-256-GCM)**: Saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted locally with PBKDF2 (600,000 iterations) and 256-bit AES-GCM before transmission.
 - **Encrypted Multi-Device Sync**: Sign in with your King Cloud account to synchronize bookmarks, passwords, and preferences across your computers in real-time over Supabase Realtime WebSockets. Encryption keys stay on your local device; the cloud server only ever receives encrypted ciphertext.
 - **Local Vault Mode**: When no King Cloud project is configured, signing up still creates a vault protected by your password (PBKDF2 600,000 iterations, AES-256-GCM) but it is stored on this device only. The sign-in form says so explicitly and nothing is uploaded, so a local account is never presented as synced.
+- **Password Recovery**: King Cloud accounts can request a password-reset email from the sign-in form ("Forgot password?"). Local-vault accounts have no recovery path by design — the password is the encryption key.
 - **Code-Based Pairing (Roadmap)**: Accountless 1-click device pairing via temporary sync codes is in active development for a future release. Until the join flow exists, the UI states that pairing is unavailable instead of offering a code that cannot be redeemed.
 
 ### On-Device Whisper Voice & Speech Recognition

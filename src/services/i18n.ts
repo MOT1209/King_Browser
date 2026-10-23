@@ -1,32 +1,113 @@
-// King has a single, bundled English interface.
+/**
+ * King ships three interface languages: English, Arabic and German.
+ *
+ * The dictionaries are bundled, so switching languages is synchronous and
+ * works offline. Arabic is right-to-left; English and German are left-to-right.
+ * The active language is persisted to `nova_language` and reflected on the
+ * document element so layout and assistive technology see it immediately.
+ */
 import en from '../locales/en.json';
+import ar from '../locales/ar.json';
+import de from '../locales/de.json';
 import { useState, useEffect } from 'react';
+import {
+  INTERFACE_LANGUAGES,
+  LOCALE_MAP,
+  getLocaleFor,
+  isRTLLanguage,
+  normalizeLanguage,
+  type InterfaceLanguage,
+  type SupportedLanguage
+} from './language';
 
-export type SupportedLanguage = 'en' | 'tr' | 'ar' | 'de';
+export {
+  INTERFACE_LANGUAGES,
+  LOCALE_MAP,
+  normalizeLanguage,
+  type InterfaceLanguage,
+  type SupportedLanguage
+};
 
-// Retain legacy codes at the API boundary so old backups and callers remain
-// readable. They cannot select another interface language.
 type Dictionary = Record<string, any>;
-const dictionaries: Record<string, Dictionary> = { en };
-const activeLanguage: SupportedLanguage = 'en';
+
+const dictionaries: Record<InterfaceLanguage, Dictionary> = { en, ar, de };
+
+/**
+ * Reads the last selected interface language. `user_settings` is consulted
+ * second so preferences saved before `nova_language` existed still survive.
+ */
+function readStoredLanguage(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const direct = localStorage.getItem('nova_language');
+    if (direct) return direct;
+    const raw = localStorage.getItem('user_settings');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.language === 'string') return parsed.language;
+  } catch (_) {
+    return null;
+  }
+  return null;
+}
+
+function detectInitialLanguage(): InterfaceLanguage {
+  const stored = readStoredLanguage();
+  if (stored) return normalizeLanguage(stored);
+  try {
+    if (typeof navigator !== 'undefined' && navigator.language) {
+      return normalizeLanguage(navigator.language);
+    }
+  } catch (_) {}
+  return 'en';
+}
+
+let activeLanguage: InterfaceLanguage = detectInitialLanguage();
+
+function applyDocumentLanguage(lang: InterfaceLanguage): void {
+  if (typeof document === 'undefined') return;
+  try {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = isRTLLanguage(lang) ? 'rtl' : 'ltr';
+  } catch (_) {}
+}
+
+applyDocumentLanguage(activeLanguage);
 
 export function ensureLanguageLoaded(_lang?: SupportedLanguage): Promise<void> {
   return Promise.resolve();
 }
 
-/** Compatibility with older callers; the bundled English dictionary is fixed. */
-export function seedDictionary(_lang: SupportedLanguage, _dict: Dictionary): void {}
+function mergeDictionary(target: Dictionary, source: Dictionary): void {
+  for (const [key, value] of Object.entries(source)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const existing = target[key];
+      if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+        target[key] = {};
+      }
+      mergeDictionary(target[key], value as Dictionary);
+    } else {
+      target[key] = value;
+    }
+  }
+}
+
+/**
+ * Overlays strings on a bundled dictionary. Used by tests and by callers that
+ * extend the interface at runtime; unknown codes resolve to English.
+ */
+export function seedDictionary(lang: SupportedLanguage, dict: Dictionary): void {
+  if (!dict || typeof dict !== 'object') return;
+  const target = normalizeLanguage(lang);
+  mergeDictionary(dictionaries[target], dict);
+}
 
 export function isLanguageReady(_lang?: SupportedLanguage): boolean {
   return true;
 }
 
-export const LOCALE_MAP: Record<SupportedLanguage, string> = {
-  en: 'en-US', tr: 'en-US', de: 'en-US', ar: 'en-US'
-};
-
-export function getLocale(_lang?: SupportedLanguage): string {
-  return 'en-US';
+export function getLocale(lang?: SupportedLanguage): string {
+  return getLocaleFor(lang ?? activeLanguage);
 }
 
 export function formatDate(date: Date | number, lang?: SupportedLanguage, options?: Intl.DateTimeFormatOptions): string {
@@ -41,32 +122,30 @@ export function formatTime(date: Date | number, lang?: SupportedLanguage, option
   return d.toLocaleTimeString(locale, options || { hour: '2-digit', minute: '2-digit' });
 }
 
-if (typeof document !== 'undefined') {
-  document.documentElement.lang = 'en';
-  document.documentElement.dir = 'ltr';
-}
-
 const listeners = new Set<(lang: SupportedLanguage) => void>();
 
-export function isRTL(_lang?: string): boolean {
-  return false;
+export function isRTL(lang?: string): boolean {
+  return isRTLLanguage(lang ?? activeLanguage);
 }
 
 export function getLanguage(): SupportedLanguage {
-  return 'en';
+  return activeLanguage;
 }
 
-export function setLanguage(_lang: SupportedLanguage): void {
-  // Do not rewrite user_settings here: its persistence owner holds live state.
+/**
+ * Selects an interface language, persists it and notifies subscribers.
+ * Legacy codes resolve to English. The settings hook owns `user_settings`
+ * persistence, so this only writes the small boot-time key.
+ */
+export function setLanguage(lang: SupportedLanguage | string): void {
+  const next = normalizeLanguage(lang);
+  activeLanguage = next;
   try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('nova_language', 'en');
+    if (typeof localStorage !== 'undefined') localStorage.setItem('nova_language', next);
   } catch (_) {}
-  if (typeof document !== 'undefined') {
-    document.documentElement.lang = 'en';
-    document.documentElement.dir = 'ltr';
-  }
+  applyDocumentLanguage(next);
   listeners.forEach(fn => {
-    try { fn('en'); } catch (_) {}
+    try { fn(next); } catch (_) {}
   });
 }
 
@@ -140,7 +219,8 @@ export function t(path: string, params?: Record<string, string | number>): strin
   const dict = dictionaries[activeLanguage] || dictionaries.en;
   const parts = path.split('.');
 
-  // Base string, with the pre-existing whole-key fallback to English.
+  // Base string, with a whole-key fallback to English when the active
+  // dictionary has not been translated yet.
   let current = lookupString(dict, parts);
   if (current === undefined) {
     current = lookupString(dictionaries.en, parts);
@@ -157,7 +237,7 @@ export function t(path: string, params?: Record<string, string | number>): strin
     // further level of nesting. The category always comes from the *active*
     // locale's rules, and the variant is only ever read from the active
     // dictionary: borrowing another language's inflected form would leak e.g.
-    // English "1 total item" into a Turkish UI, which is strictly worse than
+    // English "1 total item" into an Arabic UI, which is strictly worse than
     // the uninflected base string. Keys without a suffixed variant render
     // exactly as they always have.
     const count = firstNumericParam(params);
