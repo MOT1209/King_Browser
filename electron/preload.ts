@@ -225,4 +225,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkMicrophonePermission: () => ipcRenderer.invoke('check-microphone-permission'),
   requestMicrophonePermission: () => ipcRenderer.invoke('request-microphone-permission'),
   openSystemSettings: (pane?: string) => ipcRenderer.invoke('open-system-settings', pane),
+  openCrashLogsFolder: () => ipcRenderer.invoke('open-crash-logs-folder'),
 });

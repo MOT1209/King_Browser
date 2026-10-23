@@ -39,3 +39,30 @@ assert.match(main, /setWindowOpenHandler\(\(\{ url, disposition \}\) => \{[\s\S]
   'the guest window-open handler gives sign-in popups a real window');
 assert.match(main, /isStorageAccessPermission\(permission\)/, 'the permission check answers storage access');
 console.log('[PASS] [LoginFix] webview src, popups, preload and permission wiring');
+
+// 4. A sign-in popup must stay in the session that opened it. Returning a
+//    `webPreferences` override REPLACES the inherited one, and a popup without
+//    an explicit session lands on the default session - so an incognito tab's
+//    OAuth popup could read the normal profile's cookies.
+assert.match(main, /session: contents\.session/,
+  'the popup override pins the opener session');
+assert.match(main, /did-create-window'[\s\S]{0,700}?child\.webContents\.session !== contents\.session/,
+  'a popup that did not inherit the opener session is closed instead of used');
+assert.match(main, /did-create-window'[\s\S]{0,900}?child\.webContents\.setWindowOpenHandler\(\(\) => \(\{ action: 'deny' \}\)\)/,
+  'a sign-in popup cannot open further windows');
+assert.doesNotMatch(main, /nativeWindowOpen/,
+  'native window open is never disabled: window.opener and postMessage depend on it');
+console.log('[PASS] [LoginFix] popup session inheritance, no popup chains, window.opener preserved');
+
+// 5. The Google rejection escape hatch must reach popups and iframes. Popups are
+//    type 'window', and the rejection usually arrives in a subframe, which
+//    'did-navigate' never reports.
+assert.match(main, /wcType === 'webview' \|\| wcType === 'window'/,
+  'OAuth popup windows are watched for a Google rejection');
+assert.match(main, /on\('did-frame-navigate'[\s\S]{0,120}?onNavigate\(/,
+  'iframe-based rejections reach the fallback');
+assert.match(main, /isStorageAccessPermission\(permission\) && !isTrustedAppOrigin\(url\)/,
+  'a storage-access REQUEST is answered, not queued as a raw-string prompt');
+assert.match(main, /'storage-access': 'Storage Access/,
+  'storage access has a human-readable permission label');
+console.log('[PASS] [LoginFix] Google fallback covers popups and iframes; storage access is labelled');

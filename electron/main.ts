@@ -2,7 +2,11 @@ import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativ
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createTrustedSenderPolicy } from './security/trustedSender';
+import { appendCrashLog as writeCrashLog } from './main/crashLog';
 import { isLocalOrIntranetHost } from './main/hostPolicy';
+import { isExtensionAllowedInIncognito, setExtensionIncognitoAccess, hasExtensionIncognitoAccess } from './main/incognitoExtensions';
+import { openPageSourceViewer as createPageSourceViewer } from './windows/sourceViewer';
+import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import http from 'http';
@@ -14,10 +18,11 @@ import createDOMPurify from 'dompurify';
 import { checkPhishingDomain, matchesExtensionHostPermission } from '../src/utils/securityUtils.js';
 import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity';
 export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt };
+export { isSafeSubframeNavigation } from './main/windowOpenPolicy';
+export { isExtensionAllowedInIncognito } from './main/incognitoExtensions';
 
 console.log('Main process starting...');
 
-const MAX_CRASH_LOG_BYTES = 1024 * 1024; // 1 MB cap to prevent disk exhaustion
 // Registered once at module scope on purpose: createWindow runs again on every
 // macOS activate, so an app-level listener added there would accumulate.
 // NOTE: render-process-gone fires on `app`, not on webContents.
@@ -40,36 +45,19 @@ app.on('render-process-gone', (_event, contents, details) => {
 });
 
 function appendCrashLog(entry: string): void {
+  // Before app startup, userData may not be available yet; use a private app-owned
+  // directory rather than a shared temporary directory.
+  let crashDir: string;
   try {
-    // Avoid shared os.tmpdir() to prevent insecure temporary file / symlink attacks.
-    let crashDir: string;
-    try {
-      crashDir = app.isReady() ? app.getPath('userData') : path.join(require('os').homedir(), '.king-browser');
-    } catch {
-      crashDir = path.join(require('os').homedir(), '.king-browser');
-    }
-    try {
-      fs.mkdirSync(crashDir, { recursive: true, mode: 0o700 });
-    } catch {}
-    const logPath = path.join(crashDir, 'crash.log');
-    let fd: number | null = null;
-    try {
-      fd = fs.openSync(logPath, 'a+', 0o600);
-      const stats = fs.fstatSync(fd);
-      if (stats.size > MAX_CRASH_LOG_BYTES) {
-        const readLen = Math.min(100 * 1024, stats.size);
-        const buf = Buffer.alloc(readLen);
-        fs.readSync(fd, buf, 0, readLen, stats.size - readLen);
-        fs.ftruncateSync(fd, 0);
-        fs.writeSync(fd, buf, 0, readLen, 0);
-      }
-      fs.writeSync(fd, Buffer.from(entry, 'utf8'));
-    } finally {
-      if (fd !== null) {
-        try { fs.closeSync(fd); } catch {}
-      }
-    }
-  } catch {}
+    crashDir = app.isReady() ? app.getPath('userData') : path.join(os.homedir(), '.king-browser');
+  } catch {
+    crashDir = path.join(os.homedir(), '.king-browser');
+  }
+  try {
+    writeCrashLog(path.join(crashDir, 'crash.log'), entry);
+  } catch (error) {
+    console.error('[CrashLog] Unable to append local crash log:', error);
+  }
 }
 
 // Process-level crash guards: log errors safely to prevent full browser shutdown DoS
@@ -1703,6 +1691,14 @@ app.whenReady().then(async () => {
       const keys = permissionKeys(permission, (details as any)?.mediaTypes);
       if (!keys) return callback(false);
 
+      // Embedded sign-in frames also *request* storage access, not just check
+      // it. Third-party cookies already work in this browser, so the check
+      // handler answers yes; asking the user for a bare "storage-access" string
+      // was a confusing prompt that blocked the very widget the check allowed.
+      if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(url)) {
+        return callback(true);
+      }
+
       // Internal app pages: Allow microphone (audio) only with explicit user confirmation/remember.
       // Other permissions (camera, location, clipboard, openExternal, etc.) remain strictly denied.
       if (isTrustedAppOrigin(url)) {
@@ -1798,7 +1794,9 @@ app.whenReady().then(async () => {
         'clipboard-read': 'Read Clipboard',
         'clipboard-sanitized-write': 'Write Clipboard',
         'display-capture': 'Screen Sharing',
-        'window-management': 'Window Management'
+        'window-management': 'Window Management',
+        'storage-access': 'Storage Access (embedded sign-in)',
+        'top-level-storage-access': 'Storage Access (top-level)'
       };
 
       let permissionName = permissionNames[permission] || permission;
@@ -3311,21 +3309,6 @@ fi
   // Cmd+F is covered by the Edit menu accelerator ("Find in Page...").
 });
 
-/**
- * Restricts subframe navigation strictly to safe schemes: http:, https:, and about:blank.
- */
-export function isSafeSubframeNavigation(url: string): boolean {
-  if (!url || typeof url !== 'string') return false;
-  try {
-    const parsed = new URL(url);
-    const isSafeHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
-    const isSafeAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
-    return isSafeHttp || isSafeAboutBlank;
-  } catch {
-    return false;
-  }
-}
-
 app.on('web-contents-created', (_event, contents) => {
   // Security: Force secure webPreferences for any <webview> tags
   contents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -3430,7 +3413,12 @@ app.on('web-contents-created', (_event, contents) => {
               nodeIntegration: false,
               contextIsolation: true,
               sandbox: true,
-              webSecurity: true
+              webSecurity: true,
+              // An override REPLACES the inherited webPreferences, so without
+              // this the popup is built on the default session. An incognito
+              // page's OAuth popup then ran with the normal profile's cookies.
+              // Electron treats `session` as authoritative over `partition`.
+              session: contents.session
             }
           }
         };
@@ -3443,6 +3431,24 @@ app.on('web-contents-created', (_event, contents) => {
       }
     } catch {}
     return { action: 'deny' };
+  });
+
+  // Security: the popup that was just allowed must stay in the same session as
+  // the page that opened it (defence in depth for the `session` above) and must
+  // not open further windows of its own — popup chains are a phishing and
+  // flood vector, and a sign-in popup has no legitimate reason to spawn one.
+  contents.on('did-create-window', (child) => {
+    try {
+      if (child.isDestroyed()) return;
+      if (child.webContents.session !== contents.session) {
+        console.error('[Security] Closing a sign-in popup that did not inherit its opener session');
+        child.destroy();
+        return;
+      }
+      child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    } catch (err) {
+      console.error('[Security] Failed to harden a sign-in popup:', err);
+    }
   });
 
   if (contents.getType() === 'webview') {
@@ -3986,93 +3992,14 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
   }
 });
 
-/**
- * Opens a dedicated sandboxed window to safely view page source without
- * routing dangerous view-source: schemes through renderer navigation.
- */
 export async function openPageSourceViewer(currentUrl: string, wc?: any): Promise<BrowserWindow | null> {
-  if (!currentUrl || typeof currentUrl !== 'string') return null;
-
-  let isInternalPage = false;
-  let isViewSource = false;
-  try {
-    const parsed = new URL(currentUrl);
-    isInternalPage = parsed.protocol.startsWith('king');
-    isViewSource = parsed.protocol === 'view-source:';
-  } catch {
-    isInternalPage = currentUrl.toLowerCase().startsWith('king');
-    isViewSource = currentUrl.toLowerCase().startsWith('view-source:');
-  }
-
-  if (isInternalPage || isViewSource) return null;
-
-  let htmlSource = '';
-  if (wc && !wc.isDestroyed() && typeof wc.executeJavaScript === 'function') {
-    try {
-      htmlSource = await wc.executeJavaScript('document.documentElement.outerHTML');
-    } catch {}
-  }
-
-  if (!htmlSource && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
-    try {
-      const validated = await validatePreviewUrl(currentUrl);
-      if (!('error' in validated)) {
-        const { url: parsedUrl, pinnedIp } = validated;
-        const isHttps = parsedUrl.protocol === 'https:';
-        const agentOptions = {
-          lookup: (_hostname: string, _opts: any, cb: any) => {
-            cb(null, pinnedIp, pinnedIp.includes(':') ? 6 : 4);
-          }
-        };
-        const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
-        const resp = await fetch(currentUrl, {
-          agent,
-          signal: AbortSignal.timeout(8000),
-          headers: {
-            'User-Agent': getStandardUserAgent()
-          }
-        } as any);
-        // Bounded like every sibling fetch path: an adversarially large or
-        // never-ending body would otherwise be buffered into the main process and
-        // then serialised a second time into the viewer, twice over.
-        htmlSource = await readResponseTextWithLimit(resp, 8 * 1024 * 1024);
-      }
-    } catch {}
-  }
-
-  const sourceWin = new BrowserWindow({
-    title: `Source: ${currentUrl}`,
-    width: 1000,
-    height: 700,
-    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
-    autoHideMenuBar: true,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-    }
+  return createPageSourceViewer(currentUrl, wc, {
+    getMainWindow: () => mainWindow,
+    validatePreviewUrl,
+    fetch: fetch as any,
+    getStandardUserAgent,
+    readResponseTextWithLimit,
   });
-
-  sourceWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  sourceWin.webContents.on('will-navigate', (navEvt) => navEvt.preventDefault());
-
-  try {
-    if (!sourceWin.isDestroyed()) {
-      await sourceWin.loadURL('about:blank');
-      if (!sourceWin.isDestroyed()) {
-        await sourceWin.webContents.executeJavaScript(`
-          document.title = ${JSON.stringify(`Source: ${currentUrl}`)};
-          document.body.style.cssText = 'margin:0;padding:16px;background:#0f172a;color:#e2e8f0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;overflow-x:auto;';
-          const pre = document.createElement('pre');
-          pre.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-all;';
-          pre.textContent = ${JSON.stringify(htmlSource || '<!-- No source available -->')};
-          document.body.appendChild(pre);
-        `);
-      }
-    }
-  } catch {}
-
-  return sourceWin;
 }
 
 // Google rejects sign-in inside embedded browsers. Offer the user's default
@@ -4080,7 +4007,9 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
 function watchGoogleSigninRejection(wc: Electron.WebContents): void {
   let lastNonGoogleUrl: string | null = null;
   let prompting = false;
-  wc.on('did-navigate', (_e, url) => {
+
+  const onNavigate = (url: string): void => {
+    if (!url) return;
     if (!isGoogleEmbeddedSigninRejection(url)) {
       try {
         if (new URL(url).hostname !== 'accounts.google.com') lastNonGoogleUrl = url;
@@ -4105,12 +4034,24 @@ function watchGoogleSigninRejection(wc: Electron.WebContents): void {
       if (response === 0) return shell.openExternal(target);
     }).catch((err) => console.error('[Google Sign-in] Fallback failed:', err))
       .finally(() => { prompting = false; });
-  });
+  };
+
+  wc.on('did-navigate', (_e, url) => onNavigate(url));
+  // The rejection usually lands inside an iframe (the Google widget is
+  // embedded), and `did-navigate` only reports the top frame, so the escape
+  // hatch never appeared for the most common failure. `did-frame-navigate`
+  // reports every frame; the `prompting` guard keeps the two events from
+  // showing the dialog twice for a top-level navigation.
+  wc.on('did-frame-navigate', (_e, url) => onNavigate(url));
 }
 
 // Auto-capture thumbnails and Native Chrome-Parity Context Menu for WebViews
 app.on('web-contents-created', (_event, wc) => {
-  if (wc.getType() === 'webview') watchGoogleSigninRejection(wc);
+  // Sign-in popups are type 'window', not 'webview'. Attaching the fallback to
+  // webviews only meant a Google rejection inside an OAuth popup was a dead end,
+  // which is the opposite of what the README promises.
+  const wcType = wc.getType();
+  if (wcType === 'webview' || wcType === 'window') watchGoogleSigninRejection(wc);
   wc.removeAllListeners('context-menu');
   wc.on('context-menu', (e, params) => {
     // Only show for webviews
@@ -5085,6 +5026,30 @@ ipcMain.handle('store-set', async (event, key: string, value: string) => {
   }
 });
 
+ipcMain.handle('open-crash-logs-folder', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  // Crashes that happen before app startup are appended under the private
+  // fallback directory (see appendCrashLog), not under userData. Reveal the
+  // file that actually exists so the earliest crash is reachable too.
+  const userDataLog = path.join(app.getPath('userData'), 'crash.log');
+  const earlyLog = path.join(os.homedir(), '.king-browser', 'crash.log');
+  try {
+    if (fs.existsSync(userDataLog) || fs.existsSync(earlyLog)) {
+      shell.showItemInFolder(fs.existsSync(userDataLog) ? userDataLog : earlyLog);
+      return true;
+    }
+    // No crash has been recorded yet. Open the private directory that will hold
+    // the log instead of creating an empty file only to reveal it.
+    const logDir = path.dirname(userDataLog);
+    await fs.promises.mkdir(logDir, { recursive: true, mode: 0o700 });
+    const openError = await shell.openPath(logDir);
+    return openError === '';
+  } catch (error) {
+    console.error('[CrashLog] Unable to reveal crash log:', error);
+    return false;
+  }
+});
+
 ipcMain.handle('store-get', async (event, key: string) => {
   if (!isTrustedSender(event)) return null;
   try {
@@ -5925,13 +5890,6 @@ ipcMain.handle('list-extensions', async (event) => {
   }));
 });
 
-const incognitoAllowedExtensions = new Set<string>();
-
-export function isExtensionAllowedInIncognito(extensionId: string, manifest: any): boolean {
-  if (!extensionId) return false;
-  if (manifest?.incognito === 'not_allowed') return false;
-  return incognitoAllowedExtensions.has(extensionId);
-}
 
 // Open Extension Popup Window
 ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?: number; y?: number; width?: number; height?: number } | null, activeTabInfo?: Record<string, unknown> | null) => {
@@ -6513,18 +6471,14 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
 ipcMain.handle('set-extension-incognito-access', async (event, extensionId: unknown, allowed: unknown) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
   if (typeof extensionId !== 'string' || !extensionId) return { error: 'Invalid extension ID' };
-  if (allowed === true) {
-    incognitoAllowedExtensions.add(extensionId);
-  } else {
-    incognitoAllowedExtensions.delete(extensionId);
-  }
+  setExtensionIncognitoAccess(extensionId, allowed === true);
   return { success: true };
 });
 
 ipcMain.handle('get-extension-incognito-access', async (event, extensionId: unknown) => {
   if (!isTrustedSender(event)) return false;
   if (typeof extensionId !== 'string' || !extensionId) return false;
-  return incognitoAllowedExtensions.has(extensionId);
+  return hasExtensionIncognitoAccess(extensionId);
 });
 
 // Install from Chrome Web Store (CRX download + zip-slip guards live in main/crxInstaller.ts)

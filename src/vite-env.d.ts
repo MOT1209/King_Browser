@@ -385,6 +385,7 @@ export interface ElectronAPI {
   checkMicrophonePermission: () => Promise<{ status: 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'; canAsk: boolean; platform?: string }>;
   requestMicrophonePermission: () => Promise<{ granted: boolean; status: string; platform?: string }>;
   openSystemSettings: (pane?: string) => Promise<boolean>;
+  openCrashLogsFolder: () => Promise<boolean>;
 }
 
 declare global {
