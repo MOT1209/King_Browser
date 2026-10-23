@@ -41,6 +41,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showReset, setShowReset] = useState(false);
 
   // Read on render rather than memoised: the value depends on localStorage,
   // which the settings UI can rewrite without unmounting this form.
@@ -59,6 +60,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
     setMode(next);
     setError(null);
     setNotice(null);
+    setShowReset(false);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -93,6 +95,22 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
       } else {
         setError(err instanceof Error ? err.message : 'Authentication failed.');
       }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (busy || !trimmedEmail) return;
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      await syncService.requestPasswordReset(trimmedEmail);
+      setNotice('Password reset email sent. Check your inbox for the link.');
+      setShowReset(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send the reset email.');
     } finally {
       setBusy(false);
     }
@@ -231,6 +249,35 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
           )}
         </div>
 
+        {mode === 'signin' && cloudEnabled && (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => { setError(null); setNotice(null); setShowReset(true); }}
+              disabled={busy}
+              className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline disabled:opacity-50"
+            >
+              Forgot password?
+            </button>
+          </div>
+        )}
+
+        {showReset && (
+          <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20 space-y-2">
+            <p className="text-[11px] text-slate-600 dark:text-slate-300">
+              Send a reset link to <span className="font-semibold">{trimmedEmail || 'your email'}</span>.
+            </p>
+            <button
+              type="button"
+              onClick={handleResetPassword}
+              disabled={busy || !trimmedEmail}
+              className="w-full py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white text-[11px] font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              <span>Send reset link</span>
+            </button>
+          </div>
+        )}
         {error && (
           <div
             role="alert"

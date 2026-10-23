@@ -2623,6 +2623,32 @@ export class KingSyncService {
     return account.user;
   }
 
+  /**
+   * Ask Supabase to email a password-reset link. Only meaningful for King
+   * Cloud accounts; local-vault accounts have no recovery path by design.
+   */
+  public async requestPasswordReset(email: string): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) throw new Error('Email is required');
+
+    if (!isSupabaseConfigured()) {
+      throw new Error('Password reset requires a King Cloud account');
+    }
+
+    try {
+      void this.ensureSupabaseListener();
+      const supabase = await getSupabaseClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+      if (error) throw error;
+    } catch (err) {
+      logger.warn('SyncService:requestPasswordReset', 'Password reset request failed', err);
+      if (err instanceof Error && err.message) {
+        throw new Error(err.message);
+      }
+      throw new Error('Could not send the password reset email — please try again.');
+    }
+  }
+
   public async logout() {
     void this.unsubscribeFromRealtime();
     if (isSupabaseConfigured()) {

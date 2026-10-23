@@ -37,6 +37,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
 }) => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
   const [syncLoading, setSyncLoading] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncErr, setSyncErr] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
@@ -178,10 +179,25 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                 </button>
 
                 <button
-                  onClick={() => syncService.logout()}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 dark:bg-slate-700/50 dark:hover:bg-red-500/10 dark:text-slate-300 dark:hover:text-red-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  onClick={async () => {
+                    if (logoutLoading) return;
+                    setSyncErr(null);
+                    setSyncMsg(null);
+                    setLogoutLoading(true);
+                    try {
+                      await syncService.logout();
+                      setSyncMsg('Signed out.');
+                      setSafeTimeout(() => setSyncMsg(null), 3000);
+                    } catch (e: any) {
+                      setSyncErr(e?.message || 'Sign out failed');
+                    } finally {
+                      setLogoutLoading(false);
+                    }
+                  }}
+                  disabled={logoutLoading}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 dark:bg-slate-700/50 dark:hover:bg-red-500/10 dark:text-slate-300 dark:hover:text-red-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  Leave Chain
+                  {logoutLoading ? 'Signing out…' : 'Leave Chain'}
                 </button>
               </div>
             </div>

@@ -45,6 +45,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
   const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { setSafeTimeout } = useSafeTimeout();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -142,13 +143,21 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     }
   };
 
-  const handleLeaveChain = () => {
-    // Device pairing is not implemented (syncService throws), so there is no
-    // chain to leave. This used to call logout(), which silently destroyed the
-    // user's real cloud session and every key derived from it.
-    setGeneratedCode(null);
-    setInputSyncCode('');
+  const handleLeaveChain = async () => {
+    if (isLoggingOut) return;
     setErrorMessage(null);
+    setIsLoggingOut(true);
+    try {
+      await syncService.logout();
+      setGeneratedCode(null);
+      setInputSyncCode('');
+      setSuccessMessage('Signed out successfully.');
+      setSafeTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Sign out failed');
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const handleTogglePreference = (key: keyof SyncPreferences) => {
@@ -300,10 +309,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
                       <button
                         onClick={handleLeaveChain}
-                        className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
+                        disabled={isLoggingOut}
+                        className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
                         title="Disconnect Sync"
                       >
-                        <LogOut className="w-4 h-4" />
+                        {isLoggingOut ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>

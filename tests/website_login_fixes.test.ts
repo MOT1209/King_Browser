@@ -78,4 +78,14 @@ assert.match(sync, /if \(isExistingAccountError\(err\)\) \{\s*throw new Error\('
   'registering an existing account points at sign-in instead of a retry');
 assert.match(sync, /if \(isUnconfirmedEmailError\(err\)\) throw new EmailVerificationRequiredError\(normalizedEmail\);/,
   'an unconfirmed login asks for the confirmation link instead of blaming the password');
-console.log('[PASS] [LoginFix] auth failures point at the action that can succeed');
+// 7. Password recovery is wired to Supabase's resetPasswordForEmail, and the
+//    AccountModal disconnect now performs a real logout instead of only
+//    clearing local UI state.
+assert.match(sync, /public async requestPasswordReset\(email: string\): Promise<void>/,
+  'syncService exposes requestPasswordReset');
+assert.match(sync, /supabase\.auth\.resetPasswordForEmail\(normalizedEmail\)/,
+  'password recovery uses Supabase resetPasswordForEmail');
+const accountModal = fs.readFileSync('src/components/AccountModal.tsx', 'utf8');
+assert.match(accountModal, /await syncService\.logout\(\);/,
+  'AccountModal disconnect performs a real logout');
+console.log('[PASS] [LoginFix] password recovery and real logout are wired');
