@@ -134,7 +134,7 @@ import { BrowserMCPServer } from './mcpServer.js';
 import { registerEngineIpc } from './main/engineIpc.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
-import { isAllowedStorageAccessOrigin, isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
+import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
@@ -1692,14 +1692,13 @@ app.whenReady().then(async () => {
       if (!keys) return callback(false);
 
       // Embedded sign-in frames also *request* storage access, not just check
-      // it. Only the identity providers those widgets actually use are granted
-      // silently; every other third-party frame falls through to the prompt
-      // below instead of receiving unpartitioned cookie access automatically.
-      if (
-        isStorageAccessPermission(permission) &&
-        !isTrustedAppOrigin(url) &&
-        isAllowedStorageAccessOrigin(url)
-      ) {
+      // it. This browser already sends third-party cookies (there is no
+      // blocking policy to uphold), so the grant adds no capability the frame
+      // did not have; only the prompt did harm. Answering the prompt instead
+      // blocked the widget, so grant silently and let Chromium enforce the
+      // rest of its rules. An allowlist here bought no privacy and broke every
+      // identity provider it did not name.
+      if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(url)) {
         return callback(true);
       }
 
@@ -1862,13 +1861,10 @@ app.whenReady().then(async () => {
       const keys = permissionKeys(permission, [(details as any)?.mediaType]);
       if (!keys) return false;
 
-      // Embedded sign-in frames call document.hasStorageAccess(). Reporting
-      // access only for the identity-provider allowlist keeps those widgets
-      // working while an unknown third-party frame is told it has none, so it
-      // takes the request path (which prompts) instead of assuming a grant.
-      if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(requestingOrigin)) {
-        return isAllowedStorageAccessOrigin(requestingOrigin);
-      }
+      // Embedded sign-in frames call document.hasStorageAccess(). Third-party
+      // cookies are already enabled, so reporting "no" only pushed those
+      // widgets into a permission prompt that could not be answered usefully.
+      if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(requestingOrigin)) return true;
 
       // Fail-closed permission checking:
       // Internal pages: Permit microphone (audio) checks only if remembered/granted.

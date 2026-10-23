@@ -26,45 +26,6 @@ export function isStorageAccessPermission(permission: string): boolean {
 }
 
 /**
- * Hosts whose embedded sign-in widgets may receive unpartitioned storage
- * without a prompt. The list is explicit rather than suffix-matched on
- * purpose: allowing "google.com" would cover every other Google subdomain,
- * and a lookalike such as "accounts.google.com.example" is rejected by the
- * exact hostname comparison.
- */
-const IDENTITY_PROVIDER_HOSTS: ReadonlySet<string> = new Set([
-  'accounts.google.com',
-  'accounts.youtube.com',
-  'appleid.apple.com',
-  'idmsa.apple.com',
-  'login.microsoftonline.com',
-  'login.microsoft.com',
-  'login.live.com',
-  'github.com',
-  'www.facebook.com',
-  'web.facebook.com',
-  'www.linkedin.com',
-]);
-
-/**
- * True when a frame may use the Storage Access API without asking the user.
- * Everything else falls back to the normal permission prompt, so an unknown
- * third-party frame cannot silently obtain unpartitioned cookie access.
- * HTTPS is required: a plaintext origin cannot prove it is the provider.
- */
-export function isAllowedStorageAccessOrigin(value: string): boolean {
-  if (!value || typeof value !== 'string') return false;
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return false;
-    if (parsed.port && parsed.port !== '443') return false;
-    return IDENTITY_PROVIDER_HOSTS.has(parsed.hostname.toLowerCase());
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Restricts subframe navigation strictly to safe schemes: http:, https:, and about:blank.
  */
 export function isSafeSubframeNavigation(url: string): boolean {
