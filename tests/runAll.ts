@@ -33,6 +33,7 @@ import './extension_archive_extraction.test';
 import './update_integrity.test';
 import './agent_navigation_guard.test';
 import './sync_pairing_ui.test';
+import './king_cloud_auth.test';
 import './backup_tombstone.test';
 import './dialog_a11y.test';
 import './hover_only_controls.test';
@@ -81,6 +82,10 @@ import './download_open_policy.test';
 import './renderer_recovery.test';
 import './trusted_sender_policy.test';
 import './host_policy.test';
+import './window_open_policy.test';
+import './incognito_extensions.test';
+import './crash_log.test';
+import './sync_key_rotation.test';
 
 import './permission_boundary_regressions.test';
 import './mcp_lifecycle_regressions.test';
