@@ -92,6 +92,37 @@ assert.deepEqual(parseReActAction('Action: {"name":"navigate_to_url","arguments"
   arguments: { url: 'https://example.com' },
 });
 
+// Pretty-printed actions used to be dropped: the lazy brace match stopped at
+// the first "}" of the nested arguments object, so the JSON never parsed.
+assert.deepEqual(parseReActAction(`Action: {
+  "name": "navigate_to_url",
+  "arguments": {
+    "url": "https://example.com/nested"
+  }
+}`), {
+  name: 'navigate_to_url',
+  arguments: { url: 'https://example.com/nested' },
+});
+
+// Function-call syntax with object arguments used to be wrapped in a second
+// brace pair ("{{...}}"), which is not valid JSON.
+assert.deepEqual(parseReActAction('Action: fill_input({"selector": "#q", "text": "hello"})'), {
+  name: 'fill_input',
+  arguments: { selector: '#q', text: 'hello' },
+});
+
+// Braces inside strings must not end the object early.
+assert.deepEqual(parseReActAction('{"tool":"web_research","parameters":{"query":"json { } tutorial"}}'), {
+  name: 'web_research',
+  arguments: { query: 'json { } tutorial' },
+});
+
+// Earlier prose may contain its own braces; the tool call is still found.
+assert.deepEqual(parseReActAction('The config is {"debug":true}.\n```json\n{"name":"click_element","arguments":{"ai_id":"7"}}\n```'), {
+  name: 'click_element',
+  arguments: { ai_id: '7' },
+});
+
 // 4. Test Natural Language Direct Intent Extractor
 const intentHn = detectDirectIntent('hackernews aç');
 assert.equal(intentHn?.name, 'navigate_to_url');

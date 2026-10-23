@@ -326,23 +326,81 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
   return null;
 }
 
+// Tool names the local agent can run. Anything else is left to the MCP
+// layer's allowlist.
+const REACT_KNOWN_TOOLS = [
+  "navigate_to_url", "web_research", "execute_goal", "read_page_content", "get_page_url", "click_element",
+  "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot",
+  "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form",
+  "reload_page", "go_back", "go_forward"
+];
+
+/**
+ * Return the JSON object that starts at `start` (which must be "{") together
+ * with its matching closing brace.
+ *
+ * A lazy `\{[\s\S]*?\}` match stops at the first closing brace, so every
+ * pretty-printed tool call whose arguments are themselves an object was cut in
+ * half and failed to parse; the valid action was then dropped silently. Braces
+ * inside strings must not count either, or a URL or message containing "}"
+ * would end the object early.
+ */
+function readJsonObject(text: string, start: number): string | null {
+  if (text[start] !== '{') return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i += 1) {
+    const char = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '{') depth += 1;
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function toToolCall(parsed: unknown): { name: string; arguments: any } | null {
+  if (!parsed || typeof parsed !== 'object') return null;
+  const record = parsed as Record<string, any>;
+  const name = typeof record.name === 'string' ? record.name
+    : typeof record.tool === 'string' ? record.tool
+    : typeof record.action === 'string' ? record.action
+    : '';
+  if (!name) return null;
+  const args = record.arguments ?? record.parameters ?? record.args ?? {};
+  return { name, arguments: args && typeof args === 'object' ? args : {} };
+}
+
+/** Parse the balanced JSON object that starts at `start`, if it is a tool call. */
+function parseToolCallAt(text: string, start: number): { name: string; arguments: any } | null {
+  const json = readJsonObject(text, start);
+  if (!json) return null;
+  try {
+    return toToolCall(JSON.parse(json));
+  } catch {
+    return null;
+  }
+}
+
 // Helper to parse tool calls from ReAct output across all mini and standard models
 export function parseReActAction(text: string): { name: string; arguments: any } | null {
   if (!text || typeof text !== 'string') return null;
 
-  // 1. Look for Action: {"name": "...", "arguments": {...}}
-  const actionMatch = text.match(/Action:\s*(\{[\s\S]*?\})(?:\n|$)/i);
-  if (actionMatch) {
-    try {
-      const parsed = JSON.parse(actionMatch[1]);
-      const name = parsed.name || parsed.tool || parsed.action;
-      if (name) {
-        return {
-          name,
-          arguments: parsed.arguments || parsed.parameters || parsed.args || {}
-        };
-      }
-    } catch {}
+  // 1. Look for Action: {"name": "...", "arguments": {...}}, including the
+  // pretty-printed form where the arguments object spans several lines.
+  const actionIndex = text.search(/Action:\s*\{/i);
+  if (actionIndex !== -1) {
+    const call = parseToolCallAt(text, text.indexOf('{', actionIndex));
+    if (call) return call;
   }
 
   // 2. Look for function call syntax: Action: navigate_to_url("https://...") or click_element("1")
@@ -351,8 +409,7 @@ export function parseReActAction(text: string): { name: string; arguments: any }
   if (funcSyntax) {
     const fn = funcSyntax[1];
     const rawParam = funcSyntax[2].trim();
-    const KNOWN_TOOLS = ["navigate_to_url", "web_research", "execute_goal", "read_page_content", "get_page_url", "click_element", "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot", "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form", "reload_page", "go_back", "go_forward"];
-    if (KNOWN_TOOLS.includes(fn)) {
+    if (REACT_KNOWN_TOOLS.includes(fn)) {
       if (fn === 'navigate_to_url') {
         const cleaned = rawParam.replace(/^['"]|['"]$/g, '').trim();
         return { name: fn, arguments: { url: cleaned || 'https://google.com' } };
@@ -369,64 +426,41 @@ export function parseReActAction(text: string): { name: string; arguments: any }
         return { name: fn, arguments: {} };
       }
       try {
-        const parsed = JSON.parse(`{${rawParam}}`);
+        // The arguments may already be a JSON object:
+        // fill_input({"selector": "#q", "text": "hello"}). Wrapping that in
+        // another brace pair produced "{{...}}" and never parsed.
+        const parsed = JSON.parse(rawParam.startsWith('{') ? rawParam : `{${rawParam}}`);
         return { name: fn, arguments: parsed };
       } catch {}
     }
   }
 
   // 3. Look for Markdown code block ```json { "name": "...", "arguments": ... } ```
-  const jsonCodeMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
-  if (jsonCodeMatch) {
-    try {
-      const parsed = JSON.parse(jsonCodeMatch[1]);
-      const name = parsed.name || parsed.tool || parsed.action;
-      if (name) {
-        return {
-          name,
-          arguments: parsed.arguments || parsed.parameters || parsed.args || {}
-        };
-      }
-    } catch {}
+  const codeIndex = text.search(/```(?:json)?\s*\{/i);
+  if (codeIndex !== -1) {
+    const call = parseToolCallAt(text, text.indexOf('{', codeIndex));
+    if (call) return call;
   }
 
   // 4. Look for <tool_call>{"name": "...", "arguments": ...}</tool_call>
-  const toolCallXml = text.match(/<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/i);
-  if (toolCallXml) {
-    try {
-      const parsed = JSON.parse(toolCallXml[1]);
-      const name = parsed.name || parsed.tool;
-      if (name) {
-        return {
-          name,
-          arguments: parsed.arguments || parsed.parameters || parsed.args || {}
-        };
-      }
-    } catch {}
+  const xmlIndex = text.search(/<tool_call>\s*\{/i);
+  if (xmlIndex !== -1) {
+    const call = parseToolCallAt(text, text.indexOf('{', xmlIndex));
+    if (call) return call;
   }
 
-  // 5. Look for direct JSON matching known tool names
-  const KNOWN_TOOLS = [
-    "navigate_to_url", "web_research", "execute_goal", "read_page_content", "get_page_url", "click_element",
-    "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot",
-    "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form",
-    "reload_page", "go_back", "go_forward"
-  ];
-  for (const tool of KNOWN_TOOLS) {
-    if (text.includes(`"${tool}"`) || text.includes(`'${tool}'`)) {
-      const braceMatch = text.match(/\{[\s\S]*?\}/);
-      if (braceMatch) {
-        try {
-          const parsed = JSON.parse(braceMatch[0]);
-          if (parsed.name === tool || parsed.tool === tool || parsed.action === tool) {
-            return {
-              name: tool,
-              arguments: parsed.arguments || parsed.parameters || parsed.args || {}
-            };
-          }
-        } catch {}
-      }
-    }
+  // 5. Look for any JSON object naming a known tool. Scanning every balanced
+  // object matters because the first "{" in the text may belong to unrelated
+  // prose, and the tool call's own arguments are usually nested.
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] !== '{') continue;
+    const json = readJsonObject(text, i);
+    if (!json) continue;
+    try {
+      const call = toToolCall(JSON.parse(json));
+      if (call && REACT_KNOWN_TOOLS.includes(call.name)) return call;
+    } catch {}
+    i += json.length - 1;
   }
 
   return null;

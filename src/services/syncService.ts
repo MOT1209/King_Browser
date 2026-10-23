@@ -1330,6 +1330,28 @@ export class EmailVerificationRequiredError extends Error {
 }
 
 /**
+ * Provider failures that need different copy than "try again".
+ *
+ * Supabase reports both of these as ordinary auth errors, so without the
+ * checks the user is told to retry a request that can never succeed: signing
+ * up again for an address that already has an account, or signing in before
+ * opening the confirmation link.
+ */
+function isExistingAccountError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  return message.includes('already registered') ||
+    message.includes('already exists') ||
+    message.includes('user already');
+}
+
+function isUnconfirmedEmailError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  return message.includes('email not confirmed') ||
+    message.includes('email_not_confirmed') ||
+    message.includes('not confirmed');
+}
+
+/**
  * A vault write that was rejected because the row changed under it. Only this
  * is retried; every other failure aborts the sync.
  */
@@ -2420,6 +2442,9 @@ export class KingSyncService {
         // believe cloud sync works and then hit errors on first sync.
         // Raw provider error is logged above; keep the user-facing copy stable
         // instead of interpolating internal error text.
+        if (isExistingAccountError(err)) {
+          throw new Error('An account with this email already exists. Sign in instead.');
+        }
         throw new Error('Could not create your cloud account — please try again.');
       }
     }
@@ -2549,6 +2574,9 @@ export class KingSyncService {
         // zero-config registry when Supabase IS configured — that would
         // silently sign the user into a non-syncing local account.
         // Raw provider error is logged above; keep user-facing copy stable.
+        // An unconfirmed address is not a wrong password: point at the
+        // confirmation link the provider already sent.
+        if (isUnconfirmedEmailError(err)) throw new EmailVerificationRequiredError(normalizedEmail);
         throw new Error('Could not sign in to your cloud account — please check your credentials and try again.');
       }
     }

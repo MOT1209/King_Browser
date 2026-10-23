@@ -299,6 +299,7 @@ async function run() {
     });
     assert.equal(d.risk, 'sensitive', 'typing into a described password field is sensitive');
     assert.ok(d.triggers.includes('sensitive_input'));
+    assert.equal(d.redactedArgs.text, REDACTED, 'typed value redacted when the field description identifies a password');
     console.log('[PASS] Policy — field description reveals sensitive input');
   }
 
