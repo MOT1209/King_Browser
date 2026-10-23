@@ -688,7 +688,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('newtab.incognitoPlaceholder')}
-                className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-colors duration-200 shadow-xl backdrop-blur-xl"
+                className="w-full block ps-14 pe-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-colors duration-200 shadow-xl backdrop-blur-xl"
               />
               <button
                 type="submit"
@@ -760,7 +760,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               <button
                 type="button"
                 onClick={shuffleWallpaper}
-                className="ml-0.5 p-1 -mr-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/15 active:scale-90 transition-all duration-200 flex items-center justify-center focus:outline-none group/btn"
+                className="ms-0.5 p-1 -me-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/15 active:scale-90 transition-all duration-200 flex items-center justify-center focus:outline-none group/btn"
                 title={t('newtab.shuffleWallpaper')}
               >
                 <Shuffle className="w-3 h-3 group-hover/btn:rotate-180 transition-transform duration-500 ease-out" />

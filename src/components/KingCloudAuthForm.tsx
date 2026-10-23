@@ -118,7 +118,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
 
   const pad = compact ? 'p-4' : 'p-5 sm:p-6';
   const fieldClass =
-    'w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-cyan-500 transition-colors';
+    'w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl ps-10 pe-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-cyan-500 transition-colors';
 
   return (
     <div className={`${pad} rounded-2xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 space-y-4 ${className}`}>

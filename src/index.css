@@ -346,14 +346,81 @@ button:active:not(:disabled) {
   text-align: right;
 }
 
+/* Addresses, emails and passwords stay left-to-right even in Arabic. */
 [dir="rtl"] input[type="url"],
 [dir="rtl"] input[type="email"],
-[dir="rtl"] input[type="password"] {
+[dir="rtl"] input[type="password"],
+[dir="rtl"] input[type="search"] {
   direction: ltr;
-  text-align: left;
+  text-align: left !important;
 }
 
-/* RTL faz-1: logical helpers (search bar + container only) */
+/* Physical alignment utilities are mirrored so Arabic text aligns to the
+   right edge of cards, menu items and settings rows. */
+[dir="rtl"] .text-left { text-align: right; }
+[dir="rtl"] .text-right { text-align: left; }
+
+/* One-sided spacing utilities. Components that need spacing on both sides
+   use the logical `ms/me/ps/pe` utilities so the two values are not
+   collapsed into one by these overrides. */
+[dir="rtl"] .ml-auto:not([class*="mr-"]) { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .mr-auto:not([class*="ml-"]) { margin-right: 0; margin-left: auto; }
+[dir="rtl"] .ml-0\.5:not([class*="mr-"]) { margin-left: 0; margin-right: 0.125rem; }
+[dir="rtl"] .ml-1:not([class*="mr-"]) { margin-left: 0; margin-right: 0.25rem; }
+[dir="rtl"] .ml-1\.5:not([class*="mr-"]) { margin-left: 0; margin-right: 0.375rem; }
+[dir="rtl"] .ml-2:not([class*="mr-"]) { margin-left: 0; margin-right: 0.5rem; }
+[dir="rtl"] .ml-2\.5:not([class*="mr-"]) { margin-left: 0; margin-right: 0.625rem; }
+[dir="rtl"] .ml-3\.5:not([class*="mr-"]) { margin-left: 0; margin-right: 0.875rem; }
+[dir="rtl"] .ml-4:not([class*="mr-"]) { margin-left: 0; margin-right: 1rem; }
+[dir="rtl"] .mr-1:not([class*="ml-"]) { margin-right: 0; margin-left: 0.25rem; }
+[dir="rtl"] .mr-2:not([class*="ml-"]) { margin-right: 0; margin-left: 0.5rem; }
+[dir="rtl"] .mr-2\.5:not([class*="ml-"]) { margin-right: 0; margin-left: 0.625rem; }
+[dir="rtl"] .pl-1:not([class*="pr-"]) { padding-left: 0; padding-right: 0.25rem; }
+[dir="rtl"] .pl-4:not([class*="pr-"]) { padding-left: 0; padding-right: 1rem; }
+[dir="rtl"] .pl-10:not([class*="pr-"]) { padding-left: 0; padding-right: 2.5rem; }
+[dir="rtl"] .pl-11:not([class*="pr-"]) { padding-left: 0; padding-right: 2.75rem; }
+[dir="rtl"] .pl-28:not([class*="pr-"]) { padding-left: 0; padding-right: 7rem; }
+[dir="rtl"] .pl-34:not([class*="pr-"]) { padding-left: 0; padding-right: 8.5rem; }
+[dir="rtl"] .pl-52:not([class*="pr-"]) { padding-left: 0; padding-right: 13rem; }
+[dir="rtl"] .pr-1:not([class*="pl-"]) { padding-right: 0; padding-left: 0.25rem; }
+[dir="rtl"] .pr-2:not([class*="pl-"]) { padding-right: 0; padding-left: 0.5rem; }
+[dir="rtl"] .pr-3\.5:not([class*="pl-"]) { padding-right: 0; padding-left: 0.875rem; }
+[dir="rtl"] .pr-4:not([class*="pl-"]) { padding-right: 0; padding-left: 1rem; }
+[dir="rtl"] .pr-12:not([class*="pl-"]) { padding-right: 0; padding-left: 3rem; }
+[dir="rtl"] .pr-24:not([class*="pl-"]) { padding-right: 0; padding-left: 6rem; }
+[dir="rtl"] .-ml-4:not([class*="mr-"]) { margin-left: 0; margin-right: -1rem; }
+
+/* Absolute offsets mirror so dropdowns, badges and overlays stay anchored
+   to the reading edge. Symmetric spans (left-0 right-0) are left intact. */
+[dir="rtl"] .left-0:not(.right-0) { left: auto; right: 0; }
+[dir="rtl"] .right-0:not(.left-0) { right: auto; left: 0; }
+[dir="rtl"] .left-1 { left: auto; right: 0.25rem; }
+[dir="rtl"] .right-1 { right: auto; left: 0.25rem; }
+[dir="rtl"] .left-2 { left: auto; right: 0.5rem; }
+[dir="rtl"] .right-2 { right: auto; left: 0.5rem; }
+[dir="rtl"] .left-3 { left: auto; right: 0.75rem; }
+[dir="rtl"] .right-3 { right: auto; left: 0.75rem; }
+[dir="rtl"] .left-3\.5 { left: auto; right: 0.875rem; }
+[dir="rtl"] .left-4 { left: auto; right: 1rem; }
+[dir="rtl"] .right-4 { right: auto; left: 1rem; }
+[dir="rtl"] .right-6 { right: auto; left: 1.5rem; }
+[dir="rtl"] .right-12 { right: auto; left: 3rem; }
+[dir="rtl"] .left-full { left: auto; right: 100%; }
+[dir="rtl"] .right-full { right: auto; left: 100%; }
+[dir="rtl"] .left-1\/2 { left: auto; right: 50%; }
+[dir="rtl"] .right-1\/2 { right: auto; left: 50%; }
+[dir="rtl"] .-right-1 { right: auto; left: -0.25rem; }
+[dir="rtl"] .-translate-x-1\/2 { --tw-translate-x: 50%; }
+
+/* Side borders follow the reading direction. */
+[dir="rtl"] .border-r { border-right-width: 0; border-left-width: 1px; }
+[dir="rtl"] .border-l { border-left-width: 0; border-right-width: 1px; }
+[dir="rtl"] .border-r-2 { border-right-width: 0; border-left-width: 2px; }
+[dir="rtl"] .border-l-2 { border-left-width: 0; border-right-width: 2px; }
+[dir="rtl"] .border-r-0 { border-left-width: 0; }
+[dir="rtl"] .border-l-0 { border-right-width: 0; }
+
+/* RTL helpers for icons and text that need an explicit direction. */
 [dir="rtl"] .rtl-rotate-arrow {
   transform: scaleX(-1);
 }
