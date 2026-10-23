@@ -68,3 +68,14 @@ assert.match(main, /isStorageAccessPermission\(permission\) && !isTrustedAppOrig
 assert.match(main, /'storage-access': 'Storage Access/,
   'storage access has a human-readable permission label');
 console.log('[PASS] [LoginFix] Google fallback covers popups and iframes; storage access is labelled');
+
+// 6. Auth failures that need a different action than "try again" carry their
+//    own copy: an address that already has an account points at sign-in, and an
+//    unconfirmed address points at the confirmation link instead of blaming the
+//    password.
+const sync = fs.readFileSync('src/services/syncService.ts', 'utf8');
+assert.match(sync, /if \(isExistingAccountError\(err\)\) \{\s*throw new Error\('An account with this email already exists\. Sign in instead\.'\);/,
+  'registering an existing account points at sign-in instead of a retry');
+assert.match(sync, /if \(isUnconfirmedEmailError\(err\)\) throw new EmailVerificationRequiredError\(normalizedEmail\);/,
+  'an unconfirmed login asks for the confirmation link instead of blaming the password');
+console.log('[PASS] [LoginFix] auth failures point at the action that can succeed');
