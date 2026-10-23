@@ -134,7 +134,7 @@ import { BrowserMCPServer } from './mcpServer.js';
 import { registerEngineIpc } from './main/engineIpc.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
-import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
+import { isAllowedStorageAccessOrigin, isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
@@ -1692,10 +1692,14 @@ app.whenReady().then(async () => {
       if (!keys) return callback(false);
 
       // Embedded sign-in frames also *request* storage access, not just check
-      // it. Third-party cookies already work in this browser, so the check
-      // handler answers yes; asking the user for a bare "storage-access" string
-      // was a confusing prompt that blocked the very widget the check allowed.
-      if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(url)) {
+      // it. Only the identity providers those widgets actually use are granted
+      // silently; every other third-party frame falls through to the prompt
+      // below instead of receiving unpartitioned cookie access automatically.
+      if (
+        isStorageAccessPermission(permission) &&
+        !isTrustedAppOrigin(url) &&
+        isAllowedStorageAccessOrigin(url)
+      ) {
         return callback(true);
       }
 
@@ -1858,10 +1862,13 @@ app.whenReady().then(async () => {
       const keys = permissionKeys(permission, [(details as any)?.mediaType]);
       if (!keys) return false;
 
-      // Embedded sign-in frames call document.hasStorageAccess(). Third-party
-      // cookies already work in this browser, so answering "no" here only broke
-      // those widgets; Chromium still enforces its own rules for the request.
-      if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(requestingOrigin)) return true;
+      // Embedded sign-in frames call document.hasStorageAccess(). Reporting
+      // access only for the identity-provider allowlist keeps those widgets
+      // working while an unknown third-party frame is told it has none, so it
+      // takes the request path (which prompts) instead of assuming a grant.
+      if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(requestingOrigin)) {
+        return isAllowedStorageAccessOrigin(requestingOrigin);
+      }
 
       // Fail-closed permission checking:
       // Internal pages: Permit microphone (audio) checks only if remembered/granted.

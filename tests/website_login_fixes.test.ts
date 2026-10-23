@@ -61,8 +61,10 @@ assert.match(main, /wcType === 'webview' \|\| wcType === 'window'/,
   'OAuth popup windows are watched for a Google rejection');
 assert.match(main, /on\('did-frame-navigate'[\s\S]{0,120}?onNavigate\(/,
   'iframe-based rejections reach the fallback');
-assert.match(main, /isStorageAccessPermission\(permission\) && !isTrustedAppOrigin\(url\)/,
-  'a storage-access REQUEST is answered, not queued as a raw-string prompt');
+assert.match(main, /isStorageAccessPermission\(permission\) &&\s*!isTrustedAppOrigin\(url\) &&\s*isAllowedStorageAccessOrigin\(url\)/,
+  'a storage-access REQUEST from an identity provider is answered silently');
+assert.match(main, /isStorageAccessPermission\(permission\) && !isTrustedAppOrigin\(requestingOrigin\)[\s\S]{0,80}?isAllowedStorageAccessOrigin\(requestingOrigin\)/,
+  'the storage-access CHECK reports access only for identity providers');
 assert.match(main, /'storage-access': 'Storage Access/,
   'storage access has a human-readable permission label');
 console.log('[PASS] [LoginFix] Google fallback covers popups and iframes; storage access is labelled');
