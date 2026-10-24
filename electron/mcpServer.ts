@@ -1168,7 +1168,7 @@ export class BrowserMCPServer {
       this.injectionSuspect = null;
     }
     const approvalSummary = decision.risk === 'sensitive'
-      ? buildApprovalSummary({ toolName: canonicalTool, args }, decision)
+      ? buildApprovalSummary({ toolName: canonicalTool, args, ...pageContext }, decision)
       : null;
     const actionRequest: ActionRequest = {
       toolName: canonicalTool,
@@ -1176,7 +1176,13 @@ export class BrowserMCPServer {
       risk: decision.risk,
       domain: decision.domain,
       summary: approvalSummary
-        ? [approvalSummary.intendedAction, approvalSummary.affectedResource, ...approvalSummary.consequences]
+        ? [
+            approvalSummary.intendedAction,
+            approvalSummary.affectedResource,
+            approvalSummary.pageUrl ? `Page: ${approvalSummary.pageUrl}` : undefined,
+            approvalSummary.targetText ? `Element: "${approvalSummary.targetText}"` : undefined,
+            ...approvalSummary.consequences
+          ]
             .filter((part): part is string => Boolean(part))
             .join(' — ')
         : undefined
