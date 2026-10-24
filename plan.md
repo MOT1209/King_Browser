@@ -52,6 +52,13 @@
 1. المرحلة 1 كاملة. 2. التوقيع والتدقيق. 3. التسجيل والملفات المعزولة. 4. التقليص والصيانة.
 **معيار النجاح:** مطوّر جديد يوصل OpenCode بأقل من خمس دقائق، وينفّذ الوكيل مهمة حقيقية، ويرفض هو إجراءً حساساً، بلا أي تدخل منك.
 
+## حالة مراجعة الاعتماد والمزامنة (أكتوبر 2026) — [منفَّذ ومختبر] / [يحتاج بيئة خارجية]
+- [منفَّذ ومختبر] حارس الحساب المتعدد في `initSupabaseListener` (`src/services/syncService.ts`): جلسة `INITIAL_SESSION` قديمة تخص حساباً آخر لا تُعتمد بعد الآن ولا تُكتب مفتاح المزامنة في خانة حساب مغاير. مغطاة باختبارات سلوك حقيقية (`tests/king_cloud_auth_behaviour.test.ts`، 61 فحصاً).
+- [منفَّذ ومختبر] تكامل الاختبارات: بقية الأجنحة خضراء في تشغيلين كاملين متتاليين لـ `npm test` (منها 32 فحص اعتماد، 78 فحص صحة مزامنة، 11 فحص لوحة الوكيل، 17 فحص لوح المقص/Q).
+- [منفَّذ ومختبر] مراجعة `supabase_schema.sql`: سياسات RLS سليمة (قبو المستخدم، الدعوات، دالة الاستهلاك security definer). ملاحظة واحدة: العمود `consumed_by` بلا `on delete`، فحذف مستخدم استهلك دعوة سيفشل — لكن ميزة الإقران معطّلة اليوم (`PAIRING_AVAILABLE = false`)، فلا أثر فعلياً.
+- [يحتاج بيئة خارجية] تحقق حي على Supabase حقيقي بحسابين حقيقيين وسياسات RLS الفعلية: لا يوجد مشروع اختبار متاح من هذه البيئة.
+- [يحتاج بيئة خارجية] Workflow الليلي في PR #15 (مدموج في main): ترتيب «حذف ثم رفع» يجعل أي فشل في الروفع يترك بدون نسخة ليلية؛ محلول بمقترح في تقرير المراجعة — لا يُطبَّق هنا.
+
 ---
 
 # Deutsch
@@ -97,6 +104,9 @@ Ein Open-Source-Browser, in dem ein Coding-Agent (z. B. OpenCode) einen echten, 
 - **Einnahmen [Meinung]:** unklar. Erst über Geld nachdenken, wenn es echte Nutzer gibt. Vercel Hobby (für die Website) ist nicht kommerziell.
 - **Was ich nicht weiß:** ob Nutzer einen eigenen Browser einer schlanken MCP-Lösung vorziehen.
 
-## Empfohlene Reihenfolge
-1. Phase 1 komplett. 2. Signierung und Prüfung. 3. Aufzeichnen und isolierte Profile. 4. Verkleinern und Wartung.
-**Erfolgskriterium:** Ein neuer Entwickler verbindet OpenCode in unter fünf Minuten, der Agent erledigt eine echte Aufgabe, und er lehnt selbst eine sensible Aktion ab, ohne dass du eingreifst.
+## Stand der Auth- und Sync-Prüfung (Oktober 2026) — [umgesetzt und getestet] / [benötigt externe Umgebung]
+- [umgesetzt und getestet] Kontenwachschutz in `initSupabaseListener` (`src/services/syncService.ts`): eine ältere `INITIAL_SESSION` eines fremden Kontos wird nicht mehr adoptiert und deren Sync-Schlüssel nicht mehr in den Vault-Slot des falschen Kontos geschrieben. Abgedeckt durch echte Verhaltenstests (`tests/king_cloud_auth_behaviour.test.ts`, 61 Prüfpunkte).
+- [umgesetzt und getestet] Suite-Integration: alle übrigen Suites sind in zwei aufeinanderfolgenden vollständigen `npm test`-Läufen grün (u. a. 32 Auth-Prüfpunkte, 78 Sync-Richtigkeit, 11 Agent-Panel, 17 Clipboard/QR).
+- [umgesetzt und getestet] Prüfung von `supabase_schema.sql`: RLS-Richtlinien in Ordnung (Benutzer-Vault, Einladungen, security-definer-RPC). Ein Befund: `consumed_by` hat kein `on delete`, das Löschen eines Benutzers, der eine Einladung verbraucht hat, würde fehlschlagen — das Pairing-Feature ist aber derzeit deaktiviert (`PAIRING_AVAILABLE = false`), keine praktische Auswirkung.
+- [benötigt externe Umgebung] Live-Verifikation auf echtem Supabase mit zwei echten Konten und den tatsächlichen RLS-Richtlinien: in dieser Umgebung kein Testprojekt verfügbar.
+- [benötigt externe Umgebung] Der Nightly-Workflow aus PR #15 (bereits in main gemerged): die Reihenfolge „löschen vor hochladen“ lässt das Nightly-Release wegfallen, wenn der Upload fehlschlägt; Korrekturvorschlag steht im Abschlussbericht und wird hier nicht angewendet.
