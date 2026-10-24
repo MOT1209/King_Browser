@@ -56,6 +56,7 @@ import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, D
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getLanguage, getLocale } from '../services/i18n';
 import { AdBlockerPopover } from './AdBlockerPopover';
+import { ADBLOCK_WHITELIST_EVENT } from '../utils/adblockWhitelist';
 import { KingAssistantIcon } from './ui/KingAssistantIcon';
 import { logger } from '../utils/logger';
 import { syncService, SyncStatus } from '../services/syncService';
@@ -1027,6 +1028,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       }
     };
     fetchWhitelist();
+    // Settings > Privacy edits the same list.
+    window.addEventListener(ADBLOCK_WHITELIST_EVENT, fetchWhitelist);
+    return () => window.removeEventListener(ADBLOCK_WHITELIST_EVENT, fetchWhitelist);
   }, []);
 
   // Fetch MCP status on mount and listen for client changes
@@ -1117,6 +1121,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     setAdblockWhitelist(newWhitelist);
     if (getElectronAPI()?.storeSet) {
       await getElectronAPI()?.storeSet('adblocker_whitelist', JSON.stringify(newWhitelist));
+      window.dispatchEvent(new CustomEvent(ADBLOCK_WHITELIST_EVENT));
     }
     onReload();
   };
