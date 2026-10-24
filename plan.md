@@ -67,7 +67,7 @@
 - **[رأي]** فكّر في تعطيل أو حذف VPN والمساعد المحلي بنماذج WebGPU والمزامنة إن لم تكن جزءاً من قصتك: كل واحد صيانة وسطح هجوم موروث من Nova. **لن أحذف شيئاً قبل قرارك الصريح.** البديل الأرخص: إخفاؤها خلف علامة "تجريبي".
 - الصعوبة: منخفضة. الوقت: أيام.
 
-### WP9 — صيانة تقنية (أنا، تدريجياً)
+### WP9 — صيانة تقنية (أنا، تدريجياً) — **جزئي: اختبار macOS غير مانع في CI، واستُخرجت دوال الترجمة من `main.ts` كمثال؛ تحذيرات ESLint (1109، منها 918 `any`) لم أمسّها لأن إصلاحها دفعة واحدة محفوف بالمخاطر**
 - تقسيم `electron/main.ts` (نحو 6900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة.
 - تخفيض تحذيرات ESLint (1081) تدريجياً؛ macOS في CI؛ سياسة تحديث Electron (تحديثات Chromium الأمنية كل بضعة أسابيع التزام دائم).
 
@@ -147,7 +147,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - **[Meinung]** VPN, lokalen WebGPU-Assistenten und Sync deaktivieren oder entfernen, wenn sie nicht zu deiner Geschichte gehören: Jedes ist Wartung und von Nova geerbte Angriffsfläche. **Ich lösche nichts ohne deine ausdrückliche Entscheidung.** Günstigere Alternative: hinter einem „Experimentell“-Schalter verstecken.
 - Schwierigkeit: niedrig. Zeit: Tage.
 
-### WP9 — Technische Wartung (ich, schrittweise)
+### WP9 — Technische Wartung (ich, schrittweise) — **teilweise: nicht blockierender macOS-Test in der CI, Übersetzungs-Helfer als Beispiel aus `main.ts` ausgelagert; ESLint-Warnungen (1109, davon 918 `any`) nicht angefasst, da ein Massen-Fix riskant ist**
 - `electron/main.ts` (ca. 6900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug.
 - ESLint-Warnungen (1081) schrittweise abbauen; macOS in der CI; Electron-Update-Politik (Chromium-Sicherheitsupdates alle paar Wochen sind eine Dauerverpflichtung).
 

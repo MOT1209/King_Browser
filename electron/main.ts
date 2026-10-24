@@ -142,6 +142,7 @@ import {
 } from './main/adblockManager.js';
 import { BrowserMCPServer } from './mcpServer.js';
 import { registerEngineIpc } from './main/engineIpc.js';
+import { escapeHtmlForTranslation, unescapeHtmlForTranslation } from './main/translationText.js';
 import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
@@ -5497,27 +5498,6 @@ async function detectLanguageWithGoogle(sampleText: string): Promise<string> {
     console.warn('[Translate] Language detection error:', err);
   }
   return 'auto';
-}
-
-function escapeHtmlForTranslation(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-const TRANSLATION_HTML_ENTITY_MAP: Record<string, string> = {
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&nbsp;': ' ',
-  '&amp;': '&'
-};
-
-function unescapeHtmlForTranslation(str: string): string {
-  return str.replace(/&(?:lt|gt|quot|#39|nbsp|amp);/g, (match) => TRANSLATION_HTML_ENTITY_MAP[match] || match);
 }
 
 // IPC Handlers for One-Click Page Translation
