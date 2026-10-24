@@ -55,8 +55,8 @@ const MAX_SCANNED_CHARS = 200_000;
 export function detectPromptInjection(text: unknown): string[] {
   if (typeof text !== 'string' || !text) return [];
   const sample = text.length > MAX_SCANNED_CHARS ? text.slice(0, MAX_SCANNED_CHARS) : text;
-  // Collapse zero-width characters so "ig​nore" cannot slip past the patterns.
-  const clean = sample.replace(/[​-‏⁠﻿]/g, '');
+  // Collapse zero-width characters so a zero-width space inside "ignore" cannot slip past the patterns.
+  const clean = sample.replace(/[\u200b-\u200f\u2060\ufeff]/g, '');
   return SIGNALS.filter(signal => signal.pattern.test(clean)).map(signal => signal.label);
 }
 
