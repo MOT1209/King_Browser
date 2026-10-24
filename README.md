@@ -76,7 +76,7 @@ King has no telemetry endpoint, but these built-in features contact third-party 
 | Page translation | `translate.googleapis.com` | When the user translates a page |
 | Local AI / Whisper model download | `huggingface.co`, `hf.co` | First use of a local model |
 | Ad-block filter lists | Filter-list hosts | Start-up / list refresh |
-| King Sync (opt-in) | Your Supabase project | Only after sign-in; data is end-to-end encrypted |
+| King Sync (opt-in) | Your Supabase project | Only after King Cloud sign-in, and only when a project is configured; otherwise the vault stays on this device and nothing is sent. Data is end-to-end encrypted |
 | Fonts | `fonts.googleapis.com`, `fonts.gstatic.com` | UI start-up |
 
 ---
@@ -112,8 +112,9 @@ Current English interface in Clean Minimalist mode with the light theme.
 ### 3. King Sync
 
 <div align="center">
-  <img src="public/screenshots/sync-clean-light.jpg" alt="King Sync Interface" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35);" />
-  <p><em>King Sync sign-in screen in the light theme</em></p>
+  <p><em>King Sync uses the in-app sign-in form in <strong>Settings &rarr; Sync</strong> (and the account dialog).
+  The screenshot that used to sit here showed the old, unimplemented device-pairing screen, so it was removed
+  rather than kept as an illustration of a flow the app does not have.</em></p>
 </div>
 
 ---
@@ -123,7 +124,9 @@ Current English interface in Clean Minimalist mode with the light theme.
 ### King Cloud Sync (Zero-Knowledge E2EE)
 - **End-to-End Encryption (AES-256-GCM)**: Saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted locally with PBKDF2 (600,000 iterations) and 256-bit AES-GCM before transmission.
 - **Encrypted Multi-Device Sync**: Sign in with your King Cloud account to synchronize bookmarks, passwords, and preferences across your computers in real-time over Supabase Realtime WebSockets. Encryption keys stay on your local device; the cloud server only ever receives encrypted ciphertext.
-- **Code-Based Pairing (Roadmap)**: Accountless 1-click device pairing via temporary sync codes is in active development for a future release.
+- **Local Vault Mode**: When no King Cloud project is configured, signing up still creates a vault protected by your password (PBKDF2 600,000 iterations, AES-256-GCM) but it is stored on this device only. The sign-in form says so explicitly and nothing is uploaded, so a local account is never presented as synced.
+- **Password Recovery**: King Cloud accounts can request a password-reset email from the sign-in form ("Forgot password?"). Local-vault accounts have no recovery path by design — the password is the encryption key.
+- **Code-Based Pairing (Roadmap)**: Accountless 1-click device pairing via temporary sync codes is in active development for a future release. Until the join flow exists, the UI states that pairing is unavailable instead of offering a code that cannot be redeemed.
 
 ### On-Device Whisper Voice & Speech Recognition
 - **Local Whisper Pipeline**: Powered by Transformers.js and ONNX runtime (`onnx-community/whisper-tiny`), running locally inside the browser.
@@ -504,6 +507,8 @@ npm run benchmark
 - Email/password, GitHub and other sign-ins run in the tab like in Chrome. Sign-in popups
   ("Sign in with GitHub" and similar) open as a real small window that reports back to the
   site and closes itself; ordinary links still open as tabs.
+- A sign-in popup stays in the profile that opened it: an incognito tab's sign-in window never
+  sees your normal-browsing cookies, and a popup cannot open further popups of its own.
 - **Google accounts:** Google refuses sign-in inside embedded browsers such as King Browser
   ("This browser or app may not be secure"). King does not try to hide from that check. When
   the rejection page appears, King offers **Open in Default Browser**; you can also right-click

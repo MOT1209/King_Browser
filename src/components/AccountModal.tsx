@@ -20,6 +20,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { syncService, KingSyncService, SyncStatus, SyncPreferences } from '../services/syncService';
+import { KingCloudAuthForm } from './KingCloudAuthForm';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useSafeTimeout } from '../hooks/useSafeTimeout';
@@ -44,6 +45,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
   const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { setSafeTimeout } = useSafeTimeout();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -141,13 +143,21 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     }
   };
 
-  const handleLeaveChain = () => {
-    // Device pairing is not implemented (syncService throws), so there is no
-    // chain to leave. This used to call logout(), which silently destroyed the
-    // user's real cloud session and every key derived from it.
-    setGeneratedCode(null);
-    setInputSyncCode('');
+  const handleLeaveChain = async () => {
+    if (isLoggingOut) return;
     setErrorMessage(null);
+    setIsLoggingOut(true);
+    try {
+      await syncService.logout();
+      setGeneratedCode(null);
+      setInputSyncCode('');
+      setSuccessMessage('Signed out successfully.');
+      setSafeTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Sign out failed');
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const handleTogglePreference = (key: keyof SyncPreferences) => {
@@ -299,10 +309,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
                       <button
                         onClick={handleLeaveChain}
-                        className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
+                        disabled={isLoggingOut}
+                        className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
                         title="Disconnect Sync"
                       >
-                        <LogOut className="w-4 h-4" />
+                        {isLoggingOut ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
@@ -438,19 +449,18 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 </div>
               ) : (
                 /* Pairing is not built yet: say so instead of offering a code
-                   that can never be redeemed. */
-                <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 space-y-2.5 text-center">
-                  <div className="flex justify-center">
-                    <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                      <Laptop className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                    Sign in to sync this browser
-                  </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Your bookmarks, history, tabs and workspaces sync through your King Cloud
-                    account. Pairing a second device with a sync code is not available yet.
+                   that can never be redeemed, and give the user the route that
+                   actually works — a King Cloud (or local-vault) sign-in. */
+                <div className="space-y-3">
+                  <KingCloudAuthForm
+                    compact
+                    onAuthenticated={async () => {
+                      if (onPerformSync) await onPerformSync();
+                    }}
+                  />
+                  <p className="px-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed text-center">
+                    Sign in with your King Cloud account to sync bookmarks, history, tabs and
+                    workspaces. Pairing a second device with a sync code is not available yet.
                   </p>
                 </div>
               )}

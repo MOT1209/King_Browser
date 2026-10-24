@@ -28,16 +28,31 @@ async function runTier4Tests() {
   assert.equal(t('common.cancel'), 'Cancel');
   assert.equal(t('tabs.sleeping'), 'Tab is Sleeping');
 
-  // Legacy requests must keep the interface in English and left-to-right.
-  for (const legacy of ['tr', 'ar', 'de'] as const) {
-    setLanguage(legacy);
-    assert.equal(getLanguage(), 'en');
-    assert.equal(isRTL(), false);
-    assert.equal(mockDoc.lang, 'en');
-    assert.equal(mockDoc.dir, 'ltr');
-    assert.equal(t('common.cancel'), 'Cancel');
-    assert.equal(t('tabs.sleeping'), 'Tab is Sleeping');
-  }
+  // Unsupported legacy codes fall back to English and left-to-right.
+  setLanguage('tr');
+  assert.equal(getLanguage(), 'en');
+  assert.equal(isRTL(), false);
+  assert.equal(mockDoc.lang, 'en');
+  assert.equal(mockDoc.dir, 'ltr');
+  assert.equal(t('common.cancel'), 'Cancel');
+
+  // Arabic switches the interface and mirrors the document direction.
+  setLanguage('ar');
+  assert.equal(getLanguage(), 'ar');
+  assert.equal(isRTL(), true);
+  assert.equal(mockDoc.lang, 'ar');
+  assert.equal(mockDoc.dir, 'rtl');
+  assert.equal(t('common.cancel'), 'إلغاء');
+  assert.equal(t('tabs.sleeping'), 'التبويب في وضع السكون');
+
+  // German stays left-to-right with translated strings.
+  setLanguage('de');
+  assert.equal(getLanguage(), 'de');
+  assert.equal(isRTL(), false);
+  assert.equal(mockDoc.lang, 'de');
+  assert.equal(mockDoc.dir, 'ltr');
+  assert.equal(t('common.cancel'), 'Abbrechen');
+  assert.equal(t('tabs.sleeping'), 'Tab schläft');
 
   // Test fallback for missing nested keys
   assert.equal(t('nonexistent.key.path'), 'nonexistent.key.path');

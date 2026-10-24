@@ -98,6 +98,9 @@ assert.ok(
 
 // 8. System language detection
 const detected = detectSystemLanguage();
-assert.equal(detected, 'en', 'The interface must stay English regardless of system language');
+assert.ok(
+  ['en', 'ar', 'de'].includes(detected),
+  `System language must resolve to a supported interface language, got ${detected}`
+);
 
 console.log('[PASS] [Search Localization & Anti-Bot] 15 search localization, backward compatibility, and system detection tests passed.');

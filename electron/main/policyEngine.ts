@@ -166,7 +166,11 @@ export function extractDomain(url: string | undefined): string | undefined {
   }
 }
 
-export function redactArgs(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
+export function redactArgs(
+  toolName: string,
+  args: Record<string, unknown>,
+  fieldDescription = ''
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(args)) {
     if (SENSITIVE_ARG_KEYS.test(key)) {
@@ -179,7 +183,13 @@ export function redactArgs(toolName: string, args: Record<string, unknown>): Rec
     }
     if (toolName === 'browser_type' && key === 'text' && typeof value === 'string') {
       const selector = typeof args.selector === 'string' ? args.selector : '';
-      out[key] = SENSITIVE_SELECTOR_PATTERNS.test(selector) ? REDACTED_VALUE : value;
+      // A password input addressed by a neutral selector ("#f1") only reveals
+      // itself through its description (type, autocomplete, label). Testing
+      // the selector alone let the typed secret reach the approval screen and
+      // the run history even though the action was classified sensitive.
+      const sensitive = SENSITIVE_SELECTOR_PATTERNS.test(selector) ||
+        SENSITIVE_SELECTOR_PATTERNS.test(fieldDescription);
+      out[key] = sensitive ? REDACTED_VALUE : value;
       continue;
     }
     out[key] = value;
@@ -283,7 +293,7 @@ export function classifyAction(input: PolicyInput): PolicyDecision {
   const { toolName, args } = input;
 
   const domain = extractDomain(typeof args.url === 'string' ? args.url : input.currentUrl);
-  const redactedArgs = redactArgs(toolName, args);
+  const redactedArgs = redactArgs(toolName, args, input.elementText ?? '');
 
   if (ENGINE_CONTROL_TOOLS.has(toolName)) {
     return { risk: 'safe', triggers: [], reasons: ['Engine control command.'], domain, redactedArgs };

@@ -1117,7 +1117,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                   : "opacity 0.2s ease-out, transform 0.2s ease-out, height 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
               }}
               className={cn(
-                "prompt-scrollbar absolute top-0 inset-x-0 z-[1] w-full resize-none border-none bg-transparent pl-4 pr-12 py-3.5 text-sm leading-[22px] text-foreground outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 placeholder:font-medium placeholder:text-muted-foreground/80 cursor-text",
+                "prompt-scrollbar absolute top-0 inset-x-0 z-[1] w-full resize-none border-none bg-transparent ps-4 pe-12 py-3.5 text-sm leading-[22px] text-foreground outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 placeholder:font-medium placeholder:text-muted-foreground/80 cursor-text",
                 expanded ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-1 pointer-events-none",
                 isScrolling ? "overflow-y-auto" : "overflow-y-hidden",
                 isRecording && "pointer-events-none"
@@ -1144,7 +1144,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               onClick={expand}
               style={{ outline: 'none', transition: isSmoothResize ? "none" : "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}
               className={cn(
-                "absolute inset-x-0 top-0 z-[1] cursor-text pl-4 pr-12 py-[15px] text-left text-sm font-medium leading-[17px] text-muted-foreground/80 outline-none focus:outline-none focus-visible:outline-none",
+                "absolute inset-x-0 top-0 z-[1] cursor-text ps-4 pe-12 py-[15px] text-left text-sm font-medium leading-[17px] text-muted-foreground/80 outline-none focus:outline-none focus-visible:outline-none",
                 !expanded ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-105 translate-y-1 pointer-events-none"
               )}
               aria-label="Open prompt input"

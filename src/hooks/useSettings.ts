@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { defaultSettings, type UserSettings } from '../types/browser';
+import { normalizeLanguage } from '../services/language';
 import { safeParseObjectWithBackup } from '../utils/safeStorage';
 
 export interface UseSettingsOptions {
@@ -39,10 +40,11 @@ export function useSettings(options: UseSettingsOptions = {}) {
 
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('user_settings') : null;
     const parsed = safeParseObjectWithBackup<Partial<UserSettings>>('user_settings', saved, {});
+    const bootLanguage = typeof localStorage !== 'undefined' ? localStorage.getItem('nova_language') : null;
     const merged: UserSettings = {
       ...initialSettings,
       ...parsed,
-      language: 'en',
+      language: normalizeLanguage(parsed.language ?? bootLanguage ?? initialSettings.language),
       shortcuts: {
         ...initialSettings.shortcuts,
         ...(parsed.shortcuts || {})
@@ -66,12 +68,13 @@ export function useSettings(options: UseSettingsOptions = {}) {
     return merged;
   });
 
-  // All restore/import/sync paths share this setter. Legacy preferences cannot
-  // re-enable an interface language after the initial migration.
+  // All restore/import/sync paths share this setter. Only the three shipped
+  // interface languages survive; legacy codes resolve to English.
   const setSettings: Dispatch<SetStateAction<UserSettings>> = useCallback(update => {
     setSettingsState(prev => {
       const next = typeof update === 'function' ? update(prev) : update;
-      return next.language === 'en' ? next : { ...next, language: 'en' };
+      const language = normalizeLanguage(next.language ?? 'en');
+      return language === next.language ? next : { ...next, language };
     });
   }, []);
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { UserSettings } from '../types/browser';
 import { setLanguage } from '../services/i18n';
+import { LOCALE_MAP, normalizeLanguage } from '../services/language';
 import { getElectronAPI } from '../utils/electronBridge';
 
 export interface UseThemeLanguageOptions {
@@ -561,11 +562,11 @@ export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
   // Apply Language and RTL Mode
   useEffect(() => {
     if (settings.language) {
-      // setLanguage falls back to 'en' internally for unknown values.
-      setLanguage('en');
+      const language = normalizeLanguage(settings.language);
+      setLanguage(language);
       // Sync with Electron session Accept-Language headers
       if (typeof window !== 'undefined' && window.electronAPI?.setAppLanguage) {
-        window.electronAPI.setAppLanguage('en').catch(() => {});
+        window.electronAPI.setAppLanguage(LOCALE_MAP[language] ?? language).catch(() => {});
       }
     }
   }, [settings.language]);

@@ -24,3 +24,18 @@ export function shouldOpenAsPopupWindow(url: string, disposition: string): boole
 export function isStorageAccessPermission(permission: string): boolean {
   return permission === 'storage-access' || permission === 'top-level-storage-access';
 }
+
+/**
+ * Restricts subframe navigation strictly to safe schemes: http:, https:, and about:blank.
+ */
+export function isSafeSubframeNavigation(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    const isSafeHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
+    const isSafeAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
+    return isSafeHttp || isSafeAboutBlank;
+  } catch {
+    return false;
+  }
+}

@@ -32,6 +32,65 @@ const CUSTOM_SUPABASE_URL_PATTERN = /^https:\/\/[a-z0-9]{10,}\.supabase\.co$/;
 const isValidCustomSupabaseUrl = (url: unknown): url is string =>
   typeof url === 'string' && CUSTOM_SUPABASE_URL_PATTERN.test(url);
 
+// Values shipped in .env.example. Copying that file verbatim must NOT count as
+// "configured": doing so makes the app attempt real auth against a project
+// that does not exist instead of falling back to the local vault.
+const PLACEHOLDER_MARKERS = [
+  'your-project',
+  'your-supabase',
+  'your_supabase',
+  'placeholder',
+  'changeme',
+  'change-me',
+  'dummykeyfordemo',
+  'example.com'
+];
+
+const looksLikePlaceholder = (value: string): boolean => {
+  const lower = value.trim().toLowerCase();
+  return PLACEHOLDER_MARKERS.some((marker) => lower.includes(marker));
+};
+
+/**
+ * A build-time endpoint is only usable when it is a genuine https URL. A
+ * `.supabase.co` host must additionally look like a project ref, which is what
+ * rejects the example value `https://your-project.supabase.co`. Self-hosted
+ * deployments on other hosts stay allowed as long as they are https (or
+ * loopback, for local development).
+ */
+const isValidConfiguredSupabaseUrl = (raw: unknown): boolean => {
+  if (typeof raw !== 'string' || !raw.trim()) return false;
+  if (looksLikePlaceholder(raw)) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw.trim());
+  } catch {
+    return false;
+  }
+  const host = parsed.hostname.toLowerCase();
+  const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback)) {
+    return false;
+  }
+  // supabase-js appends its own paths (/auth/v1, /rest/v1). A base URL that
+  // already carries a path, query or fragment silently breaks every request,
+  // so treat it as unconfigured instead of failing later during sign-in.
+  if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    return false;
+  }
+  if (host.endsWith('.supabase.co')) {
+    return CUSTOM_SUPABASE_URL_PATTERN.test(parsed.origin);
+  }
+  return true;
+};
+
+const isValidAnonKey = (raw: unknown): boolean => {
+  if (typeof raw !== 'string') return false;
+  const key = raw.trim();
+  if (key.length < 20) return false;
+  return !looksLikePlaceholder(key);
+};
+
 // Default Supabase project endpoints for King Cloud Sync
 const DEFAULT_CONFIG: SupabaseConfig = {
   url: import.meta.env?.VITE_SUPABASE_URL || '',
@@ -47,6 +106,9 @@ let clientPromise: Promise<SupabaseClient> | null = null;
 
 export const getSupabaseConfig = (): SupabaseConfig => {
   try {
+    // Renderer-only storage. Server-side renders and the Node test harness have
+    // no localStorage, which is not an error — just no custom config.
+    if (typeof localStorage === 'undefined') return DEFAULT_CONFIG;
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -161,5 +223,15 @@ export const getSupabaseClient = (): Promise<SupabaseClient> => {
 
 export const isSupabaseConfigured = (): boolean => {
   const config = getSupabaseConfig();
-  return Boolean(config.url && config.anonKey && !config.anonKey.includes('dummyKeyForDemo'));
+  return isValidConfiguredSupabaseUrl(config.url) && isValidAnonKey(config.anonKey);
 };
+
+/**
+ * Exposed for diagnostics and tests: the same rules that decide whether King
+ * Cloud auth is reachable at all. Kept separate from `isSupabaseConfigured` so a
+ * caller can explain WHY a build is local-only instead of only reporting that
+ * it is.
+ */
+export const isValidSupabaseEndpoint = isValidConfiguredSupabaseUrl;
+export const isValidSupabaseAnonKey = isValidAnonKey;
+export const looksLikeSupabasePlaceholder = looksLikePlaceholder;
