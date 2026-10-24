@@ -1,7 +1,10 @@
 name: Release
 
-# Builds installers for macOS, Windows and Linux and attaches them to a draft
-# GitHub release. Start it by pushing a tag such as v0.0.1, or run it manually.
+# Builds installers for macOS, Windows and Linux and publishes them as a GitHub
+# release. Start it by pushing a tag such as v0.0.1, or run it manually: a manual
+# run releases the version in package.json as tag v<version> on the chosen branch.
+# The website links to /releases/latest/download/..., which only resolves for a
+# published (non-draft) release, so the release is published directly.
 #
 # Code signing is optional and driven by repository secrets. Without them the
 # builds are produced unsigned (macOS Gatekeeper and Windows SmartScreen warn).
@@ -74,9 +77,19 @@ jobs:
 
   publish:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Release tag
+        id: tag
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "name=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/download-artifact@v4
         with:
           path: release-files
@@ -88,5 +101,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          draft: false
+          generate_release_notes: true
           files: release-files/*
