@@ -12,6 +12,7 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // and queued through these dependency-free modules instead of going straight to
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
+import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
 import { createSiteRuleStore, matchSiteRule, type SiteRule, type SiteRuleStore } from './main/siteRules.js';
 import { createActivityStore, type ActivityStore } from './main/activityStore.js';
 import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from './main/executionEngine.js';
@@ -401,6 +402,13 @@ const TOOL_ALIASES: Record<string, string> = {
 // Tools whose approval decision depends on the current page and target element.
 const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_select_option', 'browser_press_key', 'browser_login']);
 
+// Tools whose output is page text the agent will read, and the actions that
+// need an approval after that text looked like an injection attempt.
+const INJECTION_SCAN_TOOLS = new Set(['browser_read_page', 'browser_get_element_text']);
+const INJECTION_GATED_TOOLS = new Set([
+  'browser_navigate', 'browser_new_tab', 'browser_click', 'browser_type', 'browser_select_option', 'browser_press_key'
+]);
+
 // Tools that read or act on the current page: per-site rules apply to them too,
 // using the live page URL when the arguments carry none.
 const SITE_RULE_TOOLS = new Set([
@@ -512,6 +520,8 @@ export class BrowserMCPServer {
   // execution-engine queue when the composition root (main.ts) enables this. It
   // stays off in unit tests so only the pre-existing dispatch path runs there.
   private policyEnforced: boolean = false;
+  /** Set when page text the agent read looked like an injection; cleared once the user is asked. */
+  private injectionSuspect: { reasons: string[] } | null = null;
   private siteRuleStoreInstance: SiteRuleStore | null | undefined;
   private activityStoreInstance: ActivityStore | null | undefined;
   private engineInstance: ExecutionEngine | null = null;
@@ -1146,6 +1156,17 @@ export class BrowserMCPServer {
       decision.reasons = [...decision.reasons, 'This site has an "always ask" rule.'];
       decision.domain = decision.domain ?? siteRuleHost;
     }
+    if (this.injectionSuspect && INJECTION_GATED_TOOLS.has(canonicalTool)) {
+      if (decision.risk === 'safe') {
+        decision.risk = 'sensitive';
+        decision.triggers = ['prompt_injection'];
+      } else if (!decision.triggers.includes('prompt_injection')) {
+        decision.triggers = [...decision.triggers, 'prompt_injection'];
+      }
+      decision.reasons = [...decision.reasons, `A page read earlier looked like it was written to instruct AI agents (${this.injectionSuspect.reasons.join('; ')}).`];
+      // The user is asked now, so the warning has done its job.
+      this.injectionSuspect = null;
+    }
     const approvalSummary = decision.risk === 'sensitive'
       ? buildApprovalSummary({ toolName: canonicalTool, args }, decision)
       : null;
@@ -1166,7 +1187,15 @@ export class BrowserMCPServer {
       throw new Error(record.error ? `${record.error} (${record.status})` : `Action ${record.status}.`);
     }
     const dispatched = (actionRequest as ActionRequest & { __mcpResult?: unknown }).__mcpResult;
-    return typeof dispatched === 'string' ? dispatched : JSON.stringify(dispatched ?? '');
+    const output = typeof dispatched === 'string' ? dispatched : JSON.stringify(dispatched ?? '');
+    if (INJECTION_SCAN_TOOLS.has(canonicalTool)) {
+      const reasons = detectPromptInjection(output);
+      if (reasons.length > 0) {
+        this.injectionSuspect = { reasons };
+        return injectionWarning(reasons) + output;
+      }
+    }
+    return output;
   }
 
   private setupRoutes(app: Express) {
