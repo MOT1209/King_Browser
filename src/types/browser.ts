@@ -121,6 +121,8 @@ export interface UserSettings {
   tabStyle: 'rounded' | 'square' | 'floating';
   tabAnimation?: 'chrome' | 'smooth' | 'snappy' | 'none';
   doNotTrack: boolean;
+  /** Opt-in: present a Firefox user agent on accounts.google.com so Google allows sign-in. */
+  googleSigninCompat: boolean;
   clearOnExit: boolean;
   hardwareAcceleration: boolean;
   developerMode: boolean;
@@ -161,6 +163,7 @@ export const defaultSettings: UserSettings = {
   tabStyle: 'floating',
   tabAnimation: 'chrome',
   doNotTrack: true,
+  googleSigninCompat: false,
   clearOnExit: false,
   hardwareAcceleration: true,
   developerMode: false,

@@ -135,6 +135,9 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
       if (window.electronAPI?.setDoNotTrack) {
         getElectronAPI()?.setDoNotTrack(settings.doNotTrack ?? true);
       }
+      if (window.electronAPI?.setGoogleSigninCompat) {
+        getElectronAPI()?.setGoogleSigninCompat(settings.googleSigninCompat ?? false);
+      }
     }, 500);
     return () => clearTimeout(timer);
   }, [settings, isDemo, isHydrated]);

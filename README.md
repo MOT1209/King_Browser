@@ -509,10 +509,14 @@ npm run benchmark
 - Email/password, GitHub and other sign-ins run in the tab like in Chrome. Sign-in popups
   ("Sign in with GitHub" and similar) open as a real small window that reports back to the
   site and closes itself; ordinary links still open as tabs.
-- **Google accounts:** Google refuses sign-in inside embedded browsers such as King Browser
-  ("This browser or app may not be secure"). King does not try to hide from that check. When
-  the rejection page appears, King offers **Open in Default Browser**; you can also right-click
-  any page and choose **Open Page in Default Browser**.
+- **Google accounts (YouTube, Gmail):** Google refuses sign-in inside embedded browsers such as
+  King Browser ("This browser or app may not be secure"). You have two options:
+  - Turn on **Settings → Privacy → Google sign-in compatibility** (off by default). King then
+    identifies as Firefox on `accounts.google.com` only, which is how other Electron browsers get
+    past this check. It is a workaround: Google can stop accepting it at any time. If Google offers
+    a passkey, choose **Try another way** and use your password.
+  - Otherwise, when the rejection page appears, King offers **Open in Default Browser**; you can
+    also right-click any page and choose **Open Page in Default Browser**.
 
 ---
 
