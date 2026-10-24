@@ -47,6 +47,30 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.2',
+    date: 'October 2026',
+    title: 'Agent control: site rules, activity log and isolated profile',
+    badge: 'Pre-release',
+    lede: 'More ways to stay in charge of the agent: rules per site, a saved and exportable activity log, a warning when a page tries to instruct the agent, and an opt-in separate session for agent tabs.',
+    highlights: [
+      'Site rules: mark a site "always ask" or "block" in Settings > MCP.',
+      'The agent activity log is saved to disk and can be exported from the control panel.',
+      'Pages that look like they instruct the agent trigger a warning and one extra approval.',
+      'The approval dialog shows the page and the target element.',
+      'Optional isolated agent profile: agent tabs use their own session and the agent cannot use your tabs.',
+      'One-click OpenCode configuration in Settings > MCP.',
+    ],
+    changes: [
+      { category: 'feature', text: 'Per-site rules (always ask / block) for the agent.' },
+      { category: 'feature', text: 'Persistent, redacted agent activity log with export button.' },
+      { category: 'security', text: 'Prompt-injection tripwire on page text returned to the agent (a warning, not a guarantee).' },
+      { category: 'security', text: 'Opt-in isolated agent profile with its own in-memory session.' },
+      { category: 'improvement', text: 'Approval dialog shows page and target element text.' },
+      { category: 'improvement', text: 'Copy a ready opencode.json from Settings > MCP.' },
+      { category: 'fix', text: 'Release workflow publishes the release, so the website download links resolve.' },
+    ],
+  },
+  {
     version: '0.0.1',
     date: 'October 2026',
     title: 'First King Browser build, derived from Nova Browser 1.5.1',
