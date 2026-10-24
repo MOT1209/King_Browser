@@ -2,13 +2,15 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { ArrowDown, ArrowDownRight, ArrowRight, ArrowUpRight, Code2, Command, Download, Github, Globe2, Layers3, LockKeyhole, Menu, Monitor, Play, Plus, Puzzle, ShieldCheck, Sparkles, Terminal, X } from 'lucide-react'
 import { copy } from './content'
 import { useSiteMotion } from './useSiteMotion'
+import pkg from '../../package.json'
 
 const REPO = 'https://github.com/MOT1209/King_Browser'
-/** Keep in step with package.json "version": Windows installers carry it in their file names. */
-const VERSION = '0.0.1'
+
+/** Single source of truth: Windows installers carry the package.json version in their file names. */
+export const VERSION = pkg.version
 const RELEASE = `${REPO}/releases/latest/download/`
 // Windows first and selected by default: it is the platform released first.
-const platforms = [
+export const platforms = [
   { name: 'Windows', icon: Monitor, choices: [{ name: 'Setup · x64', file: `King-Browser-Setup-${VERSION}-x64.exe`, type: '.exe' }, { name: 'Portable · x64', file: `King-Browser-${VERSION}-x64.exe`, type: '.exe' }] },
   { name: 'macOS', icon: Command, choices: [{ name: 'Apple Silicon', file: 'King-Browser-arm64.dmg', type: '.dmg' }, { name: 'Intel', file: 'King-Browser-x64.dmg', type: '.dmg' }] },
   { name: 'Linux', icon: Terminal, choices: [{ name: 'AppImage · x64', file: 'King-Browser-x86_64.AppImage', type: '.AppImage' }, { name: 'Debian / Ubuntu', file: 'King-Browser-amd64.deb', type: '.deb' }] },
@@ -114,7 +116,7 @@ export default function App() {
     <main id="main" tabIndex={-1}>
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy container">
-          <a className="release-note" href={`${REPO}/releases`} target="_blank" rel="noopener noreferrer"><span className="status-dot" />King 0.0.1<span className="release-divider" />{t.releaseBadge}<ArrowUpRight size={13} aria-hidden="true" /></a>
+          <a className="release-note" href={`${REPO}/releases`} target="_blank" rel="noopener noreferrer"><span className="status-dot" />King {VERSION}<span className="release-divider" />{t.releaseBadge}<ArrowUpRight size={13} aria-hidden="true" /></a>
           <h1 id="hero-title"><span className="hero-line"><span>{t.hero[0]}</span></span><span className="hero-line"><span>{t.hero[1]}</span></span></h1>
           <p className="hero-intro">{t.intro}</p>
           <div className="hero-actions"><a href="#download" className="button button-blue">{t.download}<ArrowDown size={18} /></a><button ref={watchButton} className="watch-button" onClick={openVideo}><span className="play-icon"><Play size={11} fill="currentColor" /></span>{t.watch}</button></div>
@@ -158,7 +160,7 @@ export default function App() {
 
       <section className="faq section container" aria-labelledby="faq-title"><h2 id="faq-title">{t.faqTitle}</h2><div className="faq-list">{t.faq.map(([q, a], i) => <details key={i} name="king-faq"><summary>{q}<Plus size={19} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
 
-      <section className="download-section container" id="download" aria-labelledby="download-title"><div className="download-heading"><img src="/images/king-icon.png" width="64" height="64" alt="" /><h2 id="download-title">{t.downloadTitle[0]}<br /><span>{t.downloadTitle[1]}</span></h2><p>{t.downloadText}</p></div><div className="download-picker"><div className="download-picker-header"><span>{t.installer}</span><span className="version-label"><span className="status-dot" />v{VERSION}</span></div><div className="platform-tabs" role="tablist" aria-label={t.installer}>{platforms.map(({ name, icon: Icon }, i) => <button key={name} id={`platform-tab-${i}`} role="tab" aria-selected={platform === i} aria-controls="platform-panel" tabIndex={platform === i ? 0 : -1} onClick={() => setPlatform(i)} onKeyDown={e => moveTab(e, 'platform', i)}><Icon size={20} aria-hidden="true" />{name}</button>)}</div><div id="platform-panel" role="tabpanel" aria-labelledby={`platform-tab-${platform}`} className="platform-files"><span className="platform-file-list" key={platform}>{platforms[platform].choices.map(choice => <a key={choice.file} className="download-file" href={`${RELEASE}${choice.file}`} aria-label={`${t.download}: ${choice.name} (${choice.type})`}><span><strong>{choice.name}</strong><small>{choice.type}</small></span><Download size={18} aria-hidden="true" /></a>)}</span></div><a className="all-releases" href={`${REPO}/releases/latest`} target="_blank" rel="noopener noreferrer">{t.allReleases}<ArrowUpRight size={14} /></a><p className="desktop-note">{t.desktopNote}</p></div></section>
+      <section className="download-section container" id="download" aria-labelledby="download-title"><div className="download-heading"><img src="/images/king-icon.png" width="64" height="64" alt="" /><h2 id="download-title">{t.downloadTitle[0]}<br /><span>{t.downloadTitle[1]}</span></h2><p>{t.downloadText}</p></div><div className="download-picker"><div className="download-picker-header"><span>{t.installer}</span><span className="version-label"><span className="status-dot" />v{VERSION}</span></div><div className="platform-tabs" role="tablist" aria-label={t.installer}>{platforms.map(({ name, icon: Icon }, i) => <button key={name} id={`platform-tab-${i}`} role="tab" aria-selected={platform === i} aria-controls="platform-panel" tabIndex={platform === i ? 0 : -1} onClick={() => setPlatform(i)} onKeyDown={e => moveTab(e, 'platform', i)}><Icon size={20} aria-hidden="true" />{name}</button>)}</div><div id="platform-panel" role="tabpanel" aria-labelledby={`platform-tab-${platform}`} className="platform-files"><span className="platform-file-list" key={platform}>{platforms[platform].choices.map(choice => <a key={choice.file} className="download-file" href={`${RELEASE}${choice.file}`} aria-label={`${t.download}: ${choice.name} (${choice.type})`}><span><strong>{choice.name}</strong><small>{choice.type}</small></span><Download size={18} aria-hidden="true" /></a>)}</span></div><a className="all-releases" href={`${REPO}/releases/latest`} target="_blank" rel="noopener noreferrer">{t.allReleases}<ArrowUpRight size={14} /></a><p className="desktop-note">{t.desktopNote}</p><p className="desktop-note unsigned-note">{t.unsignedNote}</p></div></section>
     </main>
 
     <footer className="footer container"><div className="footer-top"><p>{t.footerLine}</p><nav aria-label="Footer">{[REPO, `${REPO}/releases`, `${REPO}/issues`].map((url, i) => <a key={url} href={url} target="_blank" rel="noopener noreferrer">{t.footerLinks[i]}<ArrowUpRight size={14} /></a>)}</nav></div><div className="footer-wordmark" aria-hidden="true">king<span className="brand-period">.</span></div><div className="footer-bottom"><span>© {new Date().getFullYear()} King Browser</span><span>{t.footerBottom}</span><a href="#main" onClick={(e) => { e.preventDefault(); typeof window.scrollTo === 'function' && window.scrollTo({ top: 0, behavior: 'smooth' }); }} aria-label={t.backToTop}>{t.backToTop}<ArrowRight size={15} aria-hidden="true" /></a></div></footer>

@@ -2,9 +2,35 @@ import assert from 'node:assert/strict'
 import { JSDOM } from 'jsdom'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import App from '../src/App'
+import App, { platforms, VERSION } from '../src/App'
+import pkg from '../../package.json'
+
+/** Expand electron-builder's ${version}/${arch}/${ext} for the arch and extension a download link names. */
+function expectedNames(template: string, ext: string) {
+  const arches = ['x64', 'arm64', 'x86_64', 'amd64']
+  return arches.map(arch => template.replace('${version}', pkg.version).replace('${arch}', arch).replace('${ext}', ext))
+}
+
+function assertDownloadNamesMatchBuildConfig() {
+  const b = pkg.build as any
+  const templates: Record<string, string[]> = {
+    exe: [b.nsis.artifactName, b.win.artifactName],
+    dmg: [b.mac.artifactName],
+    AppImage: [b.linux.artifactName],
+    deb: [b.linux.artifactName],
+  }
+  assert.equal(VERSION, pkg.version, 'Website version comes from package.json')
+  for (const platform of platforms) {
+    for (const choice of platform.choices) {
+      const ext = choice.type.replace('.', '')
+      const ok = templates[ext].some(t => expectedNames(t, ext).includes(choice.file))
+      assert.ok(ok, `Download file ${choice.file} matches no artifactName in package.json`)
+    }
+  }
+}
 
 async function run() {
+  assertDownloadNamesMatchBuildConfig()
   const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost/' })
   const w = dom.window
   Object.assign(globalThis, { window: w, document: w.document, localStorage: w.localStorage, Node: w.Node, IS_REACT_ACT_ENVIRONMENT: true })
@@ -32,6 +58,7 @@ async function run() {
   references()
   assert.equal(document.getElementById('platform-tab-0')?.textContent, 'Windows', 'Windows is listed first')
   assert.equal(document.getElementById('platform-tab-0')?.getAttribute('aria-selected'), 'true', 'Windows is selected by default')
+  assert.ok(document.querySelector('.unsigned-note'), 'Unsigned-build install help must be visible')
   const downloadLinks = [...document.querySelectorAll('.download-file')]
   assert.equal(downloadLinks.length, 2, 'Windows platform must offer both Setup and Portable choices')
   await click(document.getElementById('platform-tab-1'))
