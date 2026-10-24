@@ -1,6 +1,7 @@
 import React from 'react';
 import { RotateCcw, Shuffle, Check, Images } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
+import { useTranslation } from '../../services/i18n';
 import { useLiveUnsplashPhoto } from '../../utils/unsplash';
 import { TabAnimationPreviewBox } from './TabAnimationPreviewBox';
 import { ToggleSwitch } from './ToggleSwitch';
@@ -12,6 +13,7 @@ export interface AppearanceSectionProps {
 }
 
 const DailyWallpaperSection = () => {
+  const { t } = useTranslation();
   const { 
     photo: currentPhoto, 
     photos, 

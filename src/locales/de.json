@@ -340,5 +340,128 @@
     "statusRejected": "abgelehnt",
     "statusRunning": "läuft",
     "statusRequested": "in Warteschlange"
+  },
+  "appearance": {
+    "wallpaper": {
+      "title": "Tägliches 4K-Hintergrundbild (Ultra HD)",
+      "customChoice": "Eigene Auswahl",
+      "desc": "Aktualisiert sich täglich automatisch mit kuratierten 4K-Fotografien. Über alle Tabs synchronisiert.",
+      "resetTitle": "Auf das heutige offizielle Hintergrundbild zurücksetzen",
+      "reset": "Auf heute zurücksetzen",
+      "shuffle": "Nächstes mischen",
+      "activeOnNewTab": "Auf neuem Tab aktiv",
+      "gallery": "4K-Hintergrundbildergalerie",
+      "galleryHint": "Klicken Sie auf ein Foto, um es sofort in allen Tabs festzulegen",
+      "active": "Aktiv"
+    },
+    "themeMode": "Designmodus",
+    "themeLight": "Hell",
+    "themeDark": "Dunkel",
+    "themeSystem": "Systemstandard",
+    "tabStyle": "Tab-Stil",
+    "tabStyleFloating": "Schwebend",
+    "tabStyleFloatingDesc": "Modern und abgesetzt",
+    "tabStyleRounded": "Abgerundet",
+    "tabStyleRoundedDesc": "Klassischer Chrome-Stil",
+    "tabStyleSquare": "Eckig",
+    "tabStyleSquareDesc": "Kompakt und scharf",
+    "tabAnimation": "Tab-Animation",
+    "tabAnimationDesc": "Wählen Sie ein Preset für die Tab-Öffnungsphysik und sehen Sie die Bewegung in der Vorschau",
+    "animationChrome": "Chrome (nativ)",
+    "animationChromeDesc": "Sanfte horizontale Breitenausdehnung und -einklappung",
+    "animationSmooth": "Flüssige Feder",
+    "animationSmoothDesc": "Sanftes schwebendes Anheben mit gedämpfter Federphysik",
+    "animationSnappy": "Zackig",
+    "animationSnappyDesc": "Klare, sehr schnelle und reaktionsfreudige Bewegung",
+    "animationNone": "Sofort (keine Bewegung)",
+    "animationNoneDesc": "Unmittelbares Öffnen des Tabs für maximale Geschwindigkeit",
+    "defaultBadge": "Standard",
+    "browserColor": "Browserfarbe (vollständiges UI-Design)",
+    "browserColorDesc": "Passen Sie die gesamte Browser-Oberfläche, den Rahmen, die Navigationsleiste und die Tab-Flächen an",
+    "colorDefault": "Klassisches Schiefergrau",
+    "colorDefaultDesc": "Standard-Ästhetik von King",
+    "colorMidnight": "Mitternachtsblau",
+    "colorMidnightDesc": "Tiefes galaktisches Blau",
+    "colorCyberpunk": "Cyberpunk-Violett",
+    "colorCyberpunkDesc": "Futuristischer Neon-Violettton",
+    "colorForest": "Smaragdwald",
+    "colorForestDesc": "Reichhaltiges organisches Botanikgrün",
+    "colorCrimson": "Karminrot",
+    "colorCrimsonDesc": "Samtiger burgunderroter Weinrot",
+    "colorWarm": "Warmer Mokka",
+    "colorWarmDesc": "Gemütlicher Espressoton",
+    "colorOcean": "Tiefer Ozean",
+    "colorOceanDesc": "Ruhiges abyssales Blaugrün",
+    "colorSunset": "Sonnenuntergangsbernstein",
+    "colorSunsetDesc": "Warmes Dämmerungsleuchten",
+    "colorCustom": "Eigene Farbe",
+    "colorCustomDesc": "Wählen Sie Ihren eigenen Hex-Farbwert",
+    "customBrowserColor": "Eigene Browserfarbe auswählen:",
+    "contrastNote": "Der Browser berechnet Rahmen, Symbolleiste und Tab-Flächen automatisch mit optimalem Kontrast.",
+    "accentColor": "Akzentfarbe",
+    "customColorPicker": "Eigene Farbe auswählen:",
+    "newTabBackground": "Hintergrund des neuen Tabs",
+    "videoImageUrl": "Video-/Bild-URL:",
+    "placeholderUrl": "z. B. https://example.com/video.mp4",
+    "layoutNavigation": "Layout und Navigation",
+    "bookmarksBar": "Lesezeichenleiste",
+    "bookmarksBarDesc": "Lieblingsseiten unter der Adressleiste anzeigen",
+    "verticalTabs": "Vertikale Tabs",
+    "verticalTabsDesc": "Tabs in der linken Seitenleiste statt oben anzeigen",
+    "tasksWidget": "Aufgaben-Widget",
+    "tasksWidgetDesc": "Aufgaben und To-Do-Liste auf der Neuer-Tab-Seite anzeigen",
+    "toggleBookmarksBar": "Lesezeichenleiste umschalten",
+    "toggleVerticalTabs": "Vertikale Tabs umschalten",
+    "toggleTasksWidget": "Aufgaben-Widget umschalten",
+    "backgrounds": {
+      "default": {
+        "name": "Schlicht minimalistisch",
+        "badge": "Standard"
+      },
+      "aurora_waves": {
+        "name": "Polarlichtwellen",
+        "badge": "3D-Welle"
+      },
+      "cyber_grid": {
+        "name": "Cyber-Raster 3D",
+        "badge": "3D-Neon"
+      },
+      "hyper_space": {
+        "name": "Hyperraum-Sterne",
+        "badge": "Partikel"
+      },
+      "fireflies": {
+        "name": "Biolumineszierende Glühwürmchen",
+        "badge": "Ambient"
+      },
+      "nebula": {
+        "name": "Kosmischer Nebelfluss",
+        "badge": "Galaxie"
+      },
+      "matrix": {
+        "name": "Digitaler Matrixregen",
+        "badge": "Code-Regen"
+      },
+      "gradient": {
+        "name": "Dynamischer Farbverlauf",
+        "badge": "Flüssig"
+      },
+      "mesh": {
+        "name": "Mesh-Polarlicht",
+        "badge": "Mesh-Leuchten"
+      },
+      "glass": {
+        "name": "Dunkles Glas und Prisma",
+        "badge": "Prismenglas"
+      },
+      "unsplash": {
+        "name": "Tägliches 4K-Hintergrundbild (Ultra HD)",
+        "badge": "Ultra HD"
+      },
+      "custom_url": {
+        "name": "Video-/Bild-URL",
+        "badge": "Eigene"
+      }
+    }
   }
 }
