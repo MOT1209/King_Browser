@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, ExternalLink, Trash2, Cpu } from 'lucide-react';
+import { ADBLOCK_WHITELIST_EVENT, ADBLOCK_WHITELIST_KEY, addWhitelistHost, parseWhitelist, removeWhitelistHost } from '../../utils/adblockWhitelist';
 import { UserSettings } from '../../types/browser';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
@@ -24,6 +25,40 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
   const [aiCacheStatus, setAiCacheStatus] = useState<string>('');
   const [isClearingCache, setIsClearingCache] = useState<boolean>(false);
   const { setSafeTimeout } = useSafeTimeout();
+  const [blockerOffSites, setBlockerOffSites] = useState<string[]>([]);
+  const [siteInput, setSiteInput] = useState('');
+  const [siteError, setSiteError] = useState('');
+
+  const loadBlockerOffSites = React.useCallback(async () => {
+    try {
+      const raw = await getElectronAPI()?.storeGet?.(ADBLOCK_WHITELIST_KEY);
+      setBlockerOffSites(parseWhitelist(raw));
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    void loadBlockerOffSites();
+    // The address-bar shield popover edits the same list.
+    window.addEventListener(ADBLOCK_WHITELIST_EVENT, loadBlockerOffSites);
+    return () => window.removeEventListener(ADBLOCK_WHITELIST_EVENT, loadBlockerOffSites);
+  }, [loadBlockerOffSites]);
+
+  const saveBlockerOffSites = async (next: string[]) => {
+    setBlockerOffSites(next);
+    await getElectronAPI()?.storeSet?.(ADBLOCK_WHITELIST_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent(ADBLOCK_WHITELIST_EVENT));
+  };
+
+  const handleAddBlockerOffSite = async () => {
+    const { list, added } = addWhitelistHost(blockerOffSites, siteInput);
+    if (!added) {
+      setSiteError('Enter a site like example.com');
+      return;
+    }
+    setSiteError('');
+    setSiteInput('');
+    await saveBlockerOffSites(list);
+  };
 
   useEffect(() => {
     if (getElectronAPI()?.getRememberedPermissionsCount) {
@@ -93,16 +128,63 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
                 King's Privacy Shield blocks malicious scripts, tracking cookies, and intrusive ads across all websites. It uses Ghostery and Cliqz blocklists to keep your browsing fast and secure.
               </p>
 
-              <button
-                onClick={() => onUpdateSettings({ privacyShield: !settings.privacyShield })}
-                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  settings.privacyShield
-                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600'
-                }`}
-              >
-                {settings.privacyShield ? 'Shield is Active' : 'Enable Shield'}
-              </button>
+              <div className="flex items-center justify-between gap-4 mb-2">
+                <div>
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Ad & tracker blocker</div>
+                  <div className={`text-xs mt-0.5 font-medium ${settings.privacyShield ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                    {settings.privacyShield ? 'On: ads and trackers are blocked' : 'Off: nothing is blocked'}
+                  </div>
+                </div>
+                <ToggleSwitch
+                  ariaLabel="Toggle the ad and tracker blocker"
+                  checked={settings.privacyShield}
+                  onToggle={() => onUpdateSettings({ privacyShield: !settings.privacyShield })}
+                />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                If a site does not open or asks you to turn off your ad blocker, switch this off, or add just that site below. Reload the open pages after changing it.
+              </p>
+
+              <div className="mt-5">
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-1.5">Sites where blocking is off</div>
+                <form
+                  className="flex gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleAddBlockerOffSite();
+                  }}
+                >
+                  <input
+                    value={siteInput}
+                    onChange={(event) => { setSiteInput(event.target.value); setSiteError(''); }}
+                    placeholder="example.com"
+                    aria-label="Site where the blocker is off"
+                    maxLength={253}
+                    className="flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
+                  />
+                  <button type="submit" className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600">Add</button>
+                </form>
+                {siteError && <p className="text-xs text-red-600 mt-1" role="alert">{siteError}</p>}
+                {blockerOffSites.length === 0 ? (
+                  <p className="text-xs text-slate-400 mt-2">No exceptions. The blocker works on every site.</p>
+                ) : (
+                  <ul className="mt-2 space-y-1.5">
+                    {blockerOffSites.map(host => (
+                      <li key={host} className="flex items-center justify-between gap-2 py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                        <code className="text-xs font-mono text-slate-700 dark:text-slate-200 truncate">{host}</code>
+                        <button
+                          type="button"
+                          onClick={() => void saveBlockerOffSites(removeWhitelistHost(blockerOffSites, host))}
+                          aria-label={`Turn the blocker back on for ${host}`}
+                          className="text-xs text-slate-500 hover:text-red-600 shrink-0"
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -132,6 +214,18 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
               ariaLabel="Toggle clear cookies on exit"
               checked={settings.clearOnExit}
               onToggle={() => onUpdateSettings({ clearOnExit: !settings.clearOnExit })}
+            />
+          </div>
+
+          <div className="p-5 flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Google sign-in compatibility</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Lets you sign in to Google, YouTube and Gmail by identifying as Firefox on accounts.google.com only. A workaround: Google may stop accepting it at any time.</div>
+            </div>
+            <ToggleSwitch
+              ariaLabel="Toggle Google sign-in compatibility"
+              checked={settings.googleSigninCompat ?? false}
+              onToggle={() => onUpdateSettings({ googleSigninCompat: !settings.googleSigninCompat })}
             />
           </div>
         </div>

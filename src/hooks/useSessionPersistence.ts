@@ -135,6 +135,9 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
       if (window.electronAPI?.setDoNotTrack) {
         getElectronAPI()?.setDoNotTrack(settings.doNotTrack ?? true);
       }
+      if (window.electronAPI?.setGoogleSigninCompat) {
+        getElectronAPI()?.setGoogleSigninCompat(settings.googleSigninCompat ?? false);
+      }
     }, 500);
     return () => clearTimeout(timer);
   }, [settings, isDemo, isHydrated]);
@@ -145,7 +148,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
     if (isDemo) return;
     const handleBeforeUnload = () => {
       try {
-        const sessionTabs = tabsRef.current.filter(t => !t.isIncognito);
+        const sessionTabs = tabsRef.current.filter(t => !t.isIncognito && !t.isAgentOwned);
         const serializedTabs = JSON.stringify(sessionTabs);
         localStorage.setItem('nova_session_tabs', serializedTabs);
         getElectronAPI()?.storeSet?.('session_tabs', serializedTabs);
@@ -229,7 +232,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
       return;
     }
     const sessionTabs = tabs
-      .filter(t => !t.isIncognito);
+      .filter(t => !t.isIncognito && !t.isAgentOwned);
     const signature = buildTabSignature(sessionTabs);
 
     // Already written, or already covered by a pending write. This is the hot

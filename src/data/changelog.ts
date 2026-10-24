@@ -47,6 +47,82 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.5',
+    date: 'October 2026',
+    title: 'Google sign-in compatibility',
+    badge: 'Pre-release',
+    lede: 'An opt-in setting lets you sign in to Google, YouTube and Gmail, and use "Sign in with Google", inside King Browser.',
+    highlights: [
+      'Google sign-in compatibility (Settings > Privacy): presents a Firefox user agent on accounts.google.com only. Off by default; Google can stop accepting it at any time.',
+      'The "Google blocked sign-in" dialog also appears in sign-in popup windows and points to the new setting.',
+    ],
+    changes: [
+      { category: 'feature', text: 'Opt-in Google sign-in compatibility mode, limited to accounts.google.com.' },
+      { category: 'fix', text: 'Google sign-in rejection is handled in popup windows as well as tabs.' },
+    ],
+  },
+  {
+    version: '0.0.4',
+    date: 'October 2026',
+    title: 'Record and replay, a persistent agent profile and automatic releases',
+    badge: 'Pre-release',
+    lede: 'Record what an agent does and replay it without a model, let the agent keep its own logins if you choose, and every version bump on main now publishes a release by itself.',
+    highlights: [
+      'Record and replay (Settings > MCP): every replayed step still asks for approval, and text typed into password fields is never stored.',
+      'Optional persistent agent profile: sign in once in an agent tab; the agent never sees the password, and one button clears it.',
+      'Releases are now published automatically when a pull request that bumps the version is merged.',
+    ],
+    changes: [
+      { category: 'feature', text: 'Record and replay for agent actions, with the approval gate on every replayed step.' },
+      { category: 'security', text: 'Optional persistent agent profile; cannot be switched on through sync, with a clear button.' },
+      { category: 'improvement', text: 'Release workflow runs when package.json changes on main and the version has no tag yet.' },
+      { category: 'improvement', text: 'macOS test job in CI (non-blocking).' },
+    ],
+  },
+  {
+    version: '0.0.3',
+    date: 'October 2026',
+    title: 'Element refs, strict approval mode and an honest injection check',
+    badge: 'Pre-release',
+    lede: 'The agent can now name page elements by short refs instead of guessing CSS selectors, you can make it ask before every action, and the activity log is visible in settings.',
+    highlights: [
+      'browser_snapshot lists the page\'s interactive elements with refs such as e12; click, type and the other element tools accept a ref.',
+      'Strict approval mode asks before every agent action (sensitive actions always ask, in both modes).',
+      'Settings > MCP shows the latest saved agent actions with a status filter.',
+      'The prompt-injection check is a tripwire that catches about two thirds of our own test attacks; the approval gate is the real protection.',
+    ],
+    changes: [
+      { category: 'feature', text: 'browser_snapshot tool and element refs for the element tools.' },
+      { category: 'security', text: 'Strict approval mode (no looser mode exists).' },
+      { category: 'improvement', text: 'Agent activity table with a status filter in Settings > MCP.' },
+      { category: 'security', text: 'Prompt-injection corpus test (13 of 20 attack texts caught); limits documented in SECURITY.md.' },
+    ],
+  },
+  {
+    version: '0.0.2',
+    date: 'October 2026',
+    title: 'Agent control: site rules, activity log and isolated profile',
+    badge: 'Pre-release',
+    lede: 'More ways to stay in charge of the agent: rules per site, a saved and exportable activity log, a warning when a page tries to instruct the agent, and an opt-in separate session for agent tabs.',
+    highlights: [
+      'Site rules: mark a site "always ask" or "block" in Settings > MCP.',
+      'The agent activity log is saved to disk and can be exported from the control panel.',
+      'Pages that look like they instruct the agent trigger a warning and one extra approval.',
+      'The approval dialog shows the page and the target element.',
+      'Optional isolated agent profile: agent tabs use their own session and the agent cannot use your tabs.',
+      'One-click OpenCode configuration in Settings > MCP.',
+    ],
+    changes: [
+      { category: 'feature', text: 'Per-site rules (always ask / block) for the agent.' },
+      { category: 'feature', text: 'Persistent, redacted agent activity log with export button.' },
+      { category: 'security', text: 'Prompt-injection tripwire on page text returned to the agent (a warning, not a guarantee).' },
+      { category: 'security', text: 'Opt-in isolated agent profile with its own in-memory session.' },
+      { category: 'improvement', text: 'Approval dialog shows page and target element text.' },
+      { category: 'improvement', text: 'Copy a ready opencode.json from Settings > MCP.' },
+      { category: 'fix', text: 'Release workflow publishes the release, so the website download links resolve.' },
+    ],
+  },
+  {
     version: '0.0.1',
     date: 'October 2026',
     title: 'First King Browser build, derived from Nova Browser 1.5.1',

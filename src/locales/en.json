@@ -330,6 +330,8 @@
     "approve": "Approve",
     "reject": "Reject",
     "history": "Recent activity",
+    "exportLog": "Export activity log (JSON)",
+    "exportFailed": "Could not export the activity log.",
     "noHistory": "No actions yet",
     "stopReason": "Stopped: {reason}",
     "resumeRequired": "STOP NOW is active — explicit resume is required before new actions run.",

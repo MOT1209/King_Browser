@@ -11,6 +11,10 @@ export interface Tab {
   isMuted?: boolean;
   isPinned?: boolean;
   isIncognito?: boolean;
+  /** Opened by the agent while the isolated agent profile is on; uses its own cookies and storage. */
+  isAgentOwned?: boolean;
+  /** Agent tab that keeps its cookies and logins on disk (persistent agent profile). */
+  agentPersistent?: boolean;
   thumbnail?: string;
   workspaceId?: string;
   folderId?: string;
@@ -108,6 +112,10 @@ export interface UserSettings {
   showBookmarksBar: boolean;
   useVerticalTabs: boolean;
   mcpServerEnabled: boolean;
+  /** Agent tabs get their own session, and the agent may only act on tabs it opened. */
+  agentIsolatedProfile?: boolean;
+  /** With the isolated profile on, keep the agent's logins on disk until you clear them. */
+  agentPersistentProfile?: boolean;
   showTasksWidget?: boolean;
   newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url' | 'aurora_waves' | 'cyber_grid' | 'hyper_space' | 'fireflies' | 'nebula' | 'matrix';
   backgroundCustomUrl?: string;
@@ -115,6 +123,8 @@ export interface UserSettings {
   tabStyle: 'rounded' | 'square' | 'floating';
   tabAnimation?: 'chrome' | 'smooth' | 'snappy' | 'none';
   doNotTrack: boolean;
+  /** Opt-in: present a Firefox user agent on accounts.google.com so Google allows sign-in. */
+  googleSigninCompat: boolean;
   clearOnExit: boolean;
   hardwareAcceleration: boolean;
   developerMode: boolean;
@@ -167,12 +177,15 @@ export const defaultSettings: UserSettings = {
   showTasksWidget: true,
   useVerticalTabs: false,
   mcpServerEnabled: false,
+  agentIsolatedProfile: false,
+  agentPersistentProfile: false,
   newTabBackground: 'default',
   backgroundCustomUrl: '',
   startupBehavior: 'newTab',
   tabStyle: 'floating',
   tabAnimation: 'chrome',
   doNotTrack: true,
+  googleSigninCompat: false,
   clearOnExit: false,
   hardwareAcceleration: true,
   developerMode: false,

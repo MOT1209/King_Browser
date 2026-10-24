@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Cpu, Play, Square, Copy, Check, Users, Key, RefreshCw, Lock, Unlock, ShieldAlert } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { copyTextToClipboard } from '../../utils/clipboard';
+import { showConfirm } from '../../utils/confirmDialog';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 
 // mcpToken from getMcpTokenStatus is only a display prefix (e.g. "king_mcp_••••").
@@ -9,13 +10,14 @@ import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 const isMaskedToken = (v: string) => !v || v.includes('•') || v.includes('****');
 
 export interface McpSectionProps {
-  settings: Pick<UserSettings, 'mcpServerEnabled'>;
+  settings: Pick<UserSettings, 'mcpServerEnabled' | 'agentIsolatedProfile' | 'agentPersistentProfile'>;
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
 }
 
 const MCP_TOOLS = [
   { name: 'browser_navigate', desc: 'Navigate to a URL', level: 'safe' },
   { name: 'browser_read_page', desc: 'Extract full page text + links', level: 'safe' },
+  { name: 'browser_snapshot', desc: 'List interactive elements with refs (e12) for click/type', level: 'safe' },
   { name: 'browser_screenshot', desc: 'Take a screenshot', level: 'safe' },
   { name: 'browser_list_tabs', desc: 'List all open tabs', level: 'safe' },
   { name: 'browser_get_url', desc: 'Get the current tab URL', level: 'safe' },
@@ -63,6 +65,7 @@ const MCP_TOOLS = [
 ];
 
 export const McpSection: React.FC<McpSectionProps> = ({
+  settings,
   onUpdateSettings,
 }) => {
   // MCP Server state
@@ -70,6 +73,17 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const [mcpToken, setMcpToken] = useState<string>('');
   const [mcpTokenVisible, setMcpTokenVisible] = useState(false);
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
+  type RecordingState = { recording: boolean; steps: number; replaying: boolean; recordings: Array<{ id: string; name: string; createdAt: string; steps: number }> };
+  const [recState, setRecState] = useState<RecordingState>({ recording: false, steps: 0, replaying: false, recordings: [] });
+  const [recName, setRecName] = useState('');
+  const [recMessage, setRecMessage] = useState('');
+  const [approvalMode, setApprovalMode] = useState<'balanced' | 'strict'>('balanced');
+  type ActivityEntry = { id: string; tool: string; domain: string; status: string; reason: string; requestedAt: string; risk: string };
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [activityFilter, setActivityFilter] = useState<'all' | 'completed' | 'rejected' | 'failed' | 'cancelled'>('all');
+  const [siteRules, setSiteRules] = useState<Array<{ domain: string; mode: 'ask' | 'block' }>>([]);
+  const [ruleDomain, setRuleDomain] = useState('');
+  const [ruleMode, setRuleMode] = useState<'ask' | 'block'>('ask');
   const [mcpCopied, setMcpCopied] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
   const [logExporting, setLogExporting] = useState(false);
@@ -91,6 +105,73 @@ export const McpSection: React.FC<McpSectionProps> = ({
     if ((window as any).electronAPI?.getMcpToolSettings) {
       setDisabledTools(await (window as any).electronAPI.getMcpToolSettings());
     }
+    if ((window as any).electronAPI?.getMcpSiteRules) {
+      setSiteRules(await (window as any).electronAPI.getMcpSiteRules());
+    }
+    if ((window as any).electronAPI?.getMcpApprovalMode) {
+      setApprovalMode(await (window as any).electronAPI.getMcpApprovalMode());
+    }
+  }, []);
+
+  const loadActivity = useCallback(async () => {
+    try {
+      const raw = await (window as any).electronAPI?.exportEngineLog?.('json');
+      const parsed = raw ? JSON.parse(raw) : null;
+      setActivity(Array.isArray(parsed?.entries) ? parsed.entries.slice().reverse().slice(0, 100) : []);
+    } catch (_) {
+      setActivity([]);
+    }
+  }, []);
+
+  useEffect(() => { void loadActivity(); }, [loadActivity]);
+
+  const loadRecordings = useCallback(async () => {
+    try {
+      const state = await (window as any).electronAPI?.getRecordingState?.();
+      if (state) setRecState(state);
+    } catch (_) {}
+  }, []);
+  useEffect(() => { void loadRecordings(); }, [loadRecordings]);
+
+  const startRecording = useCallback(async () => {
+    setRecMessage('');
+    const ok = await (window as any).electronAPI?.startRecording?.();
+    if (!ok) setRecMessage('Could not start: start the MCP server first, and finish any recording or replay in progress.');
+    await loadRecordings();
+  }, [loadRecordings]);
+
+  const stopRecording = useCallback(async () => {
+    const result = await (window as any).electronAPI?.stopRecording?.(recName);
+    setRecName('');
+    const skipped = result?.skipped?.length ? ` ${result.skipped.length} step(s) could not be recorded.` : '';
+    setRecMessage(result?.saved ? `Saved "${result.saved.name}" with ${result.saved.steps} step(s).${skipped}` : `Nothing to save: no repeatable steps were recorded.${skipped}`);
+    await loadRecordings();
+  }, [recName, loadRecordings]);
+
+  const replayRecording = useCallback(async (id: string) => {
+    setRecMessage('Replaying... approvals appear as usual.');
+    setRecState(prev => ({ ...prev, replaying: true }));
+    const report = await (window as any).electronAPI?.replayRecording?.(id);
+    setRecMessage(report?.message ?? 'Replay finished.');
+    await loadRecordings();
+  }, [loadRecordings]);
+
+  const deleteRecording = useCallback(async (id: string) => {
+    await (window as any).electronAPI?.deleteRecording?.(id);
+    await loadRecordings();
+  }, [loadRecordings]);
+
+  const changeApprovalMode = useCallback(async (mode: 'balanced' | 'strict') => {
+    const api = (window as any).electronAPI;
+    if (!api?.setMcpApprovalMode) return;
+    setApprovalMode(await api.setMcpApprovalMode(mode));
+  }, []);
+
+  const saveSiteRules = useCallback(async (next: Array<{ domain: string; mode: 'ask' | 'block' }>) => {
+    const api = (window as any).electronAPI;
+    if (!api?.setMcpSiteRules) return;
+    // The main process validates and de-duplicates; show what it actually stored.
+    setSiteRules(await api.setMcpSiteRules(next));
   }, []);
 
   useEffect(() => {
@@ -200,6 +281,16 @@ export const McpSection: React.FC<McpSectionProps> = ({
     } finally {
       setLogExporting(false);
     }
+  };
+
+  const handleCopyOpenCodeConfig = async () => {
+    try {
+      const result = await (window as any).electronAPI?.copyMcpConfig?.('opencode');
+      if (result) {
+        setMcpCopied(true);
+        setSafeTimeout(() => setMcpCopied(false), 2000);
+      }
+    } catch (_) {}
   };
 
   const handleCopyConfig = async () => {
@@ -357,6 +448,14 @@ export const McpSection: React.FC<McpSectionProps> = ({
             <p className="text-xs text-slate-500 mt-0.5">Add this to your AI tool's MCP config (e.g., claude_desktop_config.json)</p>
           </div>
           <button
+            onClick={handleCopyOpenCodeConfig}
+            title="Copies a ready opencode.json (type: remote). Paste it into opencode.json in your project or ~/.config/opencode/opencode.json."
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            OpenCode
+          </button>
+          <button
             onClick={handleCopyConfig}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
           >
@@ -410,6 +509,234 @@ export const McpSection: React.FC<McpSectionProps> = ({
             );
           })}
         </div>
+      </div>
+      {/* Persistent agent profile */}
+      {settings.agentIsolatedProfile && (
+        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-800 dark:text-slate-100">Keep the agent's logins</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Saves the agent session (cookies and logins) on this computer so you only sign in once: open a tab with the agent, sign in yourself, then let the agent work. The agent never sees your password. Anyone with access to this computer, and any instruction the agent follows, can use those logins until you clear them. Applies to tabs the agent opens from now on.
+              </p>
+            </div>
+            <button
+              onClick={() => onUpdateSettings({ agentPersistentProfile: !settings.agentPersistentProfile })}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.agentPersistentProfile ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-600'}`}
+              role="switch"
+              aria-checked={Boolean(settings.agentPersistentProfile)}
+              aria-label="Keep the agent's logins"
+            >
+              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.agentPersistentProfile ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          <button
+            onClick={async () => {
+              if (!await showConfirm({ message: 'Clear everything the agent has stored (cookies, logins, caches)?', confirmLabel: 'Clear' })) return;
+              await (window as any).electronAPI?.clearAgentProfile?.();
+            }}
+            className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm hover:bg-red-50 dark:hover:bg-red-950/40"
+          >
+            Clear the agent's session
+          </button>
+        </div>
+      )}
+
+      {/* Record and replay */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+        <p className="font-semibold text-slate-800 dark:text-slate-100">Record and replay</p>
+        <p className="text-xs text-slate-500">
+          Record what an agent does, then replay it later without any AI model. Every replayed step goes through the same approval as a live action.
+          Text typed into password-like fields is never stored; a replay stops there and waits for you. Steps that used a page element are found again by their role and name, and the replay stops if the page no longer has them.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {!recState.recording ? (
+            <button onClick={() => void startRecording()} disabled={recState.replaying} className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600 disabled:opacity-40">Start recording</button>
+          ) : (
+            <>
+              <input
+                value={recName}
+                onChange={(event) => setRecName(event.target.value)}
+                placeholder="Name this recording"
+                aria-label="Recording name"
+                maxLength={80}
+                className="flex-1 min-w-[160px] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
+              />
+              <button onClick={() => void stopRecording()} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm hover:bg-red-600">Stop and save</button>
+              <button onClick={() => void loadRecordings()} className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs">{recState.steps} step(s) so far</button>
+            </>
+          )}
+        </div>
+        {recMessage && <p className="text-xs text-slate-600 dark:text-slate-300" role="status">{recMessage}</p>}
+        {recState.recordings.length === 0 ? (
+          <p className="text-xs text-slate-400">No recordings yet.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {recState.recordings.map(rec => (
+              <li key={rec.id} className="flex items-center justify-between gap-2 py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                <span className="min-w-0 truncate text-sm text-slate-700 dark:text-slate-200">{rec.name} <span className="text-xs text-slate-400">({rec.steps} steps)</span></span>
+                <span className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => void replayRecording(rec.id)} disabled={recState.replaying || recState.recording} className="text-xs text-blue-600 hover:underline disabled:opacity-40">Replay</button>
+                  <button onClick={() => void deleteRecording(rec.id)} aria-label={`Delete ${rec.name}`} className="text-xs text-slate-500 hover:text-red-600">Delete</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Approval mode */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-800 dark:text-slate-100">Approval mode</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              <strong>Balanced</strong> asks for sensitive actions only (purchases, sending, deleting, sign-in and similar).
+              <strong> Strict</strong> asks for every agent action, including reading a page. Sensitive actions always ask in both modes.
+            </p>
+          </div>
+          <select
+            value={approvalMode}
+            onChange={(event) => void changeApprovalMode(event.target.value === 'strict' ? 'strict' : 'balanced')}
+            aria-label="Approval mode"
+            className="shrink-0 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
+          >
+            <option value="balanced">Balanced</option>
+            <option value="strict">Strict</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Activity log */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="font-semibold text-slate-800 dark:text-slate-100">Agent activity ({activity.length})</p>
+          <div className="flex items-center gap-2">
+            <select
+              value={activityFilter}
+              onChange={(event) => setActivityFilter(event.target.value as typeof activityFilter)}
+              aria-label="Filter activity"
+              className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100"
+            >
+              <option value="all">All</option>
+              <option value="completed">Completed</option>
+              <option value="rejected">Rejected</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button onClick={() => void loadActivity()} className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs hover:bg-slate-200 dark:hover:bg-slate-600">Refresh</button>
+          </div>
+        </div>
+        {(() => {
+          const rows = activity.filter(entry => activityFilter === 'all' || entry.status === activityFilter);
+          if (rows.length === 0) return <p className="text-xs text-slate-400">No activity to show.</p>;
+          return (
+            <div className="max-h-[300px] overflow-y-auto pr-1">
+              <table className="w-full text-xs text-left">
+                <thead className="text-slate-500">
+                  <tr><th className="py-1 pr-2 font-medium">Time</th><th className="py-1 pr-2 font-medium">Tool</th><th className="py-1 pr-2 font-medium">Site</th><th className="py-1 pr-2 font-medium">Result</th></tr>
+                </thead>
+                <tbody>
+                  {rows.map(entry => (
+                    <tr key={entry.id} className="border-t border-slate-100 dark:border-slate-700/50 align-top" title={entry.reason || undefined}>
+                      <td className="py-1 pr-2 whitespace-nowrap text-slate-500">{entry.requestedAt ? new Date(entry.requestedAt).toLocaleString() : ''}</td>
+                      <td className="py-1 pr-2"><code className="text-blue-600 dark:text-blue-400">{entry.tool}</code></td>
+                      <td className="py-1 pr-2 text-slate-600 dark:text-slate-300 break-all">{entry.domain}</td>
+                      <td className={`py-1 pr-2 font-medium ${entry.status === 'completed' ? 'text-green-600' : entry.status === 'rejected' ? 'text-amber-600' : 'text-red-600'}`}>{entry.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+        <p className="text-[11px] text-slate-400">Showing the latest 100 saved actions. Hover a row for the reason. Export the full log from the Agent Control panel.</p>
+      </div>
+
+      {/* Isolated agent profile */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-800 dark:text-slate-100">Isolated agent profile</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              The agent works in its own session (separate cookies and storage) and can only see and use tabs it opened itself, never the tabs you are signed in to.
+              It starts signed out. By default this session is cleared when you close the window.
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdateSettings({ agentIsolatedProfile: !settings.agentIsolatedProfile })}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.agentIsolatedProfile ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-600'}`}
+            role="switch"
+            aria-checked={Boolean(settings.agentIsolatedProfile)}
+            aria-label="Isolated agent profile"
+          >
+            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.agentIsolatedProfile ? 'translate-x-4' : 'translate-x-0'}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Per-site rules */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-red-500" />
+          <p className="font-semibold text-slate-800 dark:text-slate-100">Site Rules ({siteRules.length})</p>
+        </div>
+        <p className="text-xs text-slate-500">
+          <strong>Always ask</strong> requires your approval for every agent action on a site (for example your bank).
+          <strong> Block</strong> stops the agent from reading, using or opening it. Rules also apply to subdomains and can only make the agent more restricted.
+        </p>
+        <form
+          className="flex flex-wrap gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!ruleDomain.trim()) return;
+            void saveSiteRules([...siteRules, { domain: ruleDomain, mode: ruleMode }]);
+            setRuleDomain('');
+          }}
+        >
+          <input
+            value={ruleDomain}
+            onChange={(event) => setRuleDomain(event.target.value)}
+            placeholder="bank.example.com"
+            aria-label="Site domain"
+            maxLength={253}
+            className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
+          />
+          <select
+            value={ruleMode}
+            onChange={(event) => setRuleMode(event.target.value === 'block' ? 'block' : 'ask')}
+            aria-label="Rule"
+            className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
+          >
+            <option value="ask">Always ask</option>
+            <option value="block">Block</option>
+          </select>
+          <button type="submit" className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600">Add</button>
+        </form>
+        {siteRules.length === 0 ? (
+          <p className="text-xs text-slate-400">No site rules yet.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {siteRules.map(rule => (
+              <li key={rule.domain} className="flex items-center justify-between gap-2 py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                <code className="text-xs font-mono text-slate-700 dark:text-slate-200 truncate">{rule.domain}</code>
+                <span className="flex items-center gap-2 shrink-0">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${rule.mode === 'block' ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400'}`}>
+                    {rule.mode === 'block' ? 'Block' : 'Always ask'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void saveSiteRules(siteRules.filter(r => r.domain !== rule.domain))}
+                    aria-label={`Remove rule for ${rule.domain}`}
+                    className="text-xs text-slate-500 hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

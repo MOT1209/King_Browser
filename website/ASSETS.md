@@ -2,7 +2,7 @@
 
 All assets are served locally; the site does not request external image or font hosts.
 
-- `public/images/king-icon.svg`, `king-mark.svg`: original King logo assets from the repository.
+- `public/images/king-icon.png`, `king-mark.png`, `public/logo.png`, `public/king-icon.png`: the King app icon (`build/icon.png`, crown and globe), resized.
 - `newtab.png`, `assistant.png`, `sync.png`: original repository screenshots. The assistant image is displayed as a CSS crop of the actual sidebar; no UI was invented or redrawn.
 - `tour.webm`, `tour-poster.jpg`: existing King product walkthrough from `website/public/demo/`. The walkthrough is silent and has a descriptive text label.
 - Manrope: installed through `@fontsource-variable/manrope`, served by Vite. Lucide icons: `lucide-react`.

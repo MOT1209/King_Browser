@@ -200,6 +200,7 @@ export interface ElectronAPI {
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   setPrivacyShield: (enabled: boolean) => Promise<boolean>;
   setDoNotTrack: (enabled: boolean) => Promise<void>;
+  setGoogleSigninCompat: (enabled: boolean) => Promise<boolean>;
   getSuggestions: (query: string, engine?: string, locale?: string) => Promise<string[]>;
   fetchWallpaperPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;
   fetchUnsplashPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;
@@ -260,9 +261,19 @@ export interface ElectronAPI {
     callback: (event: any, status: { running: boolean; port?: number } | boolean) => void
   ) => () => void;
   copyMcpToken: () => Promise<boolean>;
-  copyMcpConfig: () => Promise<{ ok: boolean; autoClearSec: number } | boolean>;
+  copyMcpConfig: (kind?: 'generic' | 'opencode') => Promise<{ ok: boolean; autoClearSec: number } | boolean>;
   getMcpTokenStatus: () => Promise<{ configured: boolean; prefix: string }>;
   rotateMcpToken: () => Promise<boolean>;
+  getRecordingState: () => Promise<{ recording: boolean; steps: number; replaying: boolean; recordings: Array<{ id: string; name: string; createdAt: string; steps: number }> }>;
+  startRecording: () => Promise<boolean>;
+  stopRecording: (name?: string) => Promise<{ saved: { id: string; name: string; steps: number } | null; skipped: string[] }>;
+  deleteRecording: (id: string) => Promise<boolean>;
+  replayRecording: (id: string) => Promise<{ total: number; completed: number; status: string; message: string }>;
+  clearAgentProfile: () => Promise<boolean>;
+  getMcpApprovalMode: () => Promise<'balanced' | 'strict'>;
+  setMcpApprovalMode: (mode: 'balanced' | 'strict') => Promise<'balanced' | 'strict'>;
+  getMcpSiteRules: () => Promise<Array<{ domain: string; mode: 'ask' | 'block' }>>;
+  setMcpSiteRules: (rules: Array<{ domain: string; mode: 'ask' | 'block' }>) => Promise<Array<{ domain: string; mode: 'ask' | 'block' }>>;
   getMcpToolSettings: () => Promise<string[]>;
   setMcpToolEnabled: (toolName: string, enabled: boolean) => Promise<boolean>;
   // §10 execution control panel (engine bridge)

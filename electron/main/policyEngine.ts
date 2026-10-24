@@ -40,7 +40,10 @@ export type ApprovalTrigger =
   | 'sensitive_input'
   | 'consequential_form'
   | 'arbitrary_code'
-  | 'login';
+  | 'login'
+  | 'site_rule'
+  | 'prompt_injection'
+  | 'strict_mode';
 
 export interface PolicyInput {
   toolName: string;
@@ -67,6 +70,10 @@ export interface ApprovalSummary {
   domain: string;
   intendedAction: string;
   affectedResource?: string;
+  /** The page the action lands on (query string dropped so tokens in URLs are not shown). */
+  pageUrl?: string;
+  /** What the target element says about itself (label, text, type), shortened to one line. */
+  targetText?: string;
   details: Record<string, unknown>;
   consequences: string[];
   uncertainty: string[];
@@ -76,6 +83,7 @@ const READ_ONLY_TOOLS = new Set([
   'browser_status',
   'king_browser_info',
   'browser_read_page',
+  'browser_snapshot',
   'browser_screenshot',
   'browser_full_page_screenshot',
   'browser_get_url',
@@ -350,7 +358,10 @@ const TRIGGER_CONSEQUENCES: Record<ApprovalTrigger, string> = {
   sensitive_input: 'This enters sensitive information such as a password, card number, or secret.',
   consequential_form: 'This submits a form or performs an action with lasting consequences.',
   arbitrary_code: 'This executes arbitrary code inside the page with full page privileges.',
-  login: 'This signs in to the site with a saved account. The password is filled by the browser and is never shown to the agent.'
+  login: 'This signs in to the site with a saved account. The password is filled by the browser and is never shown to the agent.',
+  site_rule: 'You marked this site as "always ask", so every agent action on it needs your approval.',
+  strict_mode: 'Strict approval mode is on: every agent action needs your approval.',
+  prompt_injection: 'A page the agent read contains text that looks like instructions aimed at AI agents. Check that this action is what you asked for, not something the page told the agent to do.'
 };
 
 const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
@@ -365,8 +376,27 @@ const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
   sensitive_input: 'Enter sensitive information',
   consequential_form: 'Consequential form submission',
   arbitrary_code: 'Execute arbitrary code',
-  login: 'Sign in with a saved account'
+  login: 'Sign in with a saved account',
+  site_rule: 'Action on a site you marked "always ask"',
+  prompt_injection: 'Action after suspicious page text',
+  strict_mode: 'Action in strict approval mode'
 };
+
+function describePageUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`.slice(0, 160);
+  } catch {
+    return undefined;
+  }
+}
+
+function describeTargetText(text: string | undefined): string | undefined {
+  if (!text) return undefined;
+  const oneLine = text.replace(/\s+/g, ' ').trim();
+  return oneLine ? oneLine.slice(0, 120) : undefined;
+}
 
 export function buildApprovalSummary(input: PolicyInput, decision: PolicyDecision): ApprovalSummary {
   const domain = decision.domain ?? extractDomain(input.currentUrl) ?? 'unknown site';
@@ -380,6 +410,8 @@ export function buildApprovalSummary(input: PolicyInput, decision: PolicyDecisio
     domain,
     intendedAction: `${label}: ${input.toolName}${target ? ` → ${target.slice(0, 120)}` : ''}`,
     affectedResource: target,
+    pageUrl: describePageUrl(input.currentUrl),
+    targetText: describeTargetText(input.elementText),
     details: decision.redactedArgs,
     consequences: decision.triggers.map(t => TRIGGER_CONSEQUENCES[t]),
     uncertainty: [

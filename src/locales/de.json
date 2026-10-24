@@ -330,6 +330,8 @@
     "approve": "Genehmigen",
     "reject": "Ablehnen",
     "history": "Letzte Aktivitäten",
+    "exportLog": "Aktivitätsprotokoll exportieren (JSON)",
+    "exportFailed": "Das Aktivitätsprotokoll konnte nicht exportiert werden.",
     "noHistory": "Noch keine Aktionen",
     "stopReason": "Angehalten: {reason}",
     "resumeRequired": "SOFORT STOPPEN ist aktiv — neue Aktionen erfordern eine ausdrückliche Fortsetzung.",

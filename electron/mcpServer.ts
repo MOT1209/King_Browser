@@ -12,8 +12,14 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // and queued through these dependency-free modules instead of going straight to
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
+import { resolveElementRef } from './main/elementRefs.js';
+import { Recorder, RECORDABLE_TOOLS, createRecordingStore, replaySteps, type Recording, type RecordingStore, type ReplayReport } from './main/recordings.js';
+import { createApprovalModeStore, strictModeRequiresApproval, type ApprovalMode, type ApprovalModeStore } from './main/approvalMode.js';
+import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
+import { createSiteRuleStore, matchSiteRule, type SiteRule, type SiteRuleStore } from './main/siteRules.js';
+import { createActivityStore, type ActivityStore } from './main/activityStore.js';
 import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from './main/executionEngine.js';
-import { classifyAction, buildApprovalSummary } from './main/policyEngine.js';
+import { classifyAction, buildApprovalSummary, redactArgs } from './main/policyEngine.js';
 
 // Security: Screen-lock tracking prevents MCP execution while user is away
 let isScreenLocked = false;
@@ -60,19 +66,24 @@ const TOOLS: McpTool[] = [
     inputSchema: { type: 'object', properties: {} }
   },
   {
+    name: 'browser_snapshot',
+    description: 'Lists the interactive elements of the active page (links, buttons, fields) with a ref such as e12, a role and a name. Use the ref with browser_click, browser_type and the other element tools instead of guessing CSS selectors. Refs are valid until the next snapshot or navigation; take a new snapshot after the page changes.',
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
     name: 'browser_screenshot',
     description: 'Takes a screenshot of the current active page and returns it as a base64-encoded data URL (image/png).',
     inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'browser_click',
-    description: 'Clicks an element on the active page using a CSS selector.',
+    description: 'Clicks an element on the active page. Prefer "ref" from browser_snapshot; a CSS selector also works.',
     inputSchema: {
       type: 'object',
       properties: {
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
         selector: { type: 'string', description: 'CSS selector of the element to click (e.g., #submit-btn, .nav-link, a[href*="github"])' }
-      },
-      required: ['selector']
+      }
     }
   },
   {
@@ -81,11 +92,12 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the input element' },
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the input element (alternative to ref)' },
         text: { type: 'string', description: 'Text to type into the element' },
         pressEnter: { type: 'boolean', description: 'Whether to press Enter after typing (default: false)' }
       },
-      required: ['selector', 'text']
+      required: ['text']
     }
   },
 
@@ -164,9 +176,9 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the element to hover over' }
-      },
-      required: ['selector']
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element to hover over (alternative to ref)' }
+      }
     }
   },
   {
@@ -175,9 +187,9 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the element to focus' }
-      },
-      required: ['selector']
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element to focus (alternative to ref)' }
+      }
     }
   },
   {
@@ -186,10 +198,11 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the <select> element' },
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the <select> element (alternative to ref)' },
         value: { type: 'string', description: 'The value attribute of the option to select' }
       },
-      required: ['selector', 'value']
+      required: ['value']
     }
   },
   {
@@ -231,9 +244,9 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the element' }
-      },
-      required: ['selector']
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element (alternative to ref)' }
+      }
     }
   },
   {
@@ -242,9 +255,9 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the element to scroll to' }
-      },
-      required: ['selector']
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element to scroll to (alternative to ref)' }
+      }
     }
   },
   {
@@ -399,6 +412,22 @@ const TOOL_ALIASES: Record<string, string> = {
 // Tools whose approval decision depends on the current page and target element.
 const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_select_option', 'browser_press_key', 'browser_login']);
 
+// Tools whose output is page text the agent will read, and the actions that
+// need an approval after that text looked like an injection attempt.
+const INJECTION_SCAN_TOOLS = new Set(['browser_read_page', 'browser_snapshot', 'browser_get_element_text']);
+const INJECTION_GATED_TOOLS = new Set([
+  'browser_navigate', 'browser_new_tab', 'browser_click', 'browser_type', 'browser_select_option', 'browser_press_key'
+]);
+
+// Tools that read or act on the current page: per-site rules apply to them too,
+// using the live page URL when the arguments carry none.
+const SITE_RULE_TOOLS = new Set([
+  ...PAGE_CONTEXT_TOOLS,
+  'browser_read_page', 'browser_snapshot', 'browser_screenshot', 'browser_full_page_screenshot',
+  'browser_get_element_text', 'browser_find_element', 'browser_run_js',
+  'browser_scroll', 'browser_scroll_to_element', 'browser_hover', 'browser_focus'
+]);
+
 // Tool permission levels
 export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
 
@@ -415,6 +444,7 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_scroll_to_element: 'safe',
   // Sensitive read-only & inspection tools — medium (disabled by default, requires approval)
   browser_read_page: 'medium',
+  browser_snapshot: 'medium',
   browser_screenshot: 'medium',
   browser_full_page_screenshot: 'medium',
   browser_get_element_text: 'medium',
@@ -501,6 +531,15 @@ export class BrowserMCPServer {
   // execution-engine queue when the composition root (main.ts) enables this. It
   // stays off in unit tests so only the pre-existing dispatch path runs there.
   private policyEnforced: boolean = false;
+  /** Set when page text the agent read looked like an injection; cleared once the user is asked. */
+  private injectionSuspect: { reasons: string[] } | null = null;
+  private recorder: Recorder | null = null;
+  private replaying = false;
+  private lastSnapshotText = '';
+  private recordingStoreInstance: RecordingStore | null | undefined;
+  private approvalModeStoreInstance: ApprovalModeStore | null | undefined;
+  private siteRuleStoreInstance: SiteRuleStore | null | undefined;
+  private activityStoreInstance: ActivityStore | null | undefined;
   private engineInstance: ExecutionEngine | null = null;
 
   constructor(private requestedPort: number = 3020) {
@@ -759,9 +798,65 @@ export class BrowserMCPServer {
     return this.engine();
   }
 
+  /** Durable audit file in userData; null when userData is unavailable (tests). */
+  private activityStore(): ActivityStore | null {
+    if (this.activityStoreInstance === undefined) {
+      try {
+        this.activityStoreInstance = createActivityStore(path.join(electronApp.getPath('userData'), 'agent-activity.jsonl'));
+      } catch {
+        this.activityStoreInstance = null;
+      }
+    }
+    return this.activityStoreInstance;
+  }
+
+  private siteRuleStore(): SiteRuleStore | null {
+    if (this.siteRuleStoreInstance === undefined) {
+      try {
+        this.siteRuleStoreInstance = createSiteRuleStore(path.join(electronApp.getPath('userData'), 'agent-site-rules.json'));
+      } catch {
+        this.siteRuleStoreInstance = null;
+      }
+    }
+    return this.siteRuleStoreInstance;
+  }
+
+  private approvalModeStore(): ApprovalModeStore | null {
+    if (this.approvalModeStoreInstance === undefined) {
+      try {
+        this.approvalModeStoreInstance = createApprovalModeStore(path.join(electronApp.getPath('userData'), 'agent-approval-mode.json'));
+      } catch {
+        this.approvalModeStoreInstance = null;
+      }
+    }
+    return this.approvalModeStoreInstance;
+  }
+
+  public getApprovalMode(): ApprovalMode {
+    return this.approvalModeStore()?.get() ?? 'balanced';
+  }
+
+  public setApprovalMode(mode: unknown): ApprovalMode {
+    return this.approvalModeStore()?.set(mode) ?? 'balanced';
+  }
+
+  public getSiteRules(): SiteRule[] {
+    return this.siteRuleStore()?.get() ?? [];
+  }
+
+  public setSiteRules(rules: unknown): SiteRule[] {
+    return this.siteRuleStore()?.set(rules) ?? [];
+  }
+
+  /** Actions saved by earlier runs, for the exportable activity log. */
+  public getStoredHistory(): ActionRecord[] {
+    return this.activityStore()?.readAll() ?? [];
+  }
+
   private engine(): ExecutionEngine {
     if (!this.engineInstance) {
       this.engineInstance = new ExecutionEngine({
+        persist: (record) => this.activityStore()?.append(record),
         executor: (request) => this.dispatchToRenderer(request),
         askApproval: (approval) => this.promptSensitiveApproval(approval),
         // §10/§11 STOP NOW parity: every stop path — the control panel's
@@ -930,7 +1025,94 @@ export class BrowserMCPServer {
     return this.pendingApprovalPromise;
   }
 
+  /**
+   * Runs one tool call, then lets the recorder note it. Recording happens after
+   * the call succeeded, so refused or failed actions never enter a recording.
+   */
   private async executeTool(toolName: string, args: Record<string, any>): Promise<string> {
+    const result = await this.executeToolCore(toolName, args);
+    try {
+      this.afterTool(toolName, args, result);
+    } catch (_) {
+      /* recording must never break the agent */
+    }
+    return result;
+  }
+
+  private afterTool(toolName: string, args: Record<string, any>, result: string): void {
+    const canonicalTool = TOOL_ALIASES[toolName] ?? toolName;
+    if (canonicalTool === 'browser_snapshot' && typeof result === 'string') {
+      this.lastSnapshotText = result;
+      return;
+    }
+    if (!this.recorder || this.replaying || !RECORDABLE_TOOLS.has(canonicalTool)) return;
+    const original = (args && typeof args === 'object' ? args : {}) as Record<string, unknown>;
+    const redacted = redactArgs(canonicalTool, original);
+    this.recorder.add(canonicalTool, {
+      originalArgs: original,
+      lastSnapshot: this.lastSnapshotText,
+      sensitiveText: typeof original.text === 'string' && redacted.text !== original.text
+    });
+  }
+
+  private recordingStore(): RecordingStore | null {
+    if (this.recordingStoreInstance === undefined) {
+      try {
+        this.recordingStoreInstance = createRecordingStore(path.join(electronApp.getPath('userData'), 'agent-recordings.json'));
+      } catch {
+        this.recordingStoreInstance = null;
+      }
+    }
+    return this.recordingStoreInstance;
+  }
+
+  public getRecordingState(): { recording: boolean; steps: number; replaying: boolean; recordings: Array<{ id: string; name: string; createdAt: string; steps: number }> } {
+    return {
+      recording: Boolean(this.recorder),
+      steps: this.recorder?.stepCount ?? 0,
+      replaying: Boolean(this.replaying),
+      recordings: (this.recordingStore()?.list() ?? []).map(r => ({ id: r.id, name: r.name, createdAt: r.createdAt, steps: r.steps.length }))
+    };
+  }
+
+  public startRecording(): boolean {
+    if (this.recorder || this.replaying) return false;
+    this.recorder = new Recorder();
+    return true;
+  }
+
+  /** Stops recording and saves it; returns what was saved, or why nothing was. */
+  public stopRecording(name: unknown): { saved: Recording | null; skipped: string[] } {
+    const recorder = this.recorder;
+    this.recorder = null;
+    if (!recorder) return { saved: null, skipped: [] };
+    const label = typeof name === 'string' && name.trim() ? name : `Recording ${new Date().toLocaleString()}`;
+    const saved = recorder.finish(randomBytes(8).toString('hex'), label);
+    if (saved) this.recordingStore()?.add(saved);
+    return { saved, skipped: recorder.skippedReasons };
+  }
+
+  public deleteRecording(id: unknown): boolean {
+    if (typeof id !== 'string') return false;
+    this.recordingStore()?.remove(id);
+    return true;
+  }
+
+  /** Replays a saved recording through the normal approval path, one step at a time. */
+  public async replayRecording(id: unknown): Promise<ReplayReport> {
+    const empty = { total: 0, completed: 0 };
+    if (this.replaying || this.recorder) return { ...empty, status: 'busy', message: 'Stop the current recording or replay first.' };
+    const recording = typeof id === 'string' ? this.recordingStore()?.get(id) : undefined;
+    if (!recording) return { ...empty, status: 'failed', message: 'That recording no longer exists.' };
+    this.replaying = true;
+    try {
+      return await replaySteps(recording.steps, { run: (tool, args) => this.executeTool(tool, args) });
+    } finally {
+      this.replaying = false;
+    }
+  }
+
+  private async executeToolCore(toolName: string, args: Record<string, any>): Promise<string> {
     const authorizationGeneration = this.authorizationGeneration;
     const lockGeneration = screenLockGeneration;
     if (isScreenLocked) {
@@ -971,6 +1153,10 @@ export class BrowserMCPServer {
         `Permission denied: Tool '${canonicalTool}' (required by '${toolName}') is disabled in MCP security settings.`
       );
     }
+
+    // An element ref from browser_snapshot becomes the equivalent selector here,
+    // before classification, so every later check sees a plain selector.
+    args = resolveElementRef(canonicalTool, args);
 
     // Special: king_browser_info
     if (toolName === 'king_browser_info') {
@@ -1039,6 +1225,29 @@ export class BrowserMCPServer {
     if (canonicalTool === 'browser_login' && !this.policyEnforced) {
       throw new Error('browser_login requires the approval policy to be enforced.');
     }
+    // Per-site rules: "block" refuses the action, "ask" forces an approval.
+    const siteRules = this.getSiteRules();
+    let siteRuleAsk = false;
+    let siteRuleHost: string | undefined;
+    if (siteRules.length > 0) {
+      const navUrl = typeof args.url === 'string' ? args.url : undefined;
+      const scoped = Boolean(navUrl) || SITE_RULE_TOOLS.has(canonicalTool);
+      if (scoped) {
+        let hostUrl = navUrl;
+        if (!hostUrl) {
+          hostUrl = (await requestPolicyContext(this.mainWindow))?.url;
+        }
+        let host: string | undefined;
+        try { host = hostUrl ? new URL(hostUrl).hostname : undefined; } catch (_) {}
+        siteRuleHost = host;
+        const rule = matchSiteRule(siteRules, host);
+        if (rule?.mode === 'block') {
+          throw new Error(`Blocked by your site rule: the agent may not use ${rule.domain}.`);
+        }
+        // Rules exist but the page could not be read: fail closed to an approval.
+        siteRuleAsk = rule?.mode === 'ask' || (!navUrl && !host);
+      }
+    }
     if (!this.policyEnforced) {
       const result = await requestRendererMcpAction(this.mainWindow, canonicalTool, args);
       return typeof result === 'string' ? result : JSON.stringify(result);
@@ -1067,8 +1276,31 @@ export class BrowserMCPServer {
       args = { ...args, expectedOrigin };
     }
     const decision = classifyAction({ toolName: canonicalTool, args, ...pageContext });
+    if (siteRuleAsk && decision.risk === 'safe') {
+      decision.risk = 'sensitive';
+      decision.triggers = ['site_rule'];
+      decision.reasons = [...decision.reasons, 'This site has an "always ask" rule.'];
+      decision.domain = decision.domain ?? siteRuleHost;
+    }
+    if (decision.risk === 'safe' && strictModeRequiresApproval(this.getApprovalMode(), canonicalTool)) {
+      decision.risk = 'sensitive';
+      decision.triggers = ['strict_mode'];
+      decision.reasons = [...decision.reasons, 'Strict approval mode is on.'];
+      decision.domain = decision.domain ?? siteRuleHost;
+    }
+    if (this.injectionSuspect && INJECTION_GATED_TOOLS.has(canonicalTool)) {
+      if (decision.risk === 'safe') {
+        decision.risk = 'sensitive';
+        decision.triggers = ['prompt_injection'];
+      } else if (!decision.triggers.includes('prompt_injection')) {
+        decision.triggers = [...decision.triggers, 'prompt_injection'];
+      }
+      decision.reasons = [...decision.reasons, `A page read earlier looked like it was written to instruct AI agents (${this.injectionSuspect.reasons.join('; ')}).`];
+      // The user is asked now, so the warning has done its job.
+      this.injectionSuspect = null;
+    }
     const approvalSummary = decision.risk === 'sensitive'
-      ? buildApprovalSummary({ toolName: canonicalTool, args }, decision)
+      ? buildApprovalSummary({ toolName: canonicalTool, args, ...pageContext }, decision)
       : null;
     const actionRequest: ActionRequest = {
       toolName: canonicalTool,
@@ -1076,7 +1308,13 @@ export class BrowserMCPServer {
       risk: decision.risk,
       domain: decision.domain,
       summary: approvalSummary
-        ? [approvalSummary.intendedAction, approvalSummary.affectedResource, ...approvalSummary.consequences]
+        ? [
+            approvalSummary.intendedAction,
+            approvalSummary.affectedResource,
+            approvalSummary.pageUrl ? `Page: ${approvalSummary.pageUrl}` : undefined,
+            approvalSummary.targetText ? `Element: "${approvalSummary.targetText}"` : undefined,
+            ...approvalSummary.consequences
+          ]
             .filter((part): part is string => Boolean(part))
             .join(' — ')
         : undefined
@@ -1087,7 +1325,15 @@ export class BrowserMCPServer {
       throw new Error(record.error ? `${record.error} (${record.status})` : `Action ${record.status}.`);
     }
     const dispatched = (actionRequest as ActionRequest & { __mcpResult?: unknown }).__mcpResult;
-    return typeof dispatched === 'string' ? dispatched : JSON.stringify(dispatched ?? '');
+    const output = typeof dispatched === 'string' ? dispatched : JSON.stringify(dispatched ?? '');
+    if (INJECTION_SCAN_TOOLS.has(canonicalTool)) {
+      const reasons = detectPromptInjection(output);
+      if (reasons.length > 0) {
+        this.injectionSuspect = { reasons };
+        return injectionWarning(reasons) + output;
+      }
+    }
+    return output;
   }
 
   private setupRoutes(app: Express) {

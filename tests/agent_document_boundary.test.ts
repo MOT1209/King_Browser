@@ -1,5 +1,6 @@
 import * as sensitiveFieldModule from '../src/utils/sensitiveField';
 import * as agentLoginModule from '../src/utils/agentLogin';
+import * as elementSnapshotModule from '../src/utils/elementSnapshot';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -24,7 +25,7 @@ async function run() {
     canGoBack: () => canBack, canGoForward: () => canForward, goBack: () => {}, goForward: () => {},
     reload: () => { reloads++; },
     sendInputEvent: () => { if (failInput) throw new Error('Input dispatch failed'); keyEvents++; },
-    getURL: () => url, getAttribute: () => 'tab', isLoading: () => false,
+    getURL: () => url, getAttribute: () => refs[0]?.current.activeTabId ?? 'tab', isLoading: () => false,
     addEventListener: (name: string, fn: Function) => { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name)!.add(fn); },
     removeEventListener: (name: string, fn: Function) => listeners.get(name)?.delete(fn),
     executeJavaScript: async (code: string) => {
@@ -37,6 +38,7 @@ async function run() {
     capturePage: async () => { captures++; if (flipDuringCapture) { url = 'http://[::1]/'; fire('did-start-navigation'); flipDuringCapture = false; } return { toDataURL: () => 'private-image' }; },
   };
   const refs: any[] = [];
+  const settingsRef: { current: any } = { current: { mcpServerEnabled: true } };
   const responses: any[] = [];
   const api = {
     onMcpActionRequest: (fn: Function) => { request = fn; return () => {}; },
@@ -52,6 +54,7 @@ async function run() {
     '../utils/mcpActionTiming': mcpActionTiming,
     '../utils/searchHistoryBookmarks': { searchHistoryAndBookmarks: () => [] },
     '../utils/sensitiveField': sensitiveFieldModule,
+    '../utils/elementSnapshot': elementSnapshotModule,
     '../utils/agentLogin': agentLoginModule,
   };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/hooks/useBrowserAgentBridge.ts', 'utf8'), {
@@ -62,11 +65,11 @@ async function run() {
   }, URL, WeakMap, Map, Set, console, setTimeout, clearTimeout,
   window: { electronAPI: api }, document: { querySelector: () => webview, querySelectorAll: () => hasGuest ? [webview] : [] } });
   module.exports.useBrowserAgentBridge({ activeTabId: 'tab', tabs: [{ id: 'tab', url }], history: [], bookmarks: [],
-    settingsRef: { current: { mcpServerEnabled: true } }, activeWorkspaceIdRef: { current: 'default' },
+    settingsRef, activeWorkspaceIdRef: { current: 'default' },
     setActiveWorkspaceId: () => {}, setActiveTabId: () => {}, setTabs: () => {}, handleNavigate: (nextUrl: string) => { navigated = nextUrl; },
     handleNewTab: (_url: string, _source: unknown, opts: any) => { duplicates++; lastNewTabOptions = opts; }, handleCloseTab: () => {}, handleSelectTab: () => {} });
-  const call = async (tool: string) => {
-    request(tool, tool, {}, Date.now() + 15000); approve(true);
+  const call = async (tool: string, args: Record<string, unknown> = {}) => {
+    request(tool, tool, args, Date.now() + 15000); approve(true);
     await new Promise(resolve => setImmediate(resolve));
     const value = responses.at(-1)?.[1]; return typeof value === 'string' ? value : JSON.stringify(value);
   };
@@ -109,6 +112,31 @@ async function run() {
   await assert.rejects(context.onGoForward(), /history|next/i);
   canBack = true; canForward = true; await context.onGoBack(); await context.onGoForward();
   await context.onReloadPage(); assert.equal(reloads, 1);
+  // Isolated agent profile: the agent only sees and acts on tabs it opened.
+  {
+    settingsRef.current.agentIsolatedProfile = true;
+    const savedTabs = refs[0].current.tabs;
+    refs[0].current.tabs = [{ id: 'tab', url }, { id: 'agent1', url, isAgentOwned: true }];
+    const scriptsBefore = scripts;
+    assert.match(String(await call('browser_read_page')), /Isolated agent profile/, 'a user-owned active tab is off limits');
+    assert.equal(scripts, scriptsBefore, 'nothing ran in the user tab');
+    const listed = String(await call('browser_list_tabs'));
+    assert.ok(listed.includes('agent1') && !listed.includes('"id":"tab"'), 'the agent only sees its own tabs');
+    assert.match(String(await call('browser_switch_tab', { tabId: 'tab' })), /not found/i, 'the agent cannot switch to a user tab');
+    await call('browser_new_tab', { url: 'https://example.com/' });
+    assert.equal(lastNewTabOptions?.agentOwned, true, 'tabs the agent opens use the agent session');
+    assert.equal(lastNewTabOptions?.agentPersistent, false, 'the agent session is temporary unless persistence is on');
+    settingsRef.current.agentPersistentProfile = true;
+    await call('browser_new_tab', { url: 'https://example.com/' });
+    assert.equal(lastNewTabOptions?.agentPersistent, true, 'persistence applies to tabs opened while it is on');
+    settingsRef.current.agentPersistentProfile = false;
+    refs[0].current.activeTabId = 'agent1';
+    assert.match(String(await call('browser_read_page')), /private-service-secret/, 'the agent can use its own tab');
+    refs[0].current.activeTabId = 'tab';
+    settingsRef.current.agentIsolatedProfile = false;
+    assert.match(String(await call('browser_read_page')), /private-service-secret/, 'with isolation off nothing changes');
+    refs[0].current.tabs = savedTabs;
+  }
   hasGuest = false;
   for (const action of [() => context.onPressKey('Enter'), () => context.onReloadPage(), () => context.onScrollPage('down')]) {
     await assert.rejects(action, /active webview/i, 'missing page must not silently succeed');

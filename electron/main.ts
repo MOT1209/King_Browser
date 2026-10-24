@@ -132,8 +132,10 @@ import {
 } from './main/adblockManager.js';
 import { BrowserMCPServer } from './mcpServer.js';
 import { registerEngineIpc } from './main/engineIpc.js';
+import { escapeHtmlForTranslation, unescapeHtmlForTranslation } from './main/translationText.js';
+import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig.js';
 import { initMcpBridge } from './main/mcpBridge.js';
-import { canOpenInSystemBrowser, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
+import { canOpenInSystemBrowser, getGoogleSigninCompatUserAgent, isGoogleAccountsUrl, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
@@ -355,6 +357,8 @@ initMcpBridge(isTrustedSender);
 
 let isPrivacyShieldEnabled = true;
 let isDoNotTrackEnabled = true;
+/** Opt-in: present a Firefox user agent on accounts.google.com (googleSigninFallback.ts). */
+let isGoogleSigninCompatEnabled = false;
 let mcpServer: BrowserMCPServer | null = null;
 
 // Reusable getter for all active electron sessions (default + incognito partitions)
@@ -372,6 +376,10 @@ export { updateAdblockWhitelist };
 
 // Tracks which per-tab incognito partitions have already been hardened to avoid stacking listeners.
 const hardenedIncognitoPartitions = new Set<string>();
+/** Shared in-memory partition for agent tabs (isolated agent profile); cleared when the window closes. */
+const AGENT_PARTITION = 'incognito-king-agent';
+/** On-disk partition for the opt-in persistent agent profile; kept across restarts until the user clears it. */
+const AGENT_PERSIST_PARTITION = 'persist:king-agent';
 
 // Active Chromium proxy rules applied across default and all per-tab incognito sessions
 let activeChromiumProxyRules = 'direct://';
@@ -582,6 +590,8 @@ function createWindow() {
     // each later privacy/VPN/language/purge call walks all of them.
     for (const partName of Array.from(hardenedIncognitoPartitions)) {
       hardenedIncognitoPartitions.delete(partName);
+      // The persistent agent profile is the one partition that must survive.
+      if (partName === AGENT_PERSIST_PARTITION) continue;
       try {
         session.fromPartition(partName, { cache: false }).clearStorageData();
       } catch (_) {}
@@ -658,6 +668,18 @@ function createWindow() {
             .replace(/,\s*"Electron";v="[^"]*"/gi, '')
             .replace(/"Electron";v="[^"]*",?\s*/gi, '')
             .trim();
+        }
+
+        // Google sign-in compatibility: Firefox sends no client hints, so a
+        // Firefox user agent must not arrive next to Chromium sec-ch-ua headers.
+        // The second test covers subresources of a page that applyGoogleSigninCompat
+        // switched to the Firefox user agent.
+        const compatUa = getGoogleSigninCompatUserAgent();
+        if (isGoogleSigninCompatEnabled && (isGoogleAccountsUrl(details.url) || requestHeaders['User-Agent'] === compatUa)) {
+          for (const name of Object.keys(requestHeaders)) {
+            if (name.toLowerCase() === 'user-agent' || name.toLowerCase().startsWith('sec-ch-ua')) delete requestHeaders[name];
+          }
+          requestHeaders['User-Agent'] = compatUa;
         }
       }
 
@@ -2036,6 +2058,7 @@ app.whenReady().then(async () => {
       ipcMain.handle(channel, listener as (event: Electron.IpcMainInvokeEvent, ...args: any[]) => unknown);
     },
     getEngine: () => (mcpServer ? mcpServer.getExecutionEngine() : null),
+    getStoredHistory: () => (mcpServer ? mcpServer.getStoredHistory() : []),
     isTrustedSender: (event) => isTrustedSender(event as Electron.IpcMainInvokeEvent)
   });
 
@@ -3337,12 +3360,12 @@ app.on('web-contents-created', (_event, contents) => {
     // Security: Validate partition to prevent unauthorized partitions (e.g. persist:admin)
     const part = (webPreferences as any).partition || (params as any).partition;
     if (part && typeof part === 'string') {
-      if (part !== '' && !/^incognito-[a-zA-Z0-9_-]+$/.test(part)) {
+      if (part !== '' && part !== AGENT_PERSIST_PARTITION && !/^incognito-[a-zA-Z0-9_-]+$/.test(part)) {
         console.warn(`[Security] Blocked unauthorized webview partition: ${part}`);
         event.preventDefault();
         return;
       }
-      if (part.startsWith('incognito-')) {
+      if (part.startsWith('incognito-') || part === AGENT_PERSIST_PARTITION) {
         hardenIncognitoPartition(part);
       }
     }
@@ -3739,6 +3762,12 @@ ipcMain.handle('set-do-not-track', (event, enabled: boolean) => {
   isDoNotTrackEnabled = Boolean(enabled);
 });
 
+ipcMain.handle('set-google-signin-compat', (event, enabled: unknown) => {
+  if (!isTrustedSender(event)) return false;
+  isGoogleSigninCompatEnabled = enabled === true;
+  return isGoogleSigninCompatEnabled;
+});
+
 // IPC Handler to dynamically update Accept-Language across all Electron sessions
 ipcMain.handle('set-app-language', async (event, lang: unknown) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
@@ -4033,7 +4062,7 @@ function watchGoogleSigninRejection(wc: Electron.WebContents): void {
     const options: Electron.MessageBoxOptions = {
       type: 'info',
       message: 'Google blocked sign-in in this browser',
-      detail: `Google does not allow signing in from embedded browsers such as King Browser. You can continue in your default browser:\n${target}`,
+      detail: `Google does not allow signing in from embedded browsers such as King Browser. You can continue in your default browser:\n${target}\n\nTo sign in inside King Browser instead, turn on Settings → Privacy → Google sign-in compatibility and try again.`,
       buttons: ['Open in Default Browser', 'Cancel'],
       defaultId: 0,
       cancelId: 1
@@ -4056,13 +4085,36 @@ function watchGoogleSigninRejection(wc: Electron.WebContents): void {
   wc.on('did-frame-navigate', (_e, url) => onNavigate(url));
 }
 
+// With the opt-in setting on, documents on accounts.google.com also see the
+// Firefox user agent in navigator.userAgent, matching the request header that
+// applyPrivacyHeadersToSession sends. Leaving Google restores the standard one.
+function applyGoogleSigninCompat(wc: Electron.WebContents): void {
+  let overridden = false;
+  const onNavigation = (details: { url: string; isMainFrame: boolean; isSameDocument?: boolean }) => {
+    if (!details.isMainFrame || details.isSameDocument || wc.isDestroyed()) return;
+    const useCompat = isGoogleSigninCompatEnabled && isGoogleAccountsUrl(details.url);
+    if (useCompat === overridden) return;
+    try {
+      wc.setUserAgent(useCompat ? getGoogleSigninCompatUserAgent() : getStandardUserAgent());
+      overridden = useCompat;
+    } catch (err) {
+      console.warn('[Google Sign-in] Could not switch user agent:', err);
+    }
+  };
+  wc.on('did-start-navigation', onNavigation);
+  wc.on('did-redirect-navigation', onNavigation);
+}
+
 // Auto-capture thumbnails and Native Chrome-Parity Context Menu for WebViews
 app.on('web-contents-created', (_event, wc) => {
   // Sign-in popups are type 'window', not 'webview'. Attaching the fallback to
   // webviews only meant a Google rejection inside an OAuth popup was a dead end,
   // which is the opposite of what the README promises.
   const wcType = wc.getType();
-  if (wcType === 'webview' || wcType === 'window') watchGoogleSigninRejection(wc);
+  if (wcType === 'webview' || wcType === 'window') {
+    watchGoogleSigninRejection(wc);
+    applyGoogleSigninCompat(wc);
+  }
   wc.removeAllListeners('context-menu');
   wc.on('context-menu', (e, params) => {
     // Only show for webviews
@@ -4527,20 +4579,12 @@ ipcMain.handle('copy-mcp-token', (event) => {
   return false;
 });
 let clipboardConfigClearTimer: NodeJS.Timeout | null = null;
-ipcMain.handle('copy-mcp-config', (event) => {
+ipcMain.handle('copy-mcp-config', (event, kind?: unknown) => {
   if (!isTrustedSender(event)) return false;
   const token = mcpServer?.getToken() || '';
   const port = mcpServer ? mcpServer.getPort() : 3020;
-  const config = JSON.stringify({
-    mcpServers: {
-      "king-browser": {
-        url: `http://localhost:${port}/sse`,
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    }
-  }, null, 2);
+  const clientKind: McpClientKind = kind === 'opencode' ? 'opencode' : 'generic';
+  const config = buildMcpClientConfig(clientKind, port, token);
   clipboard.writeText(config);
   // Security: Auto-clear Bearer-bearing config from clipboard after 15s (same as copy-mcp-token)
   if (clipboardConfigClearTimer) clearTimeout(clipboardConfigClearTimer);
@@ -4577,6 +4621,60 @@ ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolea
   return true;
 });
 
+// Wipes everything the agent has stored (cookies, logins, caches) in both of its sessions.
+ipcMain.handle('recording-state', (event) => {
+  if (!isTrustedSender(event)) return { recording: false, steps: 0, replaying: false, recordings: [] };
+  return mcpServer?.getRecordingState() ?? { recording: false, steps: 0, replaying: false, recordings: [] };
+});
+ipcMain.handle('recording-start', (event) => {
+  if (!isTrustedSender(event)) return false;
+  return mcpServer?.startRecording() ?? false;
+});
+ipcMain.handle('recording-stop', (event, name: unknown) => {
+  if (!isTrustedSender(event)) return { saved: null, skipped: [] };
+  const result = mcpServer?.stopRecording(name);
+  return { saved: result?.saved ? { id: result.saved.id, name: result.saved.name, steps: result.saved.steps.length } : null, skipped: result?.skipped ?? [] };
+});
+ipcMain.handle('recording-delete', (event, id: unknown) => {
+  if (!isTrustedSender(event)) return false;
+  return mcpServer?.deleteRecording(id) ?? false;
+});
+ipcMain.handle('recording-replay', async (event, id: unknown) => {
+  if (!isTrustedSender(event)) return { total: 0, completed: 0, status: 'failed', message: 'Unauthorized' };
+  if (!mcpServer) return { total: 0, completed: 0, status: 'failed', message: 'Start the MCP server first.' };
+  return mcpServer.replayRecording(id);
+});
+ipcMain.handle('clear-agent-profile', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  try {
+    for (const name of [AGENT_PERSIST_PARTITION, AGENT_PARTITION]) {
+      const sess = session.fromPartition(name, { cache: false });
+      await sess.clearStorageData();
+      await sess.clearCache();
+    }
+    return true;
+  } catch (err) {
+    console.error('Error clearing agent profile:', err);
+    return false;
+  }
+});
+ipcMain.handle('get-mcp-approval-mode', (event) => {
+  if (!isTrustedSender(event)) return 'balanced';
+  return mcpServer?.getApprovalMode() ?? 'balanced';
+});
+ipcMain.handle('set-mcp-approval-mode', (event, mode: unknown) => {
+  if (!isTrustedSender(event)) return 'balanced';
+  return mcpServer?.setApprovalMode(mode) ?? 'balanced';
+});
+ipcMain.handle('get-mcp-site-rules', (event) => {
+  if (!isTrustedSender(event)) return [];
+  return mcpServer?.getSiteRules() ?? [];
+});
+ipcMain.handle('set-mcp-site-rules', (event, rules: unknown) => {
+  if (!isTrustedSender(event)) return [];
+  return mcpServer?.setSiteRules(rules) ?? [];
+});
+
 ipcMain.handle('get-mcp-status', (event) => {
   if (!isTrustedSender(event)) return { running: false, port: 0, clients: [], clientCount: 0 };
   if (!mcpServer) return { running: false, port: 0, clients: [], clientCount: 0 };
@@ -4611,9 +4709,10 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
       await sess.clearStorageData();
       await sess.clearCache();
     } else {
-      // Clear all active per-tab incognito partitions
-      const partitions = Array.from(hardenedIncognitoPartitions);
-      hardenedIncognitoPartitions.clear();
+      // Clear all active per-tab incognito partitions. The agent's shared
+      // partition is left alone: agent tabs may still be using it.
+      const partitions = Array.from(hardenedIncognitoPartitions).filter(name => name !== AGENT_PARTITION && name !== AGENT_PERSIST_PARTITION);
+      for (const partName of partitions) hardenedIncognitoPartitions.delete(partName);
       for (const partName of partitions) {
         try {
           const sess = session.fromPartition(partName, { cache: false });
@@ -5346,27 +5445,6 @@ async function detectLanguageWithGoogle(sampleText: string): Promise<string> {
     console.warn('[Translate] Language detection error:', err);
   }
   return 'auto';
-}
-
-function escapeHtmlForTranslation(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-const TRANSLATION_HTML_ENTITY_MAP: Record<string, string> = {
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&nbsp;': ' ',
-  '&amp;': '&'
-};
-
-function unescapeHtmlForTranslation(str: string): string {
-  return str.replace(/&(?:lt|gt|quot|#39|nbsp|amp);/g, (match) => TRANSLATION_HTML_ENTITY_MAP[match] || match);
 }
 
 // IPC Handlers for One-Click Page Translation

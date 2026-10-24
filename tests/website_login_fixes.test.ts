@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from '../electron/main/windowOpenPolicy';
+import { currentFirefoxVersion, getGoogleSigninCompatUserAgent, isGoogleAccountsUrl } from '../electron/main/googleSigninFallback';
 
 console.log('\n--- Website Login Fixes Suite ---');
 
@@ -89,3 +90,24 @@ const accountModal = fs.readFileSync('src/components/AccountModal.tsx', 'utf8');
 assert.match(accountModal, /await syncService\.logout\(\);/,
   'AccountModal disconnect performs a real logout');
 console.log('[PASS] [LoginFix] password recovery and real logout are wired');
+
+// 8. Opt-in Google sign-in compatibility (Firefox user agent on accounts.google.com only).
+assert.equal(isGoogleAccountsUrl('https://accounts.google.com/v3/signin/identifier?continue=x'), true);
+for (const url of ['http://accounts.google.com/', 'https://accounts.google.com.evil.com/', 'https://www.youtube.com/', 'https://myaccount.google.com/', 'not a url']) {
+  assert.equal(isGoogleAccountsUrl(url), false, `${url} is not Google's account host`);
+}
+assert.equal(currentFirefoxVersion(Date.UTC(2025, 5, 24)), 140);
+assert.equal(currentFirefoxVersion(Date.UTC(2025, 6, 22)), 141, 'one release every four weeks');
+assert.ok(currentFirefoxVersion(Date.UTC(2026, 9, 24)) > 150, 'the version keeps moving with the date');
+const winUa = getGoogleSigninCompatUserAgent('win32', Date.UTC(2025, 5, 24));
+assert.equal(winUa, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0');
+assert.match(getGoogleSigninCompatUserAgent('darwin'), /^Mozilla\/5\.0 \(Macintosh; Intel Mac OS X 10\.15; rv:\d+\.0\) Gecko\/20100101 Firefox\/\d+\.0$/);
+assert.match(getGoogleSigninCompatUserAgent('linux'), /X11; Linux x86_64; rv:/);
+assert.match(main, /let isGoogleSigninCompatEnabled = false;/, 'the compatibility mode is off by default');
+assert.match(main, /if \(isGoogleSigninCompatEnabled && \(isGoogleAccountsUrl\(details\.url\)/,
+  'the request header override is gated on the setting and the Google account host');
+assert.match(main, /const useCompat = isGoogleSigninCompatEnabled && isGoogleAccountsUrl\(details\.url\);/,
+  'the navigator user agent override is gated on the setting and the Google account host');
+const settingsTypes = fs.readFileSync('src/types/browser.ts', 'utf8');
+assert.match(settingsTypes, /googleSigninCompat: false,/, 'the setting defaults to off');
+console.log('[PASS] [LoginFix] Google sign-in compatibility is opt-in and limited to accounts.google.com');

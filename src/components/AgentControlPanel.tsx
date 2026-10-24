@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Bot,
   ChevronDown,
+  Download,
   AlertTriangle,
   Play,
   Pause as PauseIcon,
@@ -91,6 +92,23 @@ export function AgentControlPanel() {
     });
     return unsubscribe;
   }, [api, supported, refresh]);
+
+  const exportLog = useCallback(async () => {
+    if (!api) return;
+    try {
+      const json = await api.exportEngineLog('json');
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `king_agent_activity_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError(t('agentPanel.exportFailed'));
+    }
+  }, [api, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -348,8 +366,19 @@ export function AgentControlPanel() {
             </div>
 
             <div>
-              <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                {t('agentPanel.history')}
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  {t('agentPanel.history')}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void exportLog()}
+                  aria-label={t('agentPanel.exportLog')}
+                  title={t('agentPanel.exportLog')}
+                  className="p-1 rounded-md text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <Download size={13} />
+                </button>
               </div>
               {history.length === 0 ? (
                 <div className="text-xs text-gray-400 dark:text-gray-500">{t('agentPanel.noHistory')}</div>

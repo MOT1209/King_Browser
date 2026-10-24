@@ -44,7 +44,7 @@
 
 Rather than bloated cloud telemetry or generic hype, King focuses on concrete developer and power-user requirements:
 
-- **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server exposing 39 browser automation, inspection, and execution-control tools directly to coding agents (OpenCode, Claude Code, Cursor, Windsurf). Agents authenticate with a bearer token copied from Settings → MCP.
+- **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server exposing 41 browser automation, inspection, and execution-control tools directly to coding agents (OpenCode, Claude Code, Cursor, Windsurf). Agents authenticate with a bearer token copied from Settings → MCP.
 - **On-Device Whisper Voice & Neural Execution**: Run multilingual speech-to-text locally via Transformers.js (`whisper-tiny`, ~41 MB) and on-device LLMs via WebGPU (Llama 3.2, Phi 3.5 Vision, Qwen 2.5). Exactly 0 KB of voice audio or model prompt data is transmitted to cloud servers.
 - **No Analytics SDK, Network-Level Privacy Shield**: Ships no analytics or crash-reporting SDK (see [Network connections](#network-connections) for the services King does contact). Employs `@ghostery/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
 - **Tab Hibernation & Memory Eviction**: Dormant background tabs automatically suspend active rendering execution via an LRU pool (capping live webviews to 6) while preserving complete navigation state, preventing Chromium process explosion regardless of tab count.
@@ -135,7 +135,7 @@ Current English interface in Clean Minimalist mode with the light theme.
 - **Hands-Free Browser Navigation**: Voice queries automatically translate into direct browser actions (navigation, searching, tab management).
 
 ### AI Agent & Virtual Cursor (MCP Protocol)
-- **Model Context Protocol (MCP)**: Native integration for AI agents (Cursor, Claude Desktop, Windsurf, Antigravity, OpenCode) to navigate, read pages, click elements, fill forms, and take screenshots via 39 built-in tools.
+- **Model Context Protocol (MCP)**: Native integration for AI agents (Cursor, Claude Desktop, Windsurf, Antigravity, OpenCode) to navigate, read pages, click elements, fill forms, and take screenshots via 41 built-in tools.
 - **Glowing AI Cursor Overlay**: Watch autonomous AI subagents interact with live webpages in real-time with an animated glowing cursor overlay.
 - **Built-in Local AI Sidepanel**: Run lightweight local models offline directly on your GPU via WebGPU and WebLLM.
 - **Persistent Info & Memory Vault**: Automatically extracts user preferences and retains task history with category badges (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`).
@@ -172,7 +172,7 @@ King Browser natively exposes an MCP endpoint on port `3020`, enabling external 
 
 ### Built-in MCP Tools
 
-The 26 core tools are listed below. A running server exposes 39 in total: these 26, plus six aliases and convenience helpers (`browser_open`, `browser_back`, `browser_forward`, `browser_get_page_summary`, `browser_find_element`, `browser_select`), plus seven execution-governance tools (`browser_status`, `browser_request_approval`, `browser_next_step`, `browser_next_phase`, `browser_pause`, `browser_resume`, `browser_stop`). A 40th tool, `browser_login`, is listed only when the approval policy is enforced.
+King Browser defines 41 tools: 28 page and tab tools (the table below), six aliases and convenience helpers (`browser_open`, `browser_back`, `browser_forward`, `browser_get_page_summary`, `browser_find_element`, `browser_select`), and seven execution-governance tools (`browser_status`, `browser_request_approval`, `browser_next_step`, `browser_next_phase`, `browser_pause`, `browser_resume`, `browser_stop`). `/tools` lists only the tools enabled in *Settings > MCP*: medium and sensitive tools are disabled by default, so a fresh install exposes fewer.
 
 To read the exact list from a running instance:
 
@@ -185,6 +185,7 @@ curl -s -H "Authorization: Bearer $MCP_TOKEN" http://127.0.0.1:3020/tools
 | `king_browser_info` | - | Returns context about King Browser and the MCP integration |
 | `browser_navigate` | `url` | Navigates the current tab to an absolute URL |
 | `browser_read_page` | - | Returns the visible text, interactive elements, current URL, and title of the active page |
+| `browser_snapshot` | - | Lists interactive elements as `e12 button "Save"`; pass the ref to the element tools instead of guessing a CSS selector. Refs last until the next snapshot or navigation |
 | `browser_screenshot` | - | Returns the active viewport as a base64 PNG data URL |
 | `browser_click` | `ref?`, `selector?` | Clicks an element by snapshot ref or CSS selector |
 | `browser_type` | `text`, `ref?`, `selector?`, `pressEnter?` | Types text into an input or textarea |
@@ -194,6 +195,7 @@ curl -s -H "Authorization: Bearer $MCP_TOKEN" http://127.0.0.1:3020/tools
 | `browser_hover` | `ref?`, `selector?` | Simulates mouse hover over an element |
 | `browser_focus` | `ref?`, `selector?` | Focuses an input or interactive DOM node |
 | `browser_select_option` | `value`, `ref?`, `selector?` | Selects an option in a `<select>` dropdown |
+| `browser_login` | `username` | Signs in with an account saved in King Browser; the password is filled by the browser and never returned, and every call needs your approval |
 | `browser_get_element_text` | `ref?`, `selector?` | Returns the inner text of a matched element |
 | `browser_get_url` | - | Returns the URL and title of the active tab |
 | `browser_wait` | `ms` | Pauses execution for `ms` milliseconds (max 10000) |
@@ -245,7 +247,7 @@ OpenCode must use the stdio bridge. Its `type: "remote"` transport speaks Stream
 king-browser  failed: Error POSTing to endpoint: ... Cannot POST /sse (HTTP 404)
 ```
 
-Pointing the Claude Desktop `url`/`headers` shape at `http://localhost:3020/sse` does not work for this reason.
+Pointing the Claude Desktop `url`/`headers` shape at `http://localhost:3020/sse` does not work for this reason. The **OpenCode** button in *Settings > MCP* copies a `remote` entry with the live port and token; that snippet hits the same 404, so use the manual stdio config below.
 
 Add to `opencode.json` (project root) or your global OpenCode config. Keys (`type`, `command` as an array, `environment`, `enabled`) follow the [OpenCode MCP docs](https://opencode.ai/docs/mcp-servers/):
 
@@ -465,9 +467,13 @@ Project website: <https://king-browser.vercel.app> (deployed from `website/` on 
 
 ### Option A: Download a Release
 
-> **No release has been published yet.** Until then, use Option B. Builds are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen will warn about them. Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed; signing turns on once the certificate secrets are configured (see the header of that file).
+> **Builds are not code-signed yet.** Windows SmartScreen: choose *More info* then *Run anyway*. macOS: right-click the app and choose *Open*, or run `xattr -cr "/Applications/King Browser.app"`. Automatic updates on macOS need a signed build.
+>
+> Releases are built and published by `.github/workflows/release.yml`. Merging a change to `main` that raises `version` in `package.json` publishes `v<version>` automatically (once per version); you can also push a `v*` tag or run it manually under *Actions → Release*. Signing turns on once the certificate secrets are configured (see the header of that file). If the Releases page is empty, use Option B.
 
-Once published, installers will be available from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
+**Always-fresh build:** the [nightly pre-release](https://github.com/MOT1209/King_Browser/releases/tag/nightly) is rebuilt and replaced on every push to `main`, so it is the single newest download (unsigned, for trying the latest code). It never offers itself to installed apps through auto-update; use a versioned release for everyday use.
+
+Installers are available from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
 - **macOS**: `King-Browser-arm64.dmg` (Apple Silicon) or `King-Browser-x64.dmg` (Intel)
 - **Windows**: `King-Browser-Setup-0.0.1-x64.exe` (64-bit NSIS Installer)
 - **Linux**: `King-Browser-x86_64.AppImage` or `King-Browser-amd64.deb`
@@ -493,6 +499,7 @@ npm install
 ```bash
 npm run dev
 ```
+This builds the Electron bundles, then starts Vite (`http://localhost:5173`) and the Electron window together. On Linux as root (containers, CI) Electron refuses to start without `--no-sandbox`; run it as a normal user, or on a server use `xvfb-run`. Day-to-day, edit files under `src/` (hot reload); changes under `electron/` need a restart of `npm run dev`.
 
 #### 4. Build for production
 ```bash
@@ -532,10 +539,14 @@ npm run benchmark
   site and closes itself; ordinary links still open as tabs.
 - A sign-in popup stays in the profile that opened it: an incognito tab's sign-in window never
   sees your normal-browsing cookies, and a popup cannot open further popups of its own.
-- **Google accounts:** Google refuses sign-in inside embedded browsers such as King Browser
-  ("This browser or app may not be secure"). King does not try to hide from that check. When
-  the rejection page appears, King offers **Open in Default Browser**; you can also right-click
-  any page and choose **Open Page in Default Browser**.
+- **Google accounts (YouTube, Gmail):** Google refuses sign-in inside embedded browsers such as
+  King Browser ("This browser or app may not be secure"). You have two options:
+  - Turn on **Settings → Privacy → Google sign-in compatibility** (off by default). King then
+    identifies as Firefox on `accounts.google.com` only, which is how other Electron browsers get
+    past this check. It is a workaround: Google can stop accepting it at any time. If Google offers
+    a passkey, choose **Try another way** and use your password.
+  - Otherwise, when the rejection page appears, King offers **Open in Default Browser**; you can
+    also right-click any page and choose **Open Page in Default Browser**.
 
 ---
 
@@ -561,7 +572,7 @@ flowchart TB
     end
 
     subgraph Main["Electron Main Process (Privileged Host)"]
-        mcp["Native MCP Server<br/>Port 3020 / 39 Tools"]
+        mcp["Native MCP Server<br/>Port 3020 / 41 Tools"]
         ipcMain["IPC Hub & Dispatcher<br/>isTrustedSender Origin Guard"]
         netShield["Privacy Shield & AdBlock<br/>EasyList Network Filter & Anti-SSRF"]
         osBridge["Native OS & Storage<br/>safeStorage Keychain / CRX3 / TTS"]
@@ -633,7 +644,7 @@ flowchart TB
 | **Renderer Process** | Sandboxed Chromium UI (`nodeIntegration: false`) | React 18 UI shell, 27 modular state hooks, tab virtualization, dual split-screen geometry | `src/App.tsx`, `src/hooks/*`, `src/components/*` |
 | **AI Web Worker** | Isolated worker thread | Off-thread WebGPU neural inference (Llama 3.2, Phi 3.5, Qwen 2.5), local Whisper ONNX speech recognition | `src/workers/aiWorker.ts`, `src/services/localSpeechRecognition.ts` |
 | **Encrypted Vault** | Zero-knowledge client-side encryption | PBKDF2 (600k) + AES-256-GCM encrypted cloud sync over Supabase Realtime WebSockets | `src/services/syncService.ts`, `src/services/syncCrypto.ts` |
-| **External Agents** | Authenticated JSON-RPC over port 3020 | Autonomous agent navigation, DOM interaction, and inspection via 39 built-in tools | Claude Desktop, Cursor, Windsurf, Antigravity, OpenCode |
+| **External Agents** | Authenticated JSON-RPC over port 3020 | Autonomous agent navigation, DOM interaction, and inspection via 41 built-in tools | Claude Desktop, Cursor, Windsurf, Antigravity, OpenCode |
 
 ### Architectural Subsystem Breakdown
 

@@ -21,6 +21,13 @@ King Browser employs defense-in-depth principles across all application boundari
 4. **Credential Isolation**: Master keys and authentication tokens are encrypted using platform keystores (macOS Keychain, Windows DPAPI, Linux Secret Service via Electron `safeStorage`). Plaintext tokens and password hashes are never persisted in unencrypted `localStorage`.
 5. **Local MCP Server Security**: The internal Model Context Protocol (MCP) server binds strictly to the IPv4 loopback interface (`127.0.0.1`), enforces dynamic per-session bearer token authorization, and validates all incoming `Host` headers against DNS rebinding attacks.
 
+## Known Limits: AI Agent Control
+
+- **Prompt injection.** Page text returned to an agent is untrusted. King Browser runs a pattern tripwire over it (`electron/main/injectionDetector.ts`) that warns the agent and asks you before the next consequential action. It is not a defence: on our own test corpus (`tests/injection_corpus.test.ts`, 20 attack texts, many written for the patterns it knows) it catches 13 of 20, and it misses paraphrases, role-play, other languages, spaced or encoded text and fake system messages. The approval gate, not the detector, is what protects you. Treat every page the agent reads as hostile.
+- **Approval is heuristic.** Which actions count as sensitive is decided by pattern matching on the page URL, the target element and the tool. Use *Strict* approval mode (Settings > MCP) when in doubt.
+- **Isolated agent profile** (opt-in) separates the agent's tabs from yours, but is not a sandbox against a malicious page; it does not cover the in-app AI assistant.
+- No independent security audit has been done.
+
 ## Scope & Out of Scope
 
 | In Scope | Out of Scope |
