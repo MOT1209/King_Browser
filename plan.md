@@ -42,12 +42,12 @@
 - عرض السجل في الواجهة (جدول: الوقت، الأداة، الموقع، القرار، السبب) مع تصفية.
 - الصعوبة: منخفضة-متوسطة. الوقت: أسبوع.
 
-### WP4 — تسجيل وإعادة (أنا، بعد WP2)
+### WP4 — تسجيل وإعادة (أنا، بعد WP2) — **منفَّذ، غير مجرَّب بصرياً ولا على مواقع حقيقية**
 - تسجيل ما نفّذه الوكيل كسلسلة خطوات (باستخدام المراجع/المحددات) وإعادتها بلا نموذج ذكاء اصطناعي، مع المرور بنفس بوابة الموافقة في كل إعادة.
 - **الخطر:** صفحات تتغير تكسر الإعادة؛ نحتاج رسالة فشل واضحة ولا إعادة صامتة.
 - الصعوبة: متوسطة. الوقت: أسبوعان.
 
-### WP5 — ملف معزول دائم وتسليم الدخول (أنا + أنت)
+### WP5 — ملف معزول دائم وتسليم الدخول (أنا + أنت) — **منفَّذ (اختياري، افتراضه معطّل)، غير مجرَّب بصرياً**
 - الحالي مؤقت (يُمسح عند إغلاق النافذة). المطلوب خيار "حفظ جلسة الوكيل" يسجّل فيه **أنت** الدخول يدوياً ثم يستخدمه الوكيل دون الوصول إلى كلمات مرورك.
 - **مخاطرة:** جلسة دائمة تعني أن سرقة الجهاز أو تعليمة خبيثة تصل لحسابات مفعّلة؛ تحتاج زر "امسح جلسة الوكيل" واضحاً وتنبيهاً.
 - الصعوبة: متوسطة. الوقت: أسبوع.
@@ -67,7 +67,7 @@
 - **[رأي]** فكّر في تعطيل أو حذف VPN والمساعد المحلي بنماذج WebGPU والمزامنة إن لم تكن جزءاً من قصتك: كل واحد صيانة وسطح هجوم موروث من Nova. **لن أحذف شيئاً قبل قرارك الصريح.** البديل الأرخص: إخفاؤها خلف علامة "تجريبي".
 - الصعوبة: منخفضة. الوقت: أيام.
 
-### WP9 — صيانة تقنية (أنا، تدريجياً)
+### WP9 — صيانة تقنية (أنا، تدريجياً) — **جزئي: اختبار macOS غير مانع في CI، واستُخرجت دوال الترجمة من `main.ts` كمثال؛ تحذيرات ESLint (1109، منها 918 `any`) لم أمسّها لأن إصلاحها دفعة واحدة محفوف بالمخاطر**
 - تقسيم `electron/main.ts` (نحو 6900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة.
 - تخفيض تحذيرات ESLint (1081) تدريجياً؛ macOS في CI؛ سياسة تحديث Electron (تحديثات Chromium الأمنية كل بضعة أسابيع التزام دائم).
 
@@ -122,12 +122,12 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - Protokollansicht in der Oberfläche (Zeit, Werkzeug, Seite, Entscheidung, Grund) mit Filter.
 - Schwierigkeit: niedrig–mittel. Zeit: eine Woche.
 
-### WP4 — Aufzeichnen und Abspielen (ich, nach WP2)
+### WP4 — Aufzeichnen und Abspielen (ich, nach WP2) — **umgesetzt, weder visuell noch an echten Seiten getestet**
 - Aktionen des Agenten als Schrittfolge aufzeichnen und ohne KI-Modell erneut abspielen, jedes Mal durch dasselbe Freigabe-Tor.
 - **Risiko:** Sich ändernde Seiten brechen das Abspielen; es braucht klare Fehlermeldungen, kein stilles Weiterlaufen.
 - Schwierigkeit: mittel. Zeit: zwei Wochen.
 
-### WP5 — Dauerhaftes isoliertes Profil und Login-Übergabe (ich + du)
+### WP5 — Dauerhaftes isoliertes Profil und Login-Übergabe (ich + du) — **umgesetzt (optional, standardmäßig aus), visuell nicht getestet**
 - Heute flüchtig (beim Schließen gelöscht). Gewünscht: Option „Agent-Sitzung speichern“, in der **du** dich manuell anmeldest und der Agent sie nutzt, ohne an deine Passwörter zu kommen.
 - **Risiko:** Eine dauerhafte Sitzung bedeutet, dass Gerätediebstahl oder eine bösartige Anweisung angemeldete Konten erreicht; es braucht einen klaren Button „Agent-Sitzung löschen“ und einen Hinweis.
 - Schwierigkeit: mittel. Zeit: eine Woche.
@@ -147,7 +147,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - **[Meinung]** VPN, lokalen WebGPU-Assistenten und Sync deaktivieren oder entfernen, wenn sie nicht zu deiner Geschichte gehören: Jedes ist Wartung und von Nova geerbte Angriffsfläche. **Ich lösche nichts ohne deine ausdrückliche Entscheidung.** Günstigere Alternative: hinter einem „Experimentell“-Schalter verstecken.
 - Schwierigkeit: niedrig. Zeit: Tage.
 
-### WP9 — Technische Wartung (ich, schrittweise)
+### WP9 — Technische Wartung (ich, schrittweise) — **teilweise: nicht blockierender macOS-Test in der CI, Übersetzungs-Helfer als Beispiel aus `main.ts` ausgelagert; ESLint-Warnungen (1109, davon 918 `any`) nicht angefasst, da ein Massen-Fix riskant ist**
 - `electron/main.ts` (ca. 6900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug.
 - ESLint-Warnungen (1081) schrittweise abbauen; macOS in der CI; Electron-Update-Politik (Chromium-Sicherheitsupdates alle paar Wochen sind eine Dauerverpflichtung).
 

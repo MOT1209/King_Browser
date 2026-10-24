@@ -29,9 +29,11 @@ async function run() {
   // What the renderer reports for the active page; null = context unreadable.
   let pageContext: { url: string; elementText: string } | null = { url: 'https://example.com/', elementText: '' };
   let rendererPageText: string | null = null;
+  let snapshotText: string | null = null;
   const contextRequests: Array<string | undefined> = [];
 
   const executionEngineModule = loadSource('electron/main/executionEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const recordingsModule = loadSource('electron/main/recordings.ts', { Map, Set }, { 'node:fs': fs });
   const approvalModeModule = loadSource('electron/main/approvalMode.ts', {}, { 'node:fs': fs });
   const elementRefsModule = loadSource('electron/main/elementRefs.ts', {}, {});
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
@@ -60,6 +62,7 @@ async function run() {
           await new Promise<void>((resolve, reject) => { releaseRenderer = resolve; rejectRenderer = reject; });
         }
         if (tool === 'browser_read_page' && rendererPageText !== null) return rendererPageText;
+        if (tool === 'browser_snapshot' && snapshotText !== null) return snapshotText;
         return `ok:${tool}`;
       },
       cancelPendingMcpActions: (reason: string, toolName?: string) => {
@@ -78,6 +81,7 @@ async function run() {
     './main/injectionDetector.js': injectionDetectorModule,
     './main/elementRefs.js': elementRefsModule,
     './main/approvalMode.js': approvalModeModule,
+    './main/recordings.js': recordingsModule,
     './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }
   });
 
@@ -347,6 +351,55 @@ async function run() {
     await server.executeTool('browser_read_page', {});
     assert.equal(dialogCalls, calls3, 'balanced mode is unchanged');
     console.log('[PASS] Wiring — strict approval mode gates every page action, balanced is unchanged');
+  }
+
+  // 6h) record and replay: record through the real path, replay with fresh refs, never store typed secrets
+  {
+    const server = makeServer();
+    server.firstUseApproved = true;
+    server.setPolicyEnforcement(true);
+    pageContext = { url: 'https://example.com/', elementText: '' };
+    dialogResponse = 0;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'king-wire-rec-'));
+    server.recordingStoreInstance = recordingsModule.createRecordingStore(path.join(dir, 'rec.json'));
+
+    assert.equal(server.startRecording(), true, 'recording starts');
+    assert.equal(server.startRecording(), false, 'a second start is refused');
+    snapshotText = 'URL: https://example.com/\nTitle: T\nElements: 2\ne1 button "Save"\ne2 textbox(password) "Password"';
+    await server.executeTool('browser_snapshot', {});
+    await server.executeTool('browser_click', { ref: 'e1' });
+    await server.executeTool('browser_type', { ref: 'e2', text: 'hunter2' });
+    await server.executeTool('browser_read_page', {});
+    const { saved } = server.stopRecording('  my flow ');
+    assert.ok(saved, 'the recording is saved');
+    assert.equal(saved.name, 'my flow');
+    assert.equal(JSON.stringify(saved.steps.map((st: any) => st.tool)), JSON.stringify(['browser_click', 'browser_type']), 'reads and snapshots are not steps');
+    assert.ok(!JSON.stringify(saved).includes('hunter2'), 'the typed secret is not stored');
+    assert.equal(saved.steps[1].needsInput, true);
+    assert.ok(!fs.readFileSync(path.join(dir, 'rec.json'), 'utf8').includes('hunter2'), 'nor on disk');
+
+    // Replay on a page where the same button now has a different ref.
+    snapshotText = 'URL: https://example.com/\nTitle: T\nElements: 2\ne7 button "Save"\ne8 textbox(password) "Password"';
+    const before = forwarded.length;
+    const report = await server.replayRecording(saved.id);
+    assert.equal(report.status, 'needs_input', 'the replay stops where only the user can type');
+    assert.equal(report.completed, 1);
+    const sent = forwarded.slice(before).filter((f: any) => f.tool === 'browser_click');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].args.selector, '[data-king-ref="e7"]', 'the element was found again by role and name');
+    assert.ok(!forwarded.slice(before).some((f: any) => f.tool === 'browser_type'), 'nothing was typed');
+    assert.equal(server.getRecordingState().recordings.length, 1, 'replayed steps are not recorded again');
+
+    // A refused approval stops the replay.
+    snapshotText = 'URL: https://example.com/\nTitle: T\nElements: 1\ne1 button "Other"';
+    const gone = await server.replayRecording(saved.id);
+    assert.equal(gone.status, 'target_not_found', 'a missing element is reported, never guessed');
+    assert.equal((await server.replayRecording('nope')).status, 'failed', 'an unknown recording fails cleanly');
+    assert.equal(server.deleteRecording(saved.id), true);
+    assert.equal(server.getRecordingState().recordings.length, 0);
+    snapshotText = null;
+    fs.rmSync(dir, { recursive: true, force: true });
+    console.log('[PASS] Wiring — record and replay use the live path, re-find elements and never store secrets');
   }
 
   // 7) STOP NOW: queue/execution blocked until an explicit resume

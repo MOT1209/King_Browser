@@ -125,6 +125,11 @@ async function run() {
     assert.match(String(await call('browser_switch_tab', { tabId: 'tab' })), /not found/i, 'the agent cannot switch to a user tab');
     await call('browser_new_tab', { url: 'https://example.com/' });
     assert.equal(lastNewTabOptions?.agentOwned, true, 'tabs the agent opens use the agent session');
+    assert.equal(lastNewTabOptions?.agentPersistent, false, 'the agent session is temporary unless persistence is on');
+    settingsRef.current.agentPersistentProfile = true;
+    await call('browser_new_tab', { url: 'https://example.com/' });
+    assert.equal(lastNewTabOptions?.agentPersistent, true, 'persistence applies to tabs opened while it is on');
+    settingsRef.current.agentPersistentProfile = false;
     refs[0].current.activeTabId = 'agent1';
     assert.match(String(await call('browser_read_page')), /private-service-secret/, 'the agent can use its own tab');
     refs[0].current.activeTabId = 'tab';
