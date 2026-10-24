@@ -47,7 +47,7 @@
 - **الخطر:** صفحات تتغير تكسر الإعادة؛ نحتاج رسالة فشل واضحة ولا إعادة صامتة.
 - الصعوبة: متوسطة. الوقت: أسبوعان.
 
-### WP5 — ملف معزول دائم وتسليم الدخول (أنا + أنت)
+### WP5 — ملف معزول دائم وتسليم الدخول (أنا + أنت) — **منفَّذ (اختياري، افتراضه معطّل)، غير مجرَّب بصرياً**
 - الحالي مؤقت (يُمسح عند إغلاق النافذة). المطلوب خيار "حفظ جلسة الوكيل" يسجّل فيه **أنت** الدخول يدوياً ثم يستخدمه الوكيل دون الوصول إلى كلمات مرورك.
 - **مخاطرة:** جلسة دائمة تعني أن سرقة الجهاز أو تعليمة خبيثة تصل لحسابات مفعّلة؛ تحتاج زر "امسح جلسة الوكيل" واضحاً وتنبيهاً.
 - الصعوبة: متوسطة. الوقت: أسبوع.
@@ -127,7 +127,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - **Risiko:** Sich ändernde Seiten brechen das Abspielen; es braucht klare Fehlermeldungen, kein stilles Weiterlaufen.
 - Schwierigkeit: mittel. Zeit: zwei Wochen.
 
-### WP5 — Dauerhaftes isoliertes Profil und Login-Übergabe (ich + du)
+### WP5 — Dauerhaftes isoliertes Profil und Login-Übergabe (ich + du) — **umgesetzt (optional, standardmäßig aus), visuell nicht getestet**
 - Heute flüchtig (beim Schließen gelöscht). Gewünscht: Option „Agent-Sitzung speichern“, in der **du** dich manuell anmeldest und der Agent sie nutzt, ohne an deine Passwörter zu kommen.
 - **Risiko:** Eine dauerhafte Sitzung bedeutet, dass Gerätediebstahl oder eine bösartige Anweisung angemeldete Konten erreicht; es braucht einen klaren Button „Agent-Sitzung löschen“ und einen Hinweis.
 - Schwierigkeit: mittel. Zeit: eine Woche.

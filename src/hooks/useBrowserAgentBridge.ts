@@ -53,7 +53,7 @@ export interface UseBrowserAgentBridgeOptions {
   setActiveTabId: (tabId: string) => void;
   setTabs: Dispatch<SetStateAction<Tab[]>>;
   handleNavigate: (url: string, explicitTabId?: string) => void;
-  handleNewTab: (url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean; agentOwned?: boolean }) => void;
+  handleNewTab: (url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean; agentOwned?: boolean; agentPersistent?: boolean }) => void;
   handleCloseTab: (id: string, e?: React.MouseEvent) => void;
   handleSelectTab: (id: string) => void;
 }
@@ -383,7 +383,7 @@ export function useBrowserAgentBridge({
           if (!gate.ok) {
             return `Error: Navigation blocked for unsafe destination (${gate.reason}): ${newUrl}`;
           }
-          mcpHandlersRef.current.handleNewTab(newUrl, undefined, { reuseBlank: false, agentOwned: isolated });
+          mcpHandlersRef.current.handleNewTab(newUrl, undefined, { reuseBlank: false, agentOwned: isolated, agentPersistent: isolated && Boolean(settingsRef.current?.agentPersistentProfile) });
           return `Opened new tab: ${newUrl}`;
         }
 

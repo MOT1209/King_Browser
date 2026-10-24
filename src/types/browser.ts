@@ -11,6 +11,8 @@ export interface Tab {
   isIncognito?: boolean;
   /** Opened by the agent while the isolated agent profile is on; uses its own cookies and storage. */
   isAgentOwned?: boolean;
+  /** Agent tab that keeps its cookies and logins on disk (persistent agent profile). */
+  agentPersistent?: boolean;
   thumbnail?: string;
   workspaceId?: string;
   folderId?: string;
@@ -110,6 +112,8 @@ export interface UserSettings {
   mcpServerEnabled: boolean;
   /** Agent tabs get their own session, and the agent may only act on tabs it opened. */
   agentIsolatedProfile?: boolean;
+  /** With the isolated profile on, keep the agent's logins on disk until you clear them. */
+  agentPersistentProfile?: boolean;
   showTasksWidget?: boolean;
   newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url' | 'aurora_waves' | 'cyber_grid' | 'hyper_space' | 'fireflies' | 'nebula' | 'matrix';
   backgroundCustomUrl?: string;
@@ -150,6 +154,7 @@ export const defaultSettings: UserSettings = {
   useVerticalTabs: false,
   mcpServerEnabled: false,
   agentIsolatedProfile: false,
+  agentPersistentProfile: false,
   newTabBackground: 'default',
   backgroundCustomUrl: '',
   startupBehavior: 'newTab',

@@ -451,6 +451,8 @@ export { updateAdblockWhitelist };
 const hardenedIncognitoPartitions = new Set<string>();
 /** Shared in-memory partition for agent tabs (isolated agent profile); cleared when the window closes. */
 const AGENT_PARTITION = 'incognito-king-agent';
+/** On-disk partition for the opt-in persistent agent profile; kept across restarts until the user clears it. */
+const AGENT_PERSIST_PARTITION = 'persist:king-agent';
 
 // Active Chromium proxy rules applied across default and all per-tab incognito sessions
 let activeChromiumProxyRules = 'direct://';
@@ -661,6 +663,8 @@ function createWindow() {
     // each later privacy/VPN/language/purge call walks all of them.
     for (const partName of Array.from(hardenedIncognitoPartitions)) {
       hardenedIncognitoPartitions.delete(partName);
+      // The persistent agent profile is the one partition that must survive.
+      if (partName === AGENT_PERSIST_PARTITION) continue;
       try {
         session.fromPartition(partName, { cache: false }).clearStorageData();
       } catch (_) {}
@@ -3419,12 +3423,12 @@ app.on('web-contents-created', (_event, contents) => {
     // Security: Validate partition to prevent unauthorized partitions (e.g. persist:admin)
     const part = (webPreferences as any).partition || (params as any).partition;
     if (part && typeof part === 'string') {
-      if (part !== '' && !/^incognito-[a-zA-Z0-9_-]+$/.test(part)) {
+      if (part !== '' && part !== AGENT_PERSIST_PARTITION && !/^incognito-[a-zA-Z0-9_-]+$/.test(part)) {
         console.warn(`[Security] Blocked unauthorized webview partition: ${part}`);
         event.preventDefault();
         return;
       }
-      if (part.startsWith('incognito-')) {
+      if (part.startsWith('incognito-') || part === AGENT_PERSIST_PARTITION) {
         hardenIncognitoPartition(part);
       }
     }
@@ -4693,6 +4697,21 @@ ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolea
   return true;
 });
 
+// Wipes everything the agent has stored (cookies, logins, caches) in both of its sessions.
+ipcMain.handle('clear-agent-profile', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  try {
+    for (const name of [AGENT_PERSIST_PARTITION, AGENT_PARTITION]) {
+      const sess = session.fromPartition(name, { cache: false });
+      await sess.clearStorageData();
+      await sess.clearCache();
+    }
+    return true;
+  } catch (err) {
+    console.error('Error clearing agent profile:', err);
+    return false;
+  }
+});
 ipcMain.handle('get-mcp-approval-mode', (event) => {
   if (!isTrustedSender(event)) return 'balanced';
   return mcpServer?.getApprovalMode() ?? 'balanced';
@@ -4746,7 +4765,7 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
     } else {
       // Clear all active per-tab incognito partitions. The agent's shared
       // partition is left alone: agent tabs may still be using it.
-      const partitions = Array.from(hardenedIncognitoPartitions).filter(name => name !== AGENT_PARTITION);
+      const partitions = Array.from(hardenedIncognitoPartitions).filter(name => name !== AGENT_PARTITION && name !== AGENT_PERSIST_PARTITION);
       for (const partName of partitions) hardenedIncognitoPartitions.delete(partName);
       for (const partName of partitions) {
         try {

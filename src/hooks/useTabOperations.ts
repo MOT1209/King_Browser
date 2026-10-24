@@ -437,7 +437,7 @@ export function useTabOperations({
     }
   }, [activeTabId]);
 
-  const handleNewTab = useCallback((url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean; isIncognito?: boolean; agentOwned?: boolean }) => {
+  const handleNewTab = useCallback((url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean; isIncognito?: boolean; agentOwned?: boolean; agentPersistent?: boolean }) => {
     let finalUrl = typeof url === 'string' ? url : 'king://newtab';
 
     // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
@@ -498,6 +498,8 @@ export function useTabOperations({
       isIncognito: isIncognitoTab,
       // Links and popups opened from an agent tab stay in the agent's session.
       isAgentOwned: !isIncognitoTab && (opts?.agentOwned ?? Boolean(sourceTabId && currentTarget?.isAgentOwned)) ? true : undefined,
+      agentPersistent: !isIncognitoTab && (opts?.agentOwned ?? Boolean(sourceTabId && currentTarget?.isAgentOwned))
+        && (opts?.agentPersistent ?? Boolean(sourceTabId && currentTarget?.agentPersistent)) ? true : undefined,
       lastAccessed: Date.now()
     };
     setTabs(prev => [...prev, newTab]);

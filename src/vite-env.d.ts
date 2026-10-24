@@ -263,6 +263,7 @@ export interface ElectronAPI {
   copyMcpConfig: (kind?: 'generic' | 'opencode') => Promise<{ ok: boolean; autoClearSec: number } | boolean>;
   getMcpTokenStatus: () => Promise<{ configured: boolean; prefix: string }>;
   rotateMcpToken: () => Promise<boolean>;
+  clearAgentProfile: () => Promise<boolean>;
   getMcpApprovalMode: () => Promise<'balanced' | 'strict'>;
   setMcpApprovalMode: (mode: 'balanced' | 'strict') => Promise<'balanced' | 'strict'>;
   getMcpSiteRules: () => Promise<Array<{ domain: string; mode: 'ask' | 'block' }>>;

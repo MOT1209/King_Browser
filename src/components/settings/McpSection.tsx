@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Cpu, Play, Square, Copy, Check, Users, Key, RefreshCw, Lock, Unlock, ShieldAlert } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { copyTextToClipboard } from '../../utils/clipboard';
+import { showConfirm } from '../../utils/confirmDialog';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 
 // mcpToken from getMcpTokenStatus is only a display prefix (e.g. "king_mcp_••••").
@@ -9,7 +10,7 @@ import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 const isMaskedToken = (v: string) => !v || v.includes('•') || v.includes('****');
 
 export interface McpSectionProps {
-  settings: Pick<UserSettings, 'mcpServerEnabled' | 'agentIsolatedProfile'>;
+  settings: Pick<UserSettings, 'mcpServerEnabled' | 'agentIsolatedProfile' | 'agentPersistentProfile'>;
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
 }
 
@@ -413,6 +414,38 @@ export const McpSection: React.FC<McpSectionProps> = ({
           })}
         </div>
       </div>
+      {/* Persistent agent profile */}
+      {settings.agentIsolatedProfile && (
+        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-800 dark:text-slate-100">Keep the agent's logins</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Saves the agent session (cookies and logins) on this computer so you only sign in once: open a tab with the agent, sign in yourself, then let the agent work. The agent never sees your password. Anyone with access to this computer, and any instruction the agent follows, can use those logins until you clear them. Applies to tabs the agent opens from now on.
+              </p>
+            </div>
+            <button
+              onClick={() => onUpdateSettings({ agentPersistentProfile: !settings.agentPersistentProfile })}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.agentPersistentProfile ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-600'}`}
+              role="switch"
+              aria-checked={Boolean(settings.agentPersistentProfile)}
+              aria-label="Keep the agent's logins"
+            >
+              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.agentPersistentProfile ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          <button
+            onClick={async () => {
+              if (!await showConfirm({ message: 'Clear everything the agent has stored (cookies, logins, caches)?', confirmLabel: 'Clear' })) return;
+              await (window as any).electronAPI?.clearAgentProfile?.();
+            }}
+            className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm hover:bg-red-50 dark:hover:bg-red-950/40"
+          >
+            Clear the agent's session
+          </button>
+        </div>
+      )}
+
       {/* Approval mode */}
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
         <div className="flex items-center justify-between gap-4">
@@ -488,7 +521,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
             <p className="font-semibold text-slate-800 dark:text-slate-100">Isolated agent profile</p>
             <p className="text-xs text-slate-500 mt-0.5">
               The agent works in its own session (separate cookies and storage) and can only see and use tabs it opened itself, never the tabs you are signed in to.
-              It starts signed out, and this session is cleared when you close the window.
+              It starts signed out. By default this session is cleared when you close the window.
             </p>
           </div>
           <button
