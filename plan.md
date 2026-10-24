@@ -42,7 +42,7 @@
 - عرض السجل في الواجهة (جدول: الوقت، الأداة، الموقع، القرار، السبب) مع تصفية.
 - الصعوبة: منخفضة-متوسطة. الوقت: أسبوع.
 
-### WP4 — تسجيل وإعادة (أنا، بعد WP2)
+### WP4 — تسجيل وإعادة (أنا، بعد WP2) — **منفَّذ، غير مجرَّب بصرياً ولا على مواقع حقيقية**
 - تسجيل ما نفّذه الوكيل كسلسلة خطوات (باستخدام المراجع/المحددات) وإعادتها بلا نموذج ذكاء اصطناعي، مع المرور بنفس بوابة الموافقة في كل إعادة.
 - **الخطر:** صفحات تتغير تكسر الإعادة؛ نحتاج رسالة فشل واضحة ولا إعادة صامتة.
 - الصعوبة: متوسطة. الوقت: أسبوعان.
@@ -122,7 +122,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - Protokollansicht in der Oberfläche (Zeit, Werkzeug, Seite, Entscheidung, Grund) mit Filter.
 - Schwierigkeit: niedrig–mittel. Zeit: eine Woche.
 
-### WP4 — Aufzeichnen und Abspielen (ich, nach WP2)
+### WP4 — Aufzeichnen und Abspielen (ich, nach WP2) — **umgesetzt, weder visuell noch an echten Seiten getestet**
 - Aktionen des Agenten als Schrittfolge aufzeichnen und ohne KI-Modell erneut abspielen, jedes Mal durch dasselbe Freigabe-Tor.
 - **Risiko:** Sich ändernde Seiten brechen das Abspielen; es braucht klare Fehlermeldungen, kein stilles Weiterlaufen.
 - Schwierigkeit: mittel. Zeit: zwei Wochen.

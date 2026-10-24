@@ -73,6 +73,10 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const [mcpToken, setMcpToken] = useState<string>('');
   const [mcpTokenVisible, setMcpTokenVisible] = useState(false);
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
+  type RecordingState = { recording: boolean; steps: number; replaying: boolean; recordings: Array<{ id: string; name: string; createdAt: string; steps: number }> };
+  const [recState, setRecState] = useState<RecordingState>({ recording: false, steps: 0, replaying: false, recordings: [] });
+  const [recName, setRecName] = useState('');
+  const [recMessage, setRecMessage] = useState('');
   const [approvalMode, setApprovalMode] = useState<'balanced' | 'strict'>('balanced');
   type ActivityEntry = { id: string; tool: string; domain: string; status: string; reason: string; requestedAt: string; risk: string };
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
@@ -119,6 +123,42 @@ export const McpSection: React.FC<McpSectionProps> = ({
   }, []);
 
   useEffect(() => { void loadActivity(); }, [loadActivity]);
+
+  const loadRecordings = useCallback(async () => {
+    try {
+      const state = await (window as any).electronAPI?.getRecordingState?.();
+      if (state) setRecState(state);
+    } catch (_) {}
+  }, []);
+  useEffect(() => { void loadRecordings(); }, [loadRecordings]);
+
+  const startRecording = useCallback(async () => {
+    setRecMessage('');
+    const ok = await (window as any).electronAPI?.startRecording?.();
+    if (!ok) setRecMessage('Could not start: start the MCP server first, and finish any recording or replay in progress.');
+    await loadRecordings();
+  }, [loadRecordings]);
+
+  const stopRecording = useCallback(async () => {
+    const result = await (window as any).electronAPI?.stopRecording?.(recName);
+    setRecName('');
+    const skipped = result?.skipped?.length ? ` ${result.skipped.length} step(s) could not be recorded.` : '';
+    setRecMessage(result?.saved ? `Saved "${result.saved.name}" with ${result.saved.steps} step(s).${skipped}` : `Nothing to save: no repeatable steps were recorded.${skipped}`);
+    await loadRecordings();
+  }, [recName, loadRecordings]);
+
+  const replayRecording = useCallback(async (id: string) => {
+    setRecMessage('Replaying... approvals appear as usual.');
+    setRecState(prev => ({ ...prev, replaying: true }));
+    const report = await (window as any).electronAPI?.replayRecording?.(id);
+    setRecMessage(report?.message ?? 'Replay finished.');
+    await loadRecordings();
+  }, [loadRecordings]);
+
+  const deleteRecording = useCallback(async (id: string) => {
+    await (window as any).electronAPI?.deleteRecording?.(id);
+    await loadRecordings();
+  }, [loadRecordings]);
 
   const changeApprovalMode = useCallback(async (mode: 'balanced' | 'strict') => {
     const api = (window as any).electronAPI;
@@ -445,6 +485,49 @@ export const McpSection: React.FC<McpSectionProps> = ({
           </button>
         </div>
       )}
+
+      {/* Record and replay */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+        <p className="font-semibold text-slate-800 dark:text-slate-100">Record and replay</p>
+        <p className="text-xs text-slate-500">
+          Record what an agent does, then replay it later without any AI model. Every replayed step goes through the same approval as a live action.
+          Text typed into password-like fields is never stored; a replay stops there and waits for you. Steps that used a page element are found again by their role and name, and the replay stops if the page no longer has them.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {!recState.recording ? (
+            <button onClick={() => void startRecording()} disabled={recState.replaying} className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600 disabled:opacity-40">Start recording</button>
+          ) : (
+            <>
+              <input
+                value={recName}
+                onChange={(event) => setRecName(event.target.value)}
+                placeholder="Name this recording"
+                aria-label="Recording name"
+                maxLength={80}
+                className="flex-1 min-w-[160px] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
+              />
+              <button onClick={() => void stopRecording()} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm hover:bg-red-600">Stop and save</button>
+              <button onClick={() => void loadRecordings()} className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs">{recState.steps} step(s) so far</button>
+            </>
+          )}
+        </div>
+        {recMessage && <p className="text-xs text-slate-600 dark:text-slate-300" role="status">{recMessage}</p>}
+        {recState.recordings.length === 0 ? (
+          <p className="text-xs text-slate-400">No recordings yet.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {recState.recordings.map(rec => (
+              <li key={rec.id} className="flex items-center justify-between gap-2 py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                <span className="min-w-0 truncate text-sm text-slate-700 dark:text-slate-200">{rec.name} <span className="text-xs text-slate-400">({rec.steps} steps)</span></span>
+                <span className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => void replayRecording(rec.id)} disabled={recState.replaying || recState.recording} className="text-xs text-blue-600 hover:underline disabled:opacity-40">Replay</button>
+                  <button onClick={() => void deleteRecording(rec.id)} aria-label={`Delete ${rec.name}`} className="text-xs text-slate-500 hover:text-red-600">Delete</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {/* Approval mode */}
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">

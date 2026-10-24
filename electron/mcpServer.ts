@@ -13,12 +13,13 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
 import { resolveElementRef } from './main/elementRefs.js';
+import { Recorder, RECORDABLE_TOOLS, createRecordingStore, replaySteps, type Recording, type RecordingStore, type ReplayReport } from './main/recordings.js';
 import { createApprovalModeStore, strictModeRequiresApproval, type ApprovalMode, type ApprovalModeStore } from './main/approvalMode.js';
 import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
 import { createSiteRuleStore, matchSiteRule, type SiteRule, type SiteRuleStore } from './main/siteRules.js';
 import { createActivityStore, type ActivityStore } from './main/activityStore.js';
 import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from './main/executionEngine.js';
-import { classifyAction, buildApprovalSummary } from './main/policyEngine.js';
+import { classifyAction, buildApprovalSummary, redactArgs } from './main/policyEngine.js';
 
 // Security: Screen-lock tracking prevents MCP execution while user is away
 let isScreenLocked = false;
@@ -532,6 +533,10 @@ export class BrowserMCPServer {
   private policyEnforced: boolean = false;
   /** Set when page text the agent read looked like an injection; cleared once the user is asked. */
   private injectionSuspect: { reasons: string[] } | null = null;
+  private recorder: Recorder | null = null;
+  private replaying = false;
+  private lastSnapshotText = '';
+  private recordingStoreInstance: RecordingStore | null | undefined;
   private approvalModeStoreInstance: ApprovalModeStore | null | undefined;
   private siteRuleStoreInstance: SiteRuleStore | null | undefined;
   private activityStoreInstance: ActivityStore | null | undefined;
@@ -1020,7 +1025,94 @@ export class BrowserMCPServer {
     return this.pendingApprovalPromise;
   }
 
+  /**
+   * Runs one tool call, then lets the recorder note it. Recording happens after
+   * the call succeeded, so refused or failed actions never enter a recording.
+   */
   private async executeTool(toolName: string, args: Record<string, any>): Promise<string> {
+    const result = await this.executeToolCore(toolName, args);
+    try {
+      this.afterTool(toolName, args, result);
+    } catch (_) {
+      /* recording must never break the agent */
+    }
+    return result;
+  }
+
+  private afterTool(toolName: string, args: Record<string, any>, result: string): void {
+    const canonicalTool = TOOL_ALIASES[toolName] ?? toolName;
+    if (canonicalTool === 'browser_snapshot' && typeof result === 'string') {
+      this.lastSnapshotText = result;
+      return;
+    }
+    if (!this.recorder || this.replaying || !RECORDABLE_TOOLS.has(canonicalTool)) return;
+    const original = (args && typeof args === 'object' ? args : {}) as Record<string, unknown>;
+    const redacted = redactArgs(canonicalTool, original);
+    this.recorder.add(canonicalTool, {
+      originalArgs: original,
+      lastSnapshot: this.lastSnapshotText,
+      sensitiveText: typeof original.text === 'string' && redacted.text !== original.text
+    });
+  }
+
+  private recordingStore(): RecordingStore | null {
+    if (this.recordingStoreInstance === undefined) {
+      try {
+        this.recordingStoreInstance = createRecordingStore(path.join(electronApp.getPath('userData'), 'agent-recordings.json'));
+      } catch {
+        this.recordingStoreInstance = null;
+      }
+    }
+    return this.recordingStoreInstance;
+  }
+
+  public getRecordingState(): { recording: boolean; steps: number; replaying: boolean; recordings: Array<{ id: string; name: string; createdAt: string; steps: number }> } {
+    return {
+      recording: Boolean(this.recorder),
+      steps: this.recorder?.stepCount ?? 0,
+      replaying: Boolean(this.replaying),
+      recordings: (this.recordingStore()?.list() ?? []).map(r => ({ id: r.id, name: r.name, createdAt: r.createdAt, steps: r.steps.length }))
+    };
+  }
+
+  public startRecording(): boolean {
+    if (this.recorder || this.replaying) return false;
+    this.recorder = new Recorder();
+    return true;
+  }
+
+  /** Stops recording and saves it; returns what was saved, or why nothing was. */
+  public stopRecording(name: unknown): { saved: Recording | null; skipped: string[] } {
+    const recorder = this.recorder;
+    this.recorder = null;
+    if (!recorder) return { saved: null, skipped: [] };
+    const label = typeof name === 'string' && name.trim() ? name : `Recording ${new Date().toLocaleString()}`;
+    const saved = recorder.finish(randomBytes(8).toString('hex'), label);
+    if (saved) this.recordingStore()?.add(saved);
+    return { saved, skipped: recorder.skippedReasons };
+  }
+
+  public deleteRecording(id: unknown): boolean {
+    if (typeof id !== 'string') return false;
+    this.recordingStore()?.remove(id);
+    return true;
+  }
+
+  /** Replays a saved recording through the normal approval path, one step at a time. */
+  public async replayRecording(id: unknown): Promise<ReplayReport> {
+    const empty = { total: 0, completed: 0 };
+    if (this.replaying || this.recorder) return { ...empty, status: 'busy', message: 'Stop the current recording or replay first.' };
+    const recording = typeof id === 'string' ? this.recordingStore()?.get(id) : undefined;
+    if (!recording) return { ...empty, status: 'failed', message: 'That recording no longer exists.' };
+    this.replaying = true;
+    try {
+      return await replaySteps(recording.steps, { run: (tool, args) => this.executeTool(tool, args) });
+    } finally {
+      this.replaying = false;
+    }
+  }
+
+  private async executeToolCore(toolName: string, args: Record<string, any>): Promise<string> {
     const authorizationGeneration = this.authorizationGeneration;
     const lockGeneration = screenLockGeneration;
     if (isScreenLocked) {

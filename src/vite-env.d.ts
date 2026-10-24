@@ -263,6 +263,11 @@ export interface ElectronAPI {
   copyMcpConfig: (kind?: 'generic' | 'opencode') => Promise<{ ok: boolean; autoClearSec: number } | boolean>;
   getMcpTokenStatus: () => Promise<{ configured: boolean; prefix: string }>;
   rotateMcpToken: () => Promise<boolean>;
+  getRecordingState: () => Promise<{ recording: boolean; steps: number; replaying: boolean; recordings: Array<{ id: string; name: string; createdAt: string; steps: number }> }>;
+  startRecording: () => Promise<boolean>;
+  stopRecording: (name?: string) => Promise<{ saved: { id: string; name: string; steps: number } | null; skipped: string[] }>;
+  deleteRecording: (id: string) => Promise<boolean>;
+  replayRecording: (id: string) => Promise<{ total: number; completed: number; status: string; message: string }>;
   clearAgentProfile: () => Promise<boolean>;
   getMcpApprovalMode: () => Promise<'balanced' | 'strict'>;
   setMcpApprovalMode: (mode: 'balanced' | 'strict') => Promise<'balanced' | 'strict'>;

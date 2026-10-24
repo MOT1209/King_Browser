@@ -4698,6 +4698,28 @@ ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolea
 });
 
 // Wipes everything the agent has stored (cookies, logins, caches) in both of its sessions.
+ipcMain.handle('recording-state', (event) => {
+  if (!isTrustedSender(event)) return { recording: false, steps: 0, replaying: false, recordings: [] };
+  return mcpServer?.getRecordingState() ?? { recording: false, steps: 0, replaying: false, recordings: [] };
+});
+ipcMain.handle('recording-start', (event) => {
+  if (!isTrustedSender(event)) return false;
+  return mcpServer?.startRecording() ?? false;
+});
+ipcMain.handle('recording-stop', (event, name: unknown) => {
+  if (!isTrustedSender(event)) return { saved: null, skipped: [] };
+  const result = mcpServer?.stopRecording(name);
+  return { saved: result?.saved ? { id: result.saved.id, name: result.saved.name, steps: result.saved.steps.length } : null, skipped: result?.skipped ?? [] };
+});
+ipcMain.handle('recording-delete', (event, id: unknown) => {
+  if (!isTrustedSender(event)) return false;
+  return mcpServer?.deleteRecording(id) ?? false;
+});
+ipcMain.handle('recording-replay', async (event, id: unknown) => {
+  if (!isTrustedSender(event)) return { total: 0, completed: 0, status: 'failed', message: 'Unauthorized' };
+  if (!mcpServer) return { total: 0, completed: 0, status: 'failed', message: 'Start the MCP server first.' };
+  return mcpServer.replayRecording(id);
+});
 ipcMain.handle('clear-agent-profile', async (event) => {
   if (!isTrustedSender(event)) return false;
   try {
