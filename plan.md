@@ -52,7 +52,7 @@
 - **مخاطرة:** جلسة دائمة تعني أن سرقة الجهاز أو تعليمة خبيثة تصل لحسابات مفعّلة؛ تحتاج زر "امسح جلسة الوكيل" واضحاً وتنبيهاً.
 - الصعوبة: متوسطة. الوقت: أسبوع.
 
-### WP6 — مجموعة اختبار حقن الأوامر (أنا)
+### WP6 — مجموعة اختبار حقن الأوامر (أنا) — **منفَّذ: النتيجة 13 من 20 (65%) على مجموعتي الخاصة، والأرجح أقل في الواقع**
 - مجموعة صفحات هجوم معروفة (تعليمات مخفية، نص أبيض، تعليقات HTML، لغات متعددة) وسكربت يقيس ما يلتقطه الكاشف ويطبع نسبة صادقة بما فيه الإخفاقات.
 - **الهدف:** أرقام صادقة قابلة للنشر. الكاشف إنذار لا حماية؛ الحماية الحقيقية هي بوابة الموافقة.
 - الصعوبة: متوسطة. الوقت: أسبوع.
@@ -132,7 +132,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - **Risiko:** Eine dauerhafte Sitzung bedeutet, dass Gerätediebstahl oder eine bösartige Anweisung angemeldete Konten erreicht; es braucht einen klaren Button „Agent-Sitzung löschen“ und einen Hinweis.
 - Schwierigkeit: mittel. Zeit: eine Woche.
 
-### WP6 — Testsatz für Prompt-Injection (ich)
+### WP6 — Testsatz für Prompt-Injection (ich) — **umgesetzt: 13 von 20 (65 %) auf meinem eigenen Satz, real vermutlich weniger**
 - Sammlung bekannter Angriffsseiten (versteckte Anweisungen, weißer Text, HTML-Kommentare, mehrere Sprachen) und ein Skript, das misst, was der Detektor fängt, und eine ehrliche Quote inklusive Fehlschlägen ausgibt.
 - **Ziel:** Ehrliche, veröffentlichbare Zahlen. Der Detektor ist ein Alarm, kein Schutz; der echte Schutz ist das Freigabe-Tor.
 - Schwierigkeit: mittel. Zeit: eine Woche.
