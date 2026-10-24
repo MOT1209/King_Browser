@@ -145,7 +145,7 @@ import { registerEngineIpc } from './main/engineIpc.js';
 import { escapeHtmlForTranslation, unescapeHtmlForTranslation } from './main/translationText.js';
 import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig.js';
 import { initMcpBridge } from './main/mcpBridge.js';
-import { canOpenInSystemBrowser, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
+import { canOpenInSystemBrowser, getGoogleSigninCompatUserAgent, isGoogleAccountsUrl, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
@@ -433,6 +433,8 @@ function isTrustedAppOrigin(urlStr: string): boolean {
 
 let isPrivacyShieldEnabled = true;
 let isDoNotTrackEnabled = true;
+/** Opt-in: present a Firefox user agent on accounts.google.com (googleSigninFallback.ts). */
+let isGoogleSigninCompatEnabled = false;
 let mcpServer: BrowserMCPServer | null = null;
 
 // Reusable getter for all active electron sessions (default + incognito partitions)
@@ -742,6 +744,18 @@ function createWindow() {
             .replace(/,\s*"Electron";v="[^"]*"/gi, '')
             .replace(/"Electron";v="[^"]*",?\s*/gi, '')
             .trim();
+        }
+
+        // Google sign-in compatibility: Firefox sends no client hints, so a
+        // Firefox user agent must not arrive next to Chromium sec-ch-ua headers.
+        // The second test covers subresources of a page that applyGoogleSigninCompat
+        // switched to the Firefox user agent.
+        const compatUa = getGoogleSigninCompatUserAgent();
+        if (isGoogleSigninCompatEnabled && (isGoogleAccountsUrl(details.url) || requestHeaders['User-Agent'] === compatUa)) {
+          for (const name of Object.keys(requestHeaders)) {
+            if (name.toLowerCase() === 'user-agent' || name.toLowerCase().startsWith('sec-ch-ua')) delete requestHeaders[name];
+          }
+          requestHeaders['User-Agent'] = compatUa;
         }
       }
 
@@ -3803,6 +3817,12 @@ ipcMain.handle('set-do-not-track', (event, enabled: boolean) => {
   isDoNotTrackEnabled = Boolean(enabled);
 });
 
+ipcMain.handle('set-google-signin-compat', (event, enabled: unknown) => {
+  if (!isTrustedSender(event)) return false;
+  isGoogleSigninCompatEnabled = enabled === true;
+  return isGoogleSigninCompatEnabled;
+});
+
 // IPC Handler to dynamically update Accept-Language across all Electron sessions
 ipcMain.handle('set-app-language', async (event, lang: unknown) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
@@ -4174,7 +4194,7 @@ function watchGoogleSigninRejection(wc: Electron.WebContents): void {
     const options: Electron.MessageBoxOptions = {
       type: 'info',
       message: 'Google blocked sign-in in this browser',
-      detail: `Google does not allow signing in from embedded browsers such as King Browser. You can continue in your default browser:\n${target}`,
+      detail: `Google does not allow signing in from embedded browsers such as King Browser. You can continue in your default browser:\n${target}\n\nTo sign in inside King Browser instead, turn on Settings → Privacy → Google sign-in compatibility and try again.`,
       buttons: ['Open in Default Browser', 'Cancel'],
       defaultId: 0,
       cancelId: 1
@@ -4189,9 +4209,33 @@ function watchGoogleSigninRejection(wc: Electron.WebContents): void {
   });
 }
 
+// With the opt-in setting on, documents on accounts.google.com also see the
+// Firefox user agent in navigator.userAgent, matching the request header that
+// applyPrivacyHeadersToSession sends. Leaving Google restores the standard one.
+function applyGoogleSigninCompat(wc: Electron.WebContents): void {
+  let overridden = false;
+  const onNavigation = (details: { url: string; isMainFrame: boolean; isSameDocument?: boolean }) => {
+    if (!details.isMainFrame || details.isSameDocument || wc.isDestroyed()) return;
+    const useCompat = isGoogleSigninCompatEnabled && isGoogleAccountsUrl(details.url);
+    if (useCompat === overridden) return;
+    try {
+      wc.setUserAgent(useCompat ? getGoogleSigninCompatUserAgent() : getStandardUserAgent());
+      overridden = useCompat;
+    } catch (err) {
+      console.warn('[Google Sign-in] Could not switch user agent:', err);
+    }
+  };
+  wc.on('did-start-navigation', onNavigation);
+  wc.on('did-redirect-navigation', onNavigation);
+}
+
 // Auto-capture thumbnails and Native Chrome-Parity Context Menu for WebViews
 app.on('web-contents-created', (_event, wc) => {
-  if (wc.getType() === 'webview') watchGoogleSigninRejection(wc);
+  // Tabs, and the popup windows that "Sign in with Google" buttons open.
+  if (wc.getType() === 'webview' || wc.getType() === 'window') {
+    watchGoogleSigninRejection(wc);
+    applyGoogleSigninCompat(wc);
+  }
   wc.removeAllListeners('context-menu');
   wc.on('context-menu', (e, params) => {
     // Only show for webviews

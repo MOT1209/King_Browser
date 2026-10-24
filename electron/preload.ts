@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.send('set-theme', theme),
   setPrivacyShield: (enabled: boolean) => ipcRenderer.invoke('set-privacy-shield', enabled),
   setDoNotTrack: (enabled: boolean) => ipcRenderer.invoke('set-do-not-track', enabled),
+  setGoogleSigninCompat: (enabled: boolean) => ipcRenderer.invoke('set-google-signin-compat', enabled),
   getSuggestions: (query: string, engine?: string, locale?: string) => ipcRenderer.invoke('get-suggestions', query, engine, locale),
   fetchWallpaperPhotos: (query: string) => ipcRenderer.invoke('fetch-wallpaper-photos', query),
   fetchUnsplashPhotos: (query: string) => ipcRenderer.invoke('fetch-unsplash-photos', query),

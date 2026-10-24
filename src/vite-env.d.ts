@@ -200,6 +200,7 @@ export interface ElectronAPI {
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   setPrivacyShield: (enabled: boolean) => Promise<boolean>;
   setDoNotTrack: (enabled: boolean) => Promise<void>;
+  setGoogleSigninCompat: (enabled: boolean) => Promise<boolean>;
   getSuggestions: (query: string, engine?: string, locale?: string) => Promise<string[]>;
   fetchWallpaperPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;
   fetchUnsplashPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;

@@ -216,6 +216,18 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
               onToggle={() => onUpdateSettings({ clearOnExit: !settings.clearOnExit })}
             />
           </div>
+
+          <div className="p-5 flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Google sign-in compatibility</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Lets you sign in to Google, YouTube and Gmail by identifying as Firefox on accounts.google.com only. A workaround: Google may stop accepting it at any time.</div>
+            </div>
+            <ToggleSwitch
+              ariaLabel="Toggle Google sign-in compatibility"
+              checked={settings.googleSigninCompat ?? false}
+              onToggle={() => onUpdateSettings({ googleSigninCompat: !settings.googleSigninCompat })}
+            />
+          </div>
         </div>
       </section>
 
