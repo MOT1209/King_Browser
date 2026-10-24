@@ -13,6 +13,9 @@ export const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
   { id: 'tor-socks', name: 'Tor Proxy (127.0.0.1:9050)', url: 'socks5://127.0.0.1:9050', type: 'custom' },
 ];
 
+/** In-memory webview partition shared by agent tabs; matches the main-process allowlist (incognito-*). */
+export const AGENT_PARTITION = 'incognito-king-agent';
+
 export const EMPTY_ARRAY: never[] = [];
 
 export const normalizeAIActionPayload = (detail: unknown): string => {

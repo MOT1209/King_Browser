@@ -69,6 +69,10 @@ export interface ApprovalSummary {
   domain: string;
   intendedAction: string;
   affectedResource?: string;
+  /** The page the action lands on (query string dropped so tokens in URLs are not shown). */
+  pageUrl?: string;
+  /** What the target element says about itself (label, text, type), shortened to one line. */
+  targetText?: string;
   details: Record<string, unknown>;
   consequences: string[];
   uncertainty: string[];
@@ -364,6 +368,22 @@ const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
   prompt_injection: 'Action after suspicious page text'
 };
 
+function describePageUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`.slice(0, 160);
+  } catch {
+    return undefined;
+  }
+}
+
+function describeTargetText(text: string | undefined): string | undefined {
+  if (!text) return undefined;
+  const oneLine = text.replace(/\s+/g, ' ').trim();
+  return oneLine ? oneLine.slice(0, 120) : undefined;
+}
+
 export function buildApprovalSummary(input: PolicyInput, decision: PolicyDecision): ApprovalSummary {
   const domain = decision.domain ?? extractDomain(input.currentUrl) ?? 'unknown site';
   const primary = decision.triggers[0];
@@ -376,6 +396,8 @@ export function buildApprovalSummary(input: PolicyInput, decision: PolicyDecisio
     domain,
     intendedAction: `${label}: ${input.toolName}${target ? ` → ${target.slice(0, 120)}` : ''}`,
     affectedResource: target,
+    pageUrl: describePageUrl(input.currentUrl),
+    targetText: describeTargetText(input.elementText),
     details: decision.redactedArgs,
     consequences: decision.triggers.map(t => TRIGGER_CONSEQUENCES[t]),
     uncertainty: [

@@ -26,7 +26,7 @@
 
 ## المرحلة 3 — التمايز
 - [ ] **التسجيل والإعادة.** سجّل ما فعله الوكيل وأعد تشغيله بلا نموذج ذكاء اصطناعي.
-- [ ] **ملفات تعريف معزولة لكل وكيل.** جلسة وكوكيز منفصلة، فلا يصل الوكيل إلى حساباتك الشخصية.
+- [~] **ملفات تعريف معزولة لكل وكيل (نسخة أولى).** إعداد "Isolated agent profile" (افتراضه معطّل) في الإعدادات > MCP: تبويبات الوكيل في جلسة منفصلة في الذاكرة (تُمسح عند إغلاق النافذة)، ولا يرى الوكيل ولا يستخدم إلا تبويباته. غير مجرَّب بصرياً ولا مع OpenCode حقيقي، ولا يغطي مساعد الذكاء الاصطناعي الداخلي. ⏳ المتبقي: جلسة دائمة، وتسجيل الدخول داخل الملف المعزول. القديم: جلسة وكوكيز منفصلة، فلا يصل الوكيل إلى حساباتك الشخصية.
 - [ ] **إعداد OpenCode بسطر واحد.** أمر يكتب `opencode.json` تلقائياً.
 
 ## المرحلة 4 — تقليص الأسطح (تجنّب الإفراط في الهندسة)
@@ -75,7 +75,7 @@ Ein Open-Source-Browser, in dem ein Coding-Agent (z. B. OpenCode) einen echten, 
 
 ## Phase 3 — Abgrenzung
 - [ ] **Aufzeichnen und Abspielen.** Aktionen des Agenten aufzeichnen und ohne KI-Modell erneut abspielen.
-- [ ] **Isolierte Profile pro Agent.** Eigene Sitzung und Cookies, damit der Agent nicht an private Konten kommt.
+- [~] **Isolierte Profile pro Agent (erste Version).** Einstellung „Isolated agent profile“ (standardmäßig aus) unter Einstellungen > MCP: Agent-Tabs laufen in einer eigenen In-Memory-Sitzung (beim Schließen des Fensters gelöscht); der Agent sieht und nutzt nur eigene Tabs. Weder visuell noch mit echtem OpenCode getestet, deckt den eingebauten KI-Assistenten nicht ab. ⏳ Offen: dauerhafte Sitzung, Login im isolierten Profil. Zuvor: Eigene Sitzung und Cookies, damit der Agent nicht an private Konten kommt.
 - [ ] **Ein-Zeilen-Einrichtung für OpenCode.** Ein Befehl schreibt `opencode.json` automatisch.
 
 ## Phase 4 — Angriffsfläche verkleinern (Überentwicklung vermeiden)

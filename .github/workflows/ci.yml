@@ -53,13 +53,11 @@ jobs:
       - name: Website tests
         run: npm --prefix website test
 
-  # Windows is where the first release targets. The test suite was written on
-  # Linux, so this job reports without blocking merges until it is known to be
-  # stable; remove continue-on-error once it passes consistently.
+  # Windows is where the first release targets. It passed on the PR and on main
+  # (two runs), so it now blocks merges like the Linux job.
   test-windows:
     runs-on: windows-latest
     timeout-minutes: 40
-    continue-on-error: true
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:

@@ -260,7 +260,7 @@ export interface ElectronAPI {
     callback: (event: any, status: { running: boolean; port?: number } | boolean) => void
   ) => () => void;
   copyMcpToken: () => Promise<boolean>;
-  copyMcpConfig: () => Promise<{ ok: boolean; autoClearSec: number } | boolean>;
+  copyMcpConfig: (kind?: 'generic' | 'opencode') => Promise<{ ok: boolean; autoClearSec: number } | boolean>;
   getMcpTokenStatus: () => Promise<{ configured: boolean; prefix: string }>;
   rotateMcpToken: () => Promise<boolean>;
   getMcpSiteRules: () => Promise<Array<{ domain: string; mode: 'ask' | 'block' }>>;

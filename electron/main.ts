@@ -142,6 +142,7 @@ import {
 } from './main/adblockManager.js';
 import { BrowserMCPServer } from './mcpServer.js';
 import { registerEngineIpc } from './main/engineIpc.js';
+import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
@@ -448,6 +449,8 @@ export { updateAdblockWhitelist };
 
 // Tracks which per-tab incognito partitions have already been hardened to avoid stacking listeners.
 const hardenedIncognitoPartitions = new Set<string>();
+/** Shared in-memory partition for agent tabs (isolated agent profile); cleared when the window closes. */
+const AGENT_PARTITION = 'incognito-king-agent';
 
 // Active Chromium proxy rules applied across default and all per-tab incognito sessions
 let activeChromiumProxyRules = 'direct://';
@@ -4648,20 +4651,12 @@ ipcMain.handle('copy-mcp-token', (event) => {
   return false;
 });
 let clipboardConfigClearTimer: NodeJS.Timeout | null = null;
-ipcMain.handle('copy-mcp-config', (event) => {
+ipcMain.handle('copy-mcp-config', (event, kind?: unknown) => {
   if (!isTrustedSender(event)) return false;
   const token = mcpServer?.getToken() || '';
   const port = mcpServer ? mcpServer.getPort() : 3020;
-  const config = JSON.stringify({
-    mcpServers: {
-      "king-browser": {
-        url: `http://localhost:${port}/sse`,
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    }
-  }, null, 2);
+  const clientKind: McpClientKind = kind === 'opencode' ? 'opencode' : 'generic';
+  const config = buildMcpClientConfig(clientKind, port, token);
   clipboard.writeText(config);
   // Security: Auto-clear Bearer-bearing config from clipboard after 15s (same as copy-mcp-token)
   if (clipboardConfigClearTimer) clearTimeout(clipboardConfigClearTimer);
@@ -4741,9 +4736,10 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
       await sess.clearStorageData();
       await sess.clearCache();
     } else {
-      // Clear all active per-tab incognito partitions
-      const partitions = Array.from(hardenedIncognitoPartitions);
-      hardenedIncognitoPartitions.clear();
+      // Clear all active per-tab incognito partitions. The agent's shared
+      // partition is left alone: agent tabs may still be using it.
+      const partitions = Array.from(hardenedIncognitoPartitions).filter(name => name !== AGENT_PARTITION);
+      for (const partName of partitions) hardenedIncognitoPartitions.delete(partName);
       for (const partName of partitions) {
         try {
           const sess = session.fromPartition(partName, { cache: false });

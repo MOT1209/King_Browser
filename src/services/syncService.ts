@@ -1099,6 +1099,10 @@ export function mergeSettingsLastWriteWins(
       if (key === 'mcpServerEnabled' && val === true && localSettings[key] !== true) {
         val = false;
       }
+      // A remote device must not be able to switch the agent's isolation off.
+      if (key === 'agentIsolatedProfile' && val !== true && localSettings[key] === true) {
+        val = true;
+      }
       if ((key === 'backgroundCustomUrl' || key === 'searchEngineCustomUrl' || key === 'customApiBaseUrl') && typeof val === 'string' && val.trim() !== '') {
         if (!isSafeNavigationUrl(val)) {
           val = (defaultSettings as any)[key] ?? '';

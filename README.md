@@ -226,7 +226,9 @@ King Browser exposes its tools through a local MCP server (`127.0.0.1`, bearer-t
 
 #### OpenCode
 
-Add to `opencode.json` (project root) or your global OpenCode config. Keys (`type`, `command` as an array, `environment`, `enabled`) follow the [OpenCode MCP docs](https://opencode.ai/docs/mcp-servers/):
+**Quickest way:** start the MCP server in *Settings > MCP*, click the **OpenCode** button (it copies a ready `opencode.json` with the live port and token; the clipboard is cleared after 15 seconds), and paste it into `opencode.json` in your project or `~/.config/opencode/opencode.json`. It uses OpenCode's `remote` server type, so no path to `mcp-bridge.mjs` is needed. Not yet verified against a real OpenCode install; if it does not connect, use the manual config below.
+
+Manual alternative: add to `opencode.json` (project root) or your global OpenCode config. Keys (`type`, `command` as an array, `environment`, `enabled`) follow the [OpenCode MCP docs](https://opencode.ai/docs/mcp-servers/):
 
 ```json
 {

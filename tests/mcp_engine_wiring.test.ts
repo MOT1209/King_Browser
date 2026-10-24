@@ -21,6 +21,7 @@ async function run() {
   const forwarded: Array<{ tool: string; args: any }> = [];
   let dialogResponse = 0;
   let dialogCalls = 0;
+  let lastDialogDetail = '';
   const cancelCalls: Array<{ reason: string; toolName?: string }> = [];
   let holdRenderer = false;
   let releaseRenderer: (() => void) | null = null;
@@ -40,7 +41,7 @@ async function run() {
       app: { isPackaged: false },
       powerMonitor: { on: () => {} },
       dialog: {
-        showMessageBox: () => { dialogCalls += 1; return Promise.resolve({ response: dialogResponse }); }
+        showMessageBox: (_win: any, options: any) => { dialogCalls += 1; lastDialogDetail = String(options?.detail ?? ''); return Promise.resolve({ response: dialogResponse }); }
       }
     },
     crypto, os, fs, path,
@@ -263,6 +264,21 @@ async function run() {
     assert.equal(dialogCalls, calls3, 'normal pages do not add approvals');
     rendererPageText = null;
     console.log('[PASS] Wiring — suspicious page text warns the agent and gates the next action once');
+  }
+
+  // 6e) the approval dialog shows the page and the target element, not just the selector
+  {
+    const server = makeServer();
+    server.firstUseApproved = true;
+    server.setPolicyEnforcement(true);
+    pageContext = { url: 'https://shop.example/account?token=SECRET123', elementText: 'Delete   account\nforever' };
+    dialogResponse = 0;
+    await server.executeTool('browser_click', { selector: '#btn-3' });
+    assert.match(lastDialogDetail, /Page: https:\/\/shop\.example\/account(?!\?)/, 'the page is shown');
+    assert.ok(!lastDialogDetail.includes('SECRET123'), 'the query string (tokens) is not shown');
+    assert.match(lastDialogDetail, /Element: "Delete account forever"/, 'the element text is shown on one line');
+    pageContext = { url: 'https://example.com/', elementText: '' };
+    console.log('[PASS] Wiring — approval dialog shows page and target element text');
   }
 
   // 7) STOP NOW: queue/execution blocked until an explicit resume

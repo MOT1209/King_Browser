@@ -52,7 +52,7 @@ export interface UseBrowserAgentBridgeOptions {
   setActiveTabId: (tabId: string) => void;
   setTabs: Dispatch<SetStateAction<Tab[]>>;
   handleNavigate: (url: string, explicitTabId?: string) => void;
-  handleNewTab: (url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean }) => void;
+  handleNewTab: (url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean; agentOwned?: boolean }) => void;
   handleCloseTab: (id: string, e?: React.MouseEvent) => void;
   handleSelectTab: (id: string) => void;
 }
@@ -64,6 +64,12 @@ export interface UseBrowserAgentBridgeOptions {
  */
 /** How long the cursor is shown on its target before the action lands. */
 const AGENT_CURSOR_LEAD_MS = 350;
+
+/** Tools that do not need an agent-owned active tab while the isolated agent profile is on. */
+const AGENT_TAB_INDEPENDENT_TOOLS = new Set([
+  'king_browser_info', 'browser_wait', 'browser_new_tab', 'browser_list_tabs',
+  'browser_switch_tab', 'browser_close_tab', MCP_POLICY_CONTEXT_ACTION
+]);
 
 export function useBrowserAgentBridge({
   activeTabId,
@@ -175,7 +181,15 @@ export function useBrowserAgentBridge({
         return "Error: Invalid toolName parameter";
       }
       const safeArgs = (args && typeof args === 'object') ? args : {};
-      const { activeTabId, tabs } = browserDataRef.current;
+      const { activeTabId: currentTabId, tabs: allTabs } = browserDataRef.current;
+      // Isolated agent profile: the agent only sees and acts on the tabs it opened,
+      // so it never reaches the tabs the user is signed in to.
+      const isolated = Boolean(settingsRef.current?.agentIsolatedProfile);
+      const tabs = isolated ? allTabs.filter(t => t.isAgentOwned) : allTabs;
+      const activeTabId = isolated && !tabs.some(t => t.id === currentTabId) ? null : currentTabId;
+      if (isolated && !AGENT_TAB_INDEPENDENT_TOOLS.has(toolName) && activeTabId === null) {
+        return "Error: Isolated agent profile is on and the active tab is not one the agent opened. Use browser_new_tab to open a tab for the agent.";
+      }
       const activeWebview = guardedGuest(canExecute);
 
       // Show the human where the agent is about to act, then give them a beat to
@@ -362,7 +376,7 @@ export function useBrowserAgentBridge({
           if (!gate.ok) {
             return `Error: Navigation blocked for unsafe destination (${gate.reason}): ${newUrl}`;
           }
-          mcpHandlersRef.current.handleNewTab(newUrl, undefined, { reuseBlank: false });
+          mcpHandlersRef.current.handleNewTab(newUrl, undefined, { reuseBlank: false, agentOwned: isolated });
           return `Opened new tab: ${newUrl}`;
         }
 
