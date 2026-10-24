@@ -443,6 +443,8 @@ Project website: <https://king-browser.vercel.app> (deployed from `website/` on 
 >
 > Releases are built and published by `.github/workflows/release.yml`. Merging a change to `main` that raises `version` in `package.json` publishes `v<version>` automatically (once per version); you can also push a `v*` tag or run it manually under *Actions → Release*. Signing turns on once the certificate secrets are configured (see the header of that file). If the Releases page is empty, use Option B.
 
+**Always-fresh build:** the [nightly pre-release](https://github.com/MOT1209/King_Browser/releases/tag/nightly) is rebuilt and replaced on every push to `main`, so it is the single newest download (unsigned, for trying the latest code). It never offers itself to installed apps through auto-update; use a versioned release for everyday use.
+
 Installers are available from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
 - **macOS**: `King-Browser-arm64.dmg` (Apple Silicon) or `King-Browser-x64.dmg` (Intel)
 - **Windows**: `King-Browser-Setup-0.0.1-x64.exe` (64-bit NSIS Installer)

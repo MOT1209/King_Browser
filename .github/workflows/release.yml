@@ -1,15 +1,23 @@
 name: Release
 
-# Builds installers for macOS, Windows and Linux and publishes them as a GitHub
-# release. It starts in three ways:
-#   - automatically when a push to main changes package.json and the tag
-#     v<version> does not exist yet (bump "version" in the pull request that
-#     ships the features, and merging it publishes the release);
-#   - by pushing a tag such as v0.0.1;
-#   - manually: a manual run releases the version in package.json as tag
-#     v<version> on the chosen branch.
-# The website links to /releases/latest/download/..., which only resolves for a
-# published (non-draft) release, so the release is published directly.
+# Builds installers for macOS, Windows and Linux and publishes them as GitHub
+# releases. There are two kinds:
+#
+#   nightly  - one rolling pre-release named "nightly". Every push to main
+#              rebuilds it and REPLACES it, so there is always a single, newest
+#              download of main and no pile of releases. It is a pre-release, so
+#              the app's auto-updater and the website's /releases/latest links
+#              ignore it. Use it to try the newest code.
+#   v<version> - a normal release. It is created once per version: merging a
+#              change to main that raises "version" in package.json publishes
+#              v<version> (and only if that tag does not exist yet). A pushed
+#              v* tag or a manual run also publishes it. The website and the
+#              auto-updater use these.
+#
+# Why not overwrite one fixed version for every update: the auto-updater decides
+# by comparing version numbers, so an update with the same number is never
+# offered to installed apps; checksums and bug reports would also stop matching
+# a version. Nightly gives the "one always-fresh download" without that.
 #
 # Code signing is optional and driven by repository secrets. Without them the
 # builds are produced unsigned (macOS Gatekeeper and Windows SmartScreen warn).
@@ -21,11 +29,12 @@ on:
   push:
     tags: ['v*']
     branches: [main]
-    paths: ['package.json']
+    # Changes that cannot alter the app do not need a new build.
+    paths-ignore: ['**.md', 'docs/**', 'website/**', 'video/**', 'LICENSE', '.github/ISSUE_TEMPLATE/**']
   workflow_dispatch:
 
-# Two runs for the same ref (for example a merge and a manual start) must not
-# publish the same version twice.
+# Runs for the same ref are queued, never run side by side, so two merges cannot
+# publish over each other.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -34,12 +43,14 @@ permissions:
   contents: write
 
 jobs:
-  # A push to main only releases when its version has no tag yet. Tag pushes and
-  # manual runs always release.
+  # Decides what this run publishes. A push to main always refreshes nightly and
+  # also publishes v<version> when that tag does not exist yet. Tag pushes and
+  # manual runs publish the versioned release only.
   check:
     runs-on: ubuntu-latest
     outputs:
-      release: ${{ steps.decide.outputs.release }}
+      nightly: ${{ steps.decide.outputs.nightly }}
+      versioned: ${{ steps.decide.outputs.versioned }}
     steps:
       - uses: actions/checkout@v4
 
@@ -47,21 +58,22 @@ jobs:
         id: decide
         run: |
           if [ "$GITHUB_EVENT_NAME" != "push" ] || [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "nightly=false" >> "$GITHUB_OUTPUT"
+            echo "versioned=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "nightly=true" >> "$GITHUB_OUTPUT"
           version="$(node -p "require('./package.json').version")"
           if git ls-remote --exit-code --tags origin "refs/tags/v${version}" >/dev/null 2>&1; then
-            echo "Tag v${version} already exists; nothing to release."
-            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "Tag v${version} already exists; only nightly is refreshed."
+            echo "versioned=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Version ${version} has no tag; releasing."
-            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${version} has no tag; releasing it too."
+            echo "versioned=true" >> "$GITHUB_OUTPUT"
           fi
 
   build:
     needs: check
-    if: needs.check.outputs.release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -117,8 +129,9 @@ jobs:
 
   publish:
     needs: [check, build]
-    if: needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
 
@@ -140,7 +153,30 @@ jobs:
         working-directory: release-files
         run: sha256sum $(ls | grep -v '\.yml$') > SHA256SUMS.txt
 
-      - uses: softprops/action-gh-release@v2
+      # Replace nightly completely (assets and tag), so no stale files from an
+      # older version number remain in it.
+      - name: Remove the previous nightly
+        if: needs.check.outputs.nightly == 'true'
+        run: gh release delete nightly --cleanup-tag --yes || true
+
+      - name: Publish nightly
+        if: needs.check.outputs.nightly == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: Nightly (latest build of main)
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: 'false'
+          draft: false
+          body: |
+            Rolling build of `main` at commit ${{ github.sha }}. It is replaced on every push to `main`.
+            Unsigned. For trying the newest code; use a versioned release for everyday use.
+          files: release-files/*
+
+      - name: Publish v-release
+        if: needs.check.outputs.versioned == 'true'
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.name }}
           target_commitish: ${{ github.sha }}
