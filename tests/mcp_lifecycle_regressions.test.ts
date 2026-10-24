@@ -102,7 +102,8 @@ async function run() {
     crypto, os, fs, path,
     './main/mcpBridge.js': { requestRendererMcpAction: async () => { forwarded++; return 'ok'; }, cancelPendingMcpActions: () => {} },
     './main/executionEngine.js': executionEngineModule,
-    './main/policyEngine.js': policyEngineModule
+    './main/policyEngine.js': policyEngineModule,
+    './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }
   });
   for (const change of ['stop', 'rotateToken', 'lock'] as const) {
     const server: any = Object.assign(Object.create(serverModule.BrowserMCPServer.prototype), {

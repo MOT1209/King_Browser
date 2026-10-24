@@ -12,6 +12,7 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // and queued through these dependency-free modules instead of going straight to
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
+import { createActivityStore, type ActivityStore } from './main/activityStore.js';
 import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from './main/executionEngine.js';
 import { classifyAction, buildApprovalSummary } from './main/policyEngine.js';
 
@@ -501,6 +502,7 @@ export class BrowserMCPServer {
   // execution-engine queue when the composition root (main.ts) enables this. It
   // stays off in unit tests so only the pre-existing dispatch path runs there.
   private policyEnforced: boolean = false;
+  private activityStoreInstance: ActivityStore | null | undefined;
   private engineInstance: ExecutionEngine | null = null;
 
   constructor(private requestedPort: number = 3020) {
@@ -759,9 +761,27 @@ export class BrowserMCPServer {
     return this.engine();
   }
 
+  /** Durable audit file in userData; null when userData is unavailable (tests). */
+  private activityStore(): ActivityStore | null {
+    if (this.activityStoreInstance === undefined) {
+      try {
+        this.activityStoreInstance = createActivityStore(path.join(electronApp.getPath('userData'), 'agent-activity.jsonl'));
+      } catch {
+        this.activityStoreInstance = null;
+      }
+    }
+    return this.activityStoreInstance;
+  }
+
+  /** Actions saved by earlier runs, for the exportable activity log. */
+  public getStoredHistory(): ActionRecord[] {
+    return this.activityStore()?.readAll() ?? [];
+  }
+
   private engine(): ExecutionEngine {
     if (!this.engineInstance) {
       this.engineInstance = new ExecutionEngine({
+        persist: (record) => this.activityStore()?.append(record),
         executor: (request) => this.dispatchToRenderer(request),
         askApproval: (approval) => this.promptSensitiveApproval(approval),
         // §10/§11 STOP NOW parity: every stop path — the control panel's

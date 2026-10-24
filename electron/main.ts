@@ -2099,6 +2099,7 @@ app.whenReady().then(async () => {
       ipcMain.handle(channel, listener as (event: Electron.IpcMainInvokeEvent, ...args: any[]) => unknown);
     },
     getEngine: () => (mcpServer ? mcpServer.getExecutionEngine() : null),
+    getStoredHistory: () => (mcpServer ? mcpServer.getStoredHistory() : []),
     isTrustedSender: (event) => isTrustedSender(event as Electron.IpcMainInvokeEvent)
   });
 

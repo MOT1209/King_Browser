@@ -94,6 +94,7 @@ import './tab_download_lifecycle_regressions.test';
 import './execution_engine.test';
 import './policy_engine.test';
 import './activity_log.test';
+import './activity_store.test';
 import './agent_login.test';
 import './mcp_engine_wiring.test';
 import './mcp_single_approval_authority.test';

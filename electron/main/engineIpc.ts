@@ -10,6 +10,8 @@
 
 import type { ExecutionEngine } from './executionEngine.js';
 import { exportActivityLog } from './activityLog.js';
+import { mergeHistory } from './activityStore.js';
+import type { ActionRecord } from './executionEngine.js';
 
 export interface EngineIpcHost {
   handle: (channel: string, listener: (event: unknown, ...args: unknown[]) => unknown) => void;
@@ -20,6 +22,8 @@ export interface EngineIpcHost {
    * window must never reach them. Optional only so tests can omit it.
    */
   isTrustedSender?: (event: unknown) => boolean;
+  /** Records saved by earlier runs, so an export survives a restart. */
+  getStoredHistory?: () => ActionRecord[];
 }
 
 export const ENGINE_IPC_CHANNELS = [
@@ -85,7 +89,9 @@ export function registerEngineIpc(host: EngineIpcHost): void {
 
   host.handle('mcp-engine-export-log', (event, format) => {
     assertTrusted(event);
-    return exportActivityLog(requireEngine().getHistory(), format === 'csv' ? 'csv' : 'json');
+    const live = requireEngine().getHistory();
+    const history = host.getStoredHistory ? mergeHistory(host.getStoredHistory(), live) : live;
+    return exportActivityLog(history, format === 'csv' ? 'csv' : 'json');
   });
 
   host.handle('mcp-engine-command', (event, command, payload) => {
