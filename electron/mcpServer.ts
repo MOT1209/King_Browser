@@ -12,6 +12,7 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // and queued through these dependency-free modules instead of going straight to
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
+import { createSiteRuleStore, matchSiteRule, type SiteRule, type SiteRuleStore } from './main/siteRules.js';
 import { createActivityStore, type ActivityStore } from './main/activityStore.js';
 import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from './main/executionEngine.js';
 import { classifyAction, buildApprovalSummary } from './main/policyEngine.js';
@@ -400,6 +401,15 @@ const TOOL_ALIASES: Record<string, string> = {
 // Tools whose approval decision depends on the current page and target element.
 const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_select_option', 'browser_press_key', 'browser_login']);
 
+// Tools that read or act on the current page: per-site rules apply to them too,
+// using the live page URL when the arguments carry none.
+const SITE_RULE_TOOLS = new Set([
+  ...PAGE_CONTEXT_TOOLS,
+  'browser_read_page', 'browser_screenshot', 'browser_full_page_screenshot',
+  'browser_get_element_text', 'browser_find_element', 'browser_run_js',
+  'browser_scroll', 'browser_scroll_to_element', 'browser_hover', 'browser_focus'
+]);
+
 // Tool permission levels
 export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
 
@@ -502,6 +512,7 @@ export class BrowserMCPServer {
   // execution-engine queue when the composition root (main.ts) enables this. It
   // stays off in unit tests so only the pre-existing dispatch path runs there.
   private policyEnforced: boolean = false;
+  private siteRuleStoreInstance: SiteRuleStore | null | undefined;
   private activityStoreInstance: ActivityStore | null | undefined;
   private engineInstance: ExecutionEngine | null = null;
 
@@ -771,6 +782,25 @@ export class BrowserMCPServer {
       }
     }
     return this.activityStoreInstance;
+  }
+
+  private siteRuleStore(): SiteRuleStore | null {
+    if (this.siteRuleStoreInstance === undefined) {
+      try {
+        this.siteRuleStoreInstance = createSiteRuleStore(path.join(electronApp.getPath('userData'), 'agent-site-rules.json'));
+      } catch {
+        this.siteRuleStoreInstance = null;
+      }
+    }
+    return this.siteRuleStoreInstance;
+  }
+
+  public getSiteRules(): SiteRule[] {
+    return this.siteRuleStore()?.get() ?? [];
+  }
+
+  public setSiteRules(rules: unknown): SiteRule[] {
+    return this.siteRuleStore()?.set(rules) ?? [];
   }
 
   /** Actions saved by earlier runs, for the exportable activity log. */
@@ -1059,6 +1089,29 @@ export class BrowserMCPServer {
     if (canonicalTool === 'browser_login' && !this.policyEnforced) {
       throw new Error('browser_login requires the approval policy to be enforced.');
     }
+    // Per-site rules: "block" refuses the action, "ask" forces an approval.
+    const siteRules = this.getSiteRules();
+    let siteRuleAsk = false;
+    let siteRuleHost: string | undefined;
+    if (siteRules.length > 0) {
+      const navUrl = typeof args.url === 'string' ? args.url : undefined;
+      const scoped = Boolean(navUrl) || SITE_RULE_TOOLS.has(canonicalTool);
+      if (scoped) {
+        let hostUrl = navUrl;
+        if (!hostUrl) {
+          hostUrl = (await requestPolicyContext(this.mainWindow))?.url;
+        }
+        let host: string | undefined;
+        try { host = hostUrl ? new URL(hostUrl).hostname : undefined; } catch (_) {}
+        siteRuleHost = host;
+        const rule = matchSiteRule(siteRules, host);
+        if (rule?.mode === 'block') {
+          throw new Error(`Blocked by your site rule: the agent may not use ${rule.domain}.`);
+        }
+        // Rules exist but the page could not be read: fail closed to an approval.
+        siteRuleAsk = rule?.mode === 'ask' || (!navUrl && !host);
+      }
+    }
     if (!this.policyEnforced) {
       const result = await requestRendererMcpAction(this.mainWindow, canonicalTool, args);
       return typeof result === 'string' ? result : JSON.stringify(result);
@@ -1087,6 +1140,12 @@ export class BrowserMCPServer {
       args = { ...args, expectedOrigin };
     }
     const decision = classifyAction({ toolName: canonicalTool, args, ...pageContext });
+    if (siteRuleAsk && decision.risk === 'safe') {
+      decision.risk = 'sensitive';
+      decision.triggers = ['site_rule'];
+      decision.reasons = [...decision.reasons, 'This site has an "always ask" rule.'];
+      decision.domain = decision.domain ?? siteRuleHost;
+    }
     const approvalSummary = decision.risk === 'sensitive'
       ? buildApprovalSummary({ toolName: canonicalTool, args }, decision)
       : null;

@@ -4698,6 +4698,15 @@ ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolea
   return true;
 });
 
+ipcMain.handle('get-mcp-site-rules', (event) => {
+  if (!isTrustedSender(event)) return [];
+  return mcpServer?.getSiteRules() ?? [];
+});
+ipcMain.handle('set-mcp-site-rules', (event, rules: unknown) => {
+  if (!isTrustedSender(event)) return [];
+  return mcpServer?.setSiteRules(rules) ?? [];
+});
+
 ipcMain.handle('get-mcp-status', (event) => {
   if (!isTrustedSender(event)) return { running: false, port: 0, clients: [], clientCount: 0 };
   if (!mcpServer) return { running: false, port: 0, clients: [], clientCount: 0 };

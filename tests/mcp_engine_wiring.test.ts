@@ -30,6 +30,7 @@ async function run() {
   const contextRequests: Array<string | undefined> = [];
 
   const executionEngineModule = loadSource('electron/main/executionEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
 
   const serverModule = loadSource('electron/mcpServer.ts', { process, Buffer, setTimeout, clearTimeout }, {
@@ -67,6 +68,7 @@ async function run() {
     },
     './main/executionEngine.js': executionEngineModule,
     './main/policyEngine.js': policyEngineModule,
+    './main/siteRules.js': siteRulesModule,
     './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }
   });
 
@@ -185,6 +187,48 @@ async function run() {
     await assert.rejects(server.executeTool('browser_login', {}), /could not be inspected/, 'fails closed without page context');
     pageContext = { url: 'https://example.com/', elementText: '' };
     console.log('[PASS] Wiring — browser_login is gated, origin-pinned and fail-closed');
+  }
+
+  // 6c) per-site rules: block refuses, ask forces an approval, no rules = unchanged
+  {
+    const server = makeServer();
+    server.firstUseApproved = true; // isolate the per-site approval from the first-use dialog
+    server.setPolicyEnforcement(true);
+    const withRules = (rules: Array<{ domain: string; mode: string }>) => {
+      server.siteRuleStoreInstance = { get: () => rules, set: () => rules };
+    };
+
+    withRules([]);
+    const calls0 = dialogCalls;
+    await server.executeTool('browser_read_page', {});
+    assert.equal(dialogCalls, calls0, 'no rules: a read-only action is not prompted');
+
+    withRules([{ domain: 'example.com', mode: 'block' }]);
+    const before = forwarded.length;
+    await assert.rejects(server.executeTool('browser_read_page', {}), /Blocked by your site rule/, 'block refuses reading the current page');
+    await assert.rejects(server.executeTool('browser_open', { url: 'https://www.example.com/x' }), /Blocked by your site rule/, 'block refuses navigating to a subdomain');
+    assert.equal(forwarded.length, before, 'blocked actions never reach the renderer');
+    await server.executeTool('browser_open', { url: 'https://other.org/' });
+    assert.equal(forwarded[forwarded.length - 1].args.url, 'https://other.org/', 'other sites are unaffected');
+
+    withRules([{ domain: 'example.com', mode: 'ask' }]);
+    dialogResponse = 1;
+    const calls1 = dialogCalls;
+    const before1 = forwarded.length;
+    await assert.rejects(server.executeTool('browser_read_page', {}), /./, 'ask + reject refuses the action');
+    assert.ok(dialogCalls > calls1, 'ask rule shows the approval dialog for an otherwise safe action');
+    assert.equal(forwarded.length, before1, 'rejected action never reaches the renderer');
+    dialogResponse = 0;
+    await server.executeTool('browser_read_page', {});
+    assert.equal(forwarded[forwarded.length - 1].tool, 'browser_read_page', 'approved action runs');
+
+    withRules([{ domain: 'bank.com', mode: 'ask' }]);
+    pageContext = null;
+    dialogResponse = 1;
+    await assert.rejects(server.executeTool('browser_read_page', {}), /./, 'rules exist but the page is unreadable: fails closed to an approval');
+    pageContext = { url: 'https://example.com/', elementText: '' };
+    dialogResponse = 0;
+    console.log('[PASS] Wiring — per-site rules block, force approval and fail closed');
   }
 
   // 7) STOP NOW: queue/execution blocked until an explicit resume

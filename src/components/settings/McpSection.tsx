@@ -70,6 +70,9 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const [mcpToken, setMcpToken] = useState<string>('');
   const [mcpTokenVisible, setMcpTokenVisible] = useState(false);
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
+  const [siteRules, setSiteRules] = useState<Array<{ domain: string; mode: 'ask' | 'block' }>>([]);
+  const [ruleDomain, setRuleDomain] = useState('');
+  const [ruleMode, setRuleMode] = useState<'ask' | 'block'>('ask');
   const [mcpCopied, setMcpCopied] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
   const { setSafeTimeout } = useSafeTimeout();
@@ -90,6 +93,16 @@ export const McpSection: React.FC<McpSectionProps> = ({
     if ((window as any).electronAPI?.getMcpToolSettings) {
       setDisabledTools(await (window as any).electronAPI.getMcpToolSettings());
     }
+    if ((window as any).electronAPI?.getMcpSiteRules) {
+      setSiteRules(await (window as any).electronAPI.getMcpSiteRules());
+    }
+  }, []);
+
+  const saveSiteRules = useCallback(async (next: Array<{ domain: string; mode: 'ask' | 'block' }>) => {
+    const api = (window as any).electronAPI;
+    if (!api?.setMcpSiteRules) return;
+    // The main process validates and de-duplicates; show what it actually stored.
+    setSiteRules(await api.setMcpSiteRules(next));
   }, []);
 
   useEffect(() => {
@@ -354,6 +367,69 @@ export const McpSection: React.FC<McpSectionProps> = ({
             );
           })}
         </div>
+      </div>
+      {/* Per-site rules */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-red-500" />
+          <p className="font-semibold text-slate-800 dark:text-slate-100">Site Rules ({siteRules.length})</p>
+        </div>
+        <p className="text-xs text-slate-500">
+          <strong>Always ask</strong> requires your approval for every agent action on a site (for example your bank).
+          <strong> Block</strong> stops the agent from reading, using or opening it. Rules also apply to subdomains and can only make the agent more restricted.
+        </p>
+        <form
+          className="flex flex-wrap gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!ruleDomain.trim()) return;
+            void saveSiteRules([...siteRules, { domain: ruleDomain, mode: ruleMode }]);
+            setRuleDomain('');
+          }}
+        >
+          <input
+            value={ruleDomain}
+            onChange={(event) => setRuleDomain(event.target.value)}
+            placeholder="bank.example.com"
+            aria-label="Site domain"
+            maxLength={253}
+            className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
+          />
+          <select
+            value={ruleMode}
+            onChange={(event) => setRuleMode(event.target.value === 'block' ? 'block' : 'ask')}
+            aria-label="Rule"
+            className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
+          >
+            <option value="ask">Always ask</option>
+            <option value="block">Block</option>
+          </select>
+          <button type="submit" className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600">Add</button>
+        </form>
+        {siteRules.length === 0 ? (
+          <p className="text-xs text-slate-400">No site rules yet.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {siteRules.map(rule => (
+              <li key={rule.domain} className="flex items-center justify-between gap-2 py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                <code className="text-xs font-mono text-slate-700 dark:text-slate-200 truncate">{rule.domain}</code>
+                <span className="flex items-center gap-2 shrink-0">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${rule.mode === 'block' ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400'}`}>
+                    {rule.mode === 'block' ? 'Block' : 'Always ask'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void saveSiteRules(siteRules.filter(r => r.domain !== rule.domain))}
+                    aria-label={`Remove rule for ${rule.domain}`}
+                    className="text-xs text-slate-500 hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
