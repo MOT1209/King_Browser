@@ -40,7 +40,9 @@ export type ApprovalTrigger =
   | 'sensitive_input'
   | 'consequential_form'
   | 'arbitrary_code'
-  | 'login';
+  | 'login'
+  | 'site_rule'
+  | 'prompt_injection';
 
 export interface PolicyInput {
   toolName: string;
@@ -340,7 +342,9 @@ const TRIGGER_CONSEQUENCES: Record<ApprovalTrigger, string> = {
   sensitive_input: 'This enters sensitive information such as a password, card number, or secret.',
   consequential_form: 'This submits a form or performs an action with lasting consequences.',
   arbitrary_code: 'This executes arbitrary code inside the page with full page privileges.',
-  login: 'This signs in to the site with a saved account. The password is filled by the browser and is never shown to the agent.'
+  login: 'This signs in to the site with a saved account. The password is filled by the browser and is never shown to the agent.',
+  site_rule: 'You marked this site as "always ask", so every agent action on it needs your approval.',
+  prompt_injection: 'A page the agent read contains text that looks like instructions aimed at AI agents. Check that this action is what you asked for, not something the page told the agent to do.'
 };
 
 const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
@@ -355,7 +359,9 @@ const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
   sensitive_input: 'Enter sensitive information',
   consequential_form: 'Consequential form submission',
   arbitrary_code: 'Execute arbitrary code',
-  login: 'Sign in with a saved account'
+  login: 'Sign in with a saved account',
+  site_rule: 'Action on a site you marked "always ask"',
+  prompt_injection: 'Action after suspicious page text'
 };
 
 export function buildApprovalSummary(input: PolicyInput, decision: PolicyDecision): ApprovalSummary {

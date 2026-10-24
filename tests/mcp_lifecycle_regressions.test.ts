@@ -95,6 +95,8 @@ async function run() {
   // §11/§12 modules are real dependencies of mcpServer.ts now — load them with
   // the same sandbox so the "Unexpected dependency" guard stays honest.
   const executionEngineModule = loadSource('electron/main/executionEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
+  const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
   const serverModule = loadSource('electron/mcpServer.ts', { process, Buffer, setTimeout, clearTimeout }, {
     electron: { app: { isPackaged: false }, powerMonitor: { on: (name: string, fn: Function) => lockEvents.set(name, fn) },
@@ -102,7 +104,10 @@ async function run() {
     crypto, os, fs, path,
     './main/mcpBridge.js': { requestRendererMcpAction: async () => { forwarded++; return 'ok'; }, cancelPendingMcpActions: () => {} },
     './main/executionEngine.js': executionEngineModule,
-    './main/policyEngine.js': policyEngineModule
+    './main/policyEngine.js': policyEngineModule,
+    './main/siteRules.js': siteRulesModule,
+    './main/injectionDetector.js': injectionDetectorModule,
+    './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }
   });
   for (const change of ['stop', 'rotateToken', 'lock'] as const) {
     const server: any = Object.assign(Object.create(serverModule.BrowserMCPServer.prototype), {

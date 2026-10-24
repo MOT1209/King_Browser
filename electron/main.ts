@@ -2099,6 +2099,7 @@ app.whenReady().then(async () => {
       ipcMain.handle(channel, listener as (event: Electron.IpcMainInvokeEvent, ...args: any[]) => unknown);
     },
     getEngine: () => (mcpServer ? mcpServer.getExecutionEngine() : null),
+    getStoredHistory: () => (mcpServer ? mcpServer.getStoredHistory() : []),
     isTrustedSender: (event) => isTrustedSender(event as Electron.IpcMainInvokeEvent)
   });
 
@@ -4695,6 +4696,15 @@ ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolea
   if (!toolName || typeof toolName !== 'string') return false;
   mcpServer?.setToolEnabled(toolName, Boolean(enabled));
   return true;
+});
+
+ipcMain.handle('get-mcp-site-rules', (event) => {
+  if (!isTrustedSender(event)) return [];
+  return mcpServer?.getSiteRules() ?? [];
+});
+ipcMain.handle('set-mcp-site-rules', (event, rules: unknown) => {
+  if (!isTrustedSender(event)) return [];
+  return mcpServer?.setSiteRules(rules) ?? [];
 });
 
 ipcMain.handle('get-mcp-status', (event) => {

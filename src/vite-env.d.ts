@@ -263,6 +263,8 @@ export interface ElectronAPI {
   copyMcpConfig: () => Promise<{ ok: boolean; autoClearSec: number } | boolean>;
   getMcpTokenStatus: () => Promise<{ configured: boolean; prefix: string }>;
   rotateMcpToken: () => Promise<boolean>;
+  getMcpSiteRules: () => Promise<Array<{ domain: string; mode: 'ask' | 'block' }>>;
+  setMcpSiteRules: (rules: Array<{ domain: string; mode: 'ask' | 'block' }>) => Promise<Array<{ domain: string; mode: 'ask' | 'block' }>>;
   getMcpToolSettings: () => Promise<string[]>;
   setMcpToolEnabled: (toolName: string, enabled: boolean) => Promise<boolean>;
   // §10 execution control panel (engine bridge)

@@ -89,6 +89,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyMcpConfig: () => ipcRenderer.invoke('copy-mcp-config'),
   getMcpTokenStatus: () => ipcRenderer.invoke('get-mcp-token-status'),
   rotateMcpToken: () => ipcRenderer.invoke('rotate-mcp-token'),
+  getMcpSiteRules: () => ipcRenderer.invoke('get-mcp-site-rules'),
+  setMcpSiteRules: (rules: Array<{ domain: string; mode: 'ask' | 'block' }>) => ipcRenderer.invoke('set-mcp-site-rules', rules),
   getMcpToolSettings: () => ipcRenderer.invoke('get-mcp-tool-settings'),
   setMcpToolEnabled: (toolName: string, enabled: boolean) => ipcRenderer.invoke('set-mcp-tool-enabled', toolName, enabled),
   // MCP action bridge: the main process asks this trusted app page to execute

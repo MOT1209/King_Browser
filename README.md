@@ -436,9 +436,11 @@ Project website: <https://king-browser.vercel.app> (deployed from `website/` on 
 
 ### Option A: Download a Release
 
-> **No release has been published yet.** Until then, use Option B. Builds are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen will warn about them. Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed; signing turns on once the certificate secrets are configured (see the header of that file).
+> **Builds are not code-signed yet.** Windows SmartScreen: choose *More info* then *Run anyway*. macOS: right-click the app and choose *Open*, or run `xattr -cr "/Applications/King Browser.app"`. Automatic updates on macOS need a signed build.
+>
+> Releases are built and published by `.github/workflows/release.yml` (push a `v*` tag, or run it manually under *Actions → Release*; a manual run publishes `v<version from package.json>`). Signing turns on once the certificate secrets are configured (see the header of that file). If the Releases page is empty, use Option B.
 
-Once published, installers will be available from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
+Installers are available from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
 - **macOS**: `King-Browser-arm64.dmg` (Apple Silicon) or `King-Browser-x64.dmg` (Intel)
 - **Windows**: `King-Browser-Setup-0.0.1-x64.exe` (64-bit NSIS Installer)
 - **Linux**: `King-Browser-x86_64.AppImage` or `King-Browser-amd64.deb`
@@ -464,6 +466,7 @@ npm install
 ```bash
 npm run dev
 ```
+This builds the Electron bundles, then starts Vite (`http://localhost:5173`) and the Electron window together. On Linux as root (containers, CI) Electron refuses to start without `--no-sandbox`; run it as a normal user, or on a server use `xvfb-run`. Day-to-day, edit files under `src/` (hot reload); changes under `electron/` need a restart of `npm run dev`.
 
 #### 4. Build for production
 ```bash

@@ -12,6 +12,9 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // and queued through these dependency-free modules instead of going straight to
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
+import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
+import { createSiteRuleStore, matchSiteRule, type SiteRule, type SiteRuleStore } from './main/siteRules.js';
+import { createActivityStore, type ActivityStore } from './main/activityStore.js';
 import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from './main/executionEngine.js';
 import { classifyAction, buildApprovalSummary } from './main/policyEngine.js';
 
@@ -399,6 +402,22 @@ const TOOL_ALIASES: Record<string, string> = {
 // Tools whose approval decision depends on the current page and target element.
 const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_select_option', 'browser_press_key', 'browser_login']);
 
+// Tools whose output is page text the agent will read, and the actions that
+// need an approval after that text looked like an injection attempt.
+const INJECTION_SCAN_TOOLS = new Set(['browser_read_page', 'browser_get_element_text']);
+const INJECTION_GATED_TOOLS = new Set([
+  'browser_navigate', 'browser_new_tab', 'browser_click', 'browser_type', 'browser_select_option', 'browser_press_key'
+]);
+
+// Tools that read or act on the current page: per-site rules apply to them too,
+// using the live page URL when the arguments carry none.
+const SITE_RULE_TOOLS = new Set([
+  ...PAGE_CONTEXT_TOOLS,
+  'browser_read_page', 'browser_screenshot', 'browser_full_page_screenshot',
+  'browser_get_element_text', 'browser_find_element', 'browser_run_js',
+  'browser_scroll', 'browser_scroll_to_element', 'browser_hover', 'browser_focus'
+]);
+
 // Tool permission levels
 export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
 
@@ -501,6 +520,10 @@ export class BrowserMCPServer {
   // execution-engine queue when the composition root (main.ts) enables this. It
   // stays off in unit tests so only the pre-existing dispatch path runs there.
   private policyEnforced: boolean = false;
+  /** Set when page text the agent read looked like an injection; cleared once the user is asked. */
+  private injectionSuspect: { reasons: string[] } | null = null;
+  private siteRuleStoreInstance: SiteRuleStore | null | undefined;
+  private activityStoreInstance: ActivityStore | null | undefined;
   private engineInstance: ExecutionEngine | null = null;
 
   constructor(private requestedPort: number = 3020) {
@@ -759,9 +782,46 @@ export class BrowserMCPServer {
     return this.engine();
   }
 
+  /** Durable audit file in userData; null when userData is unavailable (tests). */
+  private activityStore(): ActivityStore | null {
+    if (this.activityStoreInstance === undefined) {
+      try {
+        this.activityStoreInstance = createActivityStore(path.join(electronApp.getPath('userData'), 'agent-activity.jsonl'));
+      } catch {
+        this.activityStoreInstance = null;
+      }
+    }
+    return this.activityStoreInstance;
+  }
+
+  private siteRuleStore(): SiteRuleStore | null {
+    if (this.siteRuleStoreInstance === undefined) {
+      try {
+        this.siteRuleStoreInstance = createSiteRuleStore(path.join(electronApp.getPath('userData'), 'agent-site-rules.json'));
+      } catch {
+        this.siteRuleStoreInstance = null;
+      }
+    }
+    return this.siteRuleStoreInstance;
+  }
+
+  public getSiteRules(): SiteRule[] {
+    return this.siteRuleStore()?.get() ?? [];
+  }
+
+  public setSiteRules(rules: unknown): SiteRule[] {
+    return this.siteRuleStore()?.set(rules) ?? [];
+  }
+
+  /** Actions saved by earlier runs, for the exportable activity log. */
+  public getStoredHistory(): ActionRecord[] {
+    return this.activityStore()?.readAll() ?? [];
+  }
+
   private engine(): ExecutionEngine {
     if (!this.engineInstance) {
       this.engineInstance = new ExecutionEngine({
+        persist: (record) => this.activityStore()?.append(record),
         executor: (request) => this.dispatchToRenderer(request),
         askApproval: (approval) => this.promptSensitiveApproval(approval),
         // §10/§11 STOP NOW parity: every stop path — the control panel's
@@ -1039,6 +1099,29 @@ export class BrowserMCPServer {
     if (canonicalTool === 'browser_login' && !this.policyEnforced) {
       throw new Error('browser_login requires the approval policy to be enforced.');
     }
+    // Per-site rules: "block" refuses the action, "ask" forces an approval.
+    const siteRules = this.getSiteRules();
+    let siteRuleAsk = false;
+    let siteRuleHost: string | undefined;
+    if (siteRules.length > 0) {
+      const navUrl = typeof args.url === 'string' ? args.url : undefined;
+      const scoped = Boolean(navUrl) || SITE_RULE_TOOLS.has(canonicalTool);
+      if (scoped) {
+        let hostUrl = navUrl;
+        if (!hostUrl) {
+          hostUrl = (await requestPolicyContext(this.mainWindow))?.url;
+        }
+        let host: string | undefined;
+        try { host = hostUrl ? new URL(hostUrl).hostname : undefined; } catch (_) {}
+        siteRuleHost = host;
+        const rule = matchSiteRule(siteRules, host);
+        if (rule?.mode === 'block') {
+          throw new Error(`Blocked by your site rule: the agent may not use ${rule.domain}.`);
+        }
+        // Rules exist but the page could not be read: fail closed to an approval.
+        siteRuleAsk = rule?.mode === 'ask' || (!navUrl && !host);
+      }
+    }
     if (!this.policyEnforced) {
       const result = await requestRendererMcpAction(this.mainWindow, canonicalTool, args);
       return typeof result === 'string' ? result : JSON.stringify(result);
@@ -1067,6 +1150,23 @@ export class BrowserMCPServer {
       args = { ...args, expectedOrigin };
     }
     const decision = classifyAction({ toolName: canonicalTool, args, ...pageContext });
+    if (siteRuleAsk && decision.risk === 'safe') {
+      decision.risk = 'sensitive';
+      decision.triggers = ['site_rule'];
+      decision.reasons = [...decision.reasons, 'This site has an "always ask" rule.'];
+      decision.domain = decision.domain ?? siteRuleHost;
+    }
+    if (this.injectionSuspect && INJECTION_GATED_TOOLS.has(canonicalTool)) {
+      if (decision.risk === 'safe') {
+        decision.risk = 'sensitive';
+        decision.triggers = ['prompt_injection'];
+      } else if (!decision.triggers.includes('prompt_injection')) {
+        decision.triggers = [...decision.triggers, 'prompt_injection'];
+      }
+      decision.reasons = [...decision.reasons, `A page read earlier looked like it was written to instruct AI agents (${this.injectionSuspect.reasons.join('; ')}).`];
+      // The user is asked now, so the warning has done its job.
+      this.injectionSuspect = null;
+    }
     const approvalSummary = decision.risk === 'sensitive'
       ? buildApprovalSummary({ toolName: canonicalTool, args }, decision)
       : null;
@@ -1087,7 +1187,15 @@ export class BrowserMCPServer {
       throw new Error(record.error ? `${record.error} (${record.status})` : `Action ${record.status}.`);
     }
     const dispatched = (actionRequest as ActionRequest & { __mcpResult?: unknown }).__mcpResult;
-    return typeof dispatched === 'string' ? dispatched : JSON.stringify(dispatched ?? '');
+    const output = typeof dispatched === 'string' ? dispatched : JSON.stringify(dispatched ?? '');
+    if (INJECTION_SCAN_TOOLS.has(canonicalTool)) {
+      const reasons = detectPromptInjection(output);
+      if (reasons.length > 0) {
+        this.injectionSuspect = { reasons };
+        return injectionWarning(reasons) + output;
+      }
+    }
+    return output;
   }
 
   private setupRoutes(app: Express) {
