@@ -12,6 +12,8 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // and queued through these dependency-free modules instead of going straight to
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
+import { resolveElementRef } from './main/elementRefs.js';
+import { createApprovalModeStore, strictModeRequiresApproval, type ApprovalMode, type ApprovalModeStore } from './main/approvalMode.js';
 import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
 import { createSiteRuleStore, matchSiteRule, type SiteRule, type SiteRuleStore } from './main/siteRules.js';
 import { createActivityStore, type ActivityStore } from './main/activityStore.js';
@@ -63,19 +65,24 @@ const TOOLS: McpTool[] = [
     inputSchema: { type: 'object', properties: {} }
   },
   {
+    name: 'browser_snapshot',
+    description: 'Lists the interactive elements of the active page (links, buttons, fields) with a ref such as e12, a role and a name. Use the ref with browser_click, browser_type and the other element tools instead of guessing CSS selectors. Refs are valid until the next snapshot or navigation; take a new snapshot after the page changes.',
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
     name: 'browser_screenshot',
     description: 'Takes a screenshot of the current active page and returns it as a base64-encoded data URL (image/png).',
     inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'browser_click',
-    description: 'Clicks an element on the active page using a CSS selector.',
+    description: 'Clicks an element on the active page. Prefer "ref" from browser_snapshot; a CSS selector also works.',
     inputSchema: {
       type: 'object',
       properties: {
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
         selector: { type: 'string', description: 'CSS selector of the element to click (e.g., #submit-btn, .nav-link, a[href*="github"])' }
-      },
-      required: ['selector']
+      }
     }
   },
   {
@@ -84,11 +91,12 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the input element' },
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the input element (alternative to ref)' },
         text: { type: 'string', description: 'Text to type into the element' },
         pressEnter: { type: 'boolean', description: 'Whether to press Enter after typing (default: false)' }
       },
-      required: ['selector', 'text']
+      required: ['text']
     }
   },
 
@@ -167,9 +175,9 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the element to hover over' }
-      },
-      required: ['selector']
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element to hover over (alternative to ref)' }
+      }
     }
   },
   {
@@ -178,9 +186,9 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the element to focus' }
-      },
-      required: ['selector']
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element to focus (alternative to ref)' }
+      }
     }
   },
   {
@@ -189,10 +197,11 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the <select> element' },
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the <select> element (alternative to ref)' },
         value: { type: 'string', description: 'The value attribute of the option to select' }
       },
-      required: ['selector', 'value']
+      required: ['value']
     }
   },
   {
@@ -234,9 +243,9 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the element' }
-      },
-      required: ['selector']
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element (alternative to ref)' }
+      }
     }
   },
   {
@@ -245,9 +254,9 @@ const TOOLS: McpTool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector of the element to scroll to' }
-      },
-      required: ['selector']
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element to scroll to (alternative to ref)' }
+      }
     }
   },
   {
@@ -404,7 +413,7 @@ const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_se
 
 // Tools whose output is page text the agent will read, and the actions that
 // need an approval after that text looked like an injection attempt.
-const INJECTION_SCAN_TOOLS = new Set(['browser_read_page', 'browser_get_element_text']);
+const INJECTION_SCAN_TOOLS = new Set(['browser_read_page', 'browser_snapshot', 'browser_get_element_text']);
 const INJECTION_GATED_TOOLS = new Set([
   'browser_navigate', 'browser_new_tab', 'browser_click', 'browser_type', 'browser_select_option', 'browser_press_key'
 ]);
@@ -413,7 +422,7 @@ const INJECTION_GATED_TOOLS = new Set([
 // using the live page URL when the arguments carry none.
 const SITE_RULE_TOOLS = new Set([
   ...PAGE_CONTEXT_TOOLS,
-  'browser_read_page', 'browser_screenshot', 'browser_full_page_screenshot',
+  'browser_read_page', 'browser_snapshot', 'browser_screenshot', 'browser_full_page_screenshot',
   'browser_get_element_text', 'browser_find_element', 'browser_run_js',
   'browser_scroll', 'browser_scroll_to_element', 'browser_hover', 'browser_focus'
 ]);
@@ -434,6 +443,7 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_scroll_to_element: 'safe',
   // Sensitive read-only & inspection tools — medium (disabled by default, requires approval)
   browser_read_page: 'medium',
+  browser_snapshot: 'medium',
   browser_screenshot: 'medium',
   browser_full_page_screenshot: 'medium',
   browser_get_element_text: 'medium',
@@ -522,6 +532,7 @@ export class BrowserMCPServer {
   private policyEnforced: boolean = false;
   /** Set when page text the agent read looked like an injection; cleared once the user is asked. */
   private injectionSuspect: { reasons: string[] } | null = null;
+  private approvalModeStoreInstance: ApprovalModeStore | null | undefined;
   private siteRuleStoreInstance: SiteRuleStore | null | undefined;
   private activityStoreInstance: ActivityStore | null | undefined;
   private engineInstance: ExecutionEngine | null = null;
@@ -805,6 +816,25 @@ export class BrowserMCPServer {
     return this.siteRuleStoreInstance;
   }
 
+  private approvalModeStore(): ApprovalModeStore | null {
+    if (this.approvalModeStoreInstance === undefined) {
+      try {
+        this.approvalModeStoreInstance = createApprovalModeStore(path.join(electronApp.getPath('userData'), 'agent-approval-mode.json'));
+      } catch {
+        this.approvalModeStoreInstance = null;
+      }
+    }
+    return this.approvalModeStoreInstance;
+  }
+
+  public getApprovalMode(): ApprovalMode {
+    return this.approvalModeStore()?.get() ?? 'balanced';
+  }
+
+  public setApprovalMode(mode: unknown): ApprovalMode {
+    return this.approvalModeStore()?.set(mode) ?? 'balanced';
+  }
+
   public getSiteRules(): SiteRule[] {
     return this.siteRuleStore()?.get() ?? [];
   }
@@ -1032,6 +1062,10 @@ export class BrowserMCPServer {
       );
     }
 
+    // An element ref from browser_snapshot becomes the equivalent selector here,
+    // before classification, so every later check sees a plain selector.
+    args = resolveElementRef(canonicalTool, args);
+
     // Special: king_browser_info
     if (toolName === 'king_browser_info') {
       return 'You are connected to King Browser. Use the browser_* tools to navigate and interact with web pages according to user instructions and safety approvals.';
@@ -1154,6 +1188,12 @@ export class BrowserMCPServer {
       decision.risk = 'sensitive';
       decision.triggers = ['site_rule'];
       decision.reasons = [...decision.reasons, 'This site has an "always ask" rule.'];
+      decision.domain = decision.domain ?? siteRuleHost;
+    }
+    if (decision.risk === 'safe' && strictModeRequiresApproval(this.getApprovalMode(), canonicalTool)) {
+      decision.risk = 'sensitive';
+      decision.triggers = ['strict_mode'];
+      decision.reasons = [...decision.reasons, 'Strict approval mode is on.'];
       decision.domain = decision.domain ?? siteRuleHost;
     }
     if (this.injectionSuspect && INJECTION_GATED_TOOLS.has(canonicalTool)) {

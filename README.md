@@ -167,16 +167,17 @@ Current English interface in Clean Minimalist mode with the light theme.
 
 King Browser natively exposes an MCP endpoint on port `3020`, enabling external AI assistants and coding agents to interact with web pages autonomously.
 
-### Built-in MCP Tools (26 Tools)
+### Built-in MCP Tools (27 Tools)
 
 | Tool Name | Parameters | Description |
 | :--- | :--- | :--- |
 | `king_browser_info` | - | Returns King Browser version, platform, active tabs count, and status |
 | `browser_navigate` | `url`, `tabId?` | Navigates the target tab to a specified URL |
+| `browser_snapshot` | none | Lists interactive elements as `e12 button "Save"`. Pass the ref to `browser_click`, `browser_type`, `browser_select_option`, `browser_hover`, `browser_focus`, `browser_get_element_text` or `browser_scroll_to_element` as `ref` instead of guessing a CSS selector. Refs last until the next snapshot or navigation. |
 | `browser_read_page` | `tabId?`, `selector?` | Extracts clean text and DOM tree content from the active page |
 | `browser_screenshot` | `tabId?`, `fullPage?` | Captures a PNG screenshot of the current viewport or full page |
-| `browser_click` | `selector`, `tabId?` | Simulates a native click event on an element matching the selector |
-| `browser_type` | `selector`, `text`, `tabId?` | Types text into an input field or contenteditable element |
+| `browser_click` | `ref` or `selector`, `tabId?` | Simulates a native click event on an element matching the selector |
+| `browser_type` | `ref` or `selector`, `text`, `tabId?` | Types text into an input field or contenteditable element |
 | `browser_press_key` | `key`, `tabId?` | Dispatches keyboard key events (e.g., `Enter`, `Escape`, `Tab`) |
 | `browser_scroll` | `direction`, `amount`, `tabId?` | Scrolls the page `up`, `down`, `top`, or `bottom` |
 | `browser_scroll_to_element` | `selector`, `tabId?` | Smoothly scrolls the element matching the selector into view |

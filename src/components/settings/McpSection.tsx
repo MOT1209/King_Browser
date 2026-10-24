@@ -16,6 +16,7 @@ export interface McpSectionProps {
 const MCP_TOOLS = [
   { name: 'browser_navigate', desc: 'Navigate to a URL', level: 'safe' },
   { name: 'browser_read_page', desc: 'Extract full page text + links', level: 'safe' },
+  { name: 'browser_snapshot', desc: 'List interactive elements with refs (e12) for click/type', level: 'safe' },
   { name: 'browser_screenshot', desc: 'Take a screenshot', level: 'safe' },
   { name: 'browser_list_tabs', desc: 'List all open tabs', level: 'safe' },
   { name: 'browser_get_url', desc: 'Get the current tab URL', level: 'safe' },
@@ -71,6 +72,10 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const [mcpToken, setMcpToken] = useState<string>('');
   const [mcpTokenVisible, setMcpTokenVisible] = useState(false);
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
+  const [approvalMode, setApprovalMode] = useState<'balanced' | 'strict'>('balanced');
+  type ActivityEntry = { id: string; tool: string; domain: string; status: string; reason: string; requestedAt: string; risk: string };
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [activityFilter, setActivityFilter] = useState<'all' | 'completed' | 'rejected' | 'failed' | 'cancelled'>('all');
   const [siteRules, setSiteRules] = useState<Array<{ domain: string; mode: 'ask' | 'block' }>>([]);
   const [ruleDomain, setRuleDomain] = useState('');
   const [ruleMode, setRuleMode] = useState<'ask' | 'block'>('ask');
@@ -97,6 +102,27 @@ export const McpSection: React.FC<McpSectionProps> = ({
     if ((window as any).electronAPI?.getMcpSiteRules) {
       setSiteRules(await (window as any).electronAPI.getMcpSiteRules());
     }
+    if ((window as any).electronAPI?.getMcpApprovalMode) {
+      setApprovalMode(await (window as any).electronAPI.getMcpApprovalMode());
+    }
+  }, []);
+
+  const loadActivity = useCallback(async () => {
+    try {
+      const raw = await (window as any).electronAPI?.exportEngineLog?.('json');
+      const parsed = raw ? JSON.parse(raw) : null;
+      setActivity(Array.isArray(parsed?.entries) ? parsed.entries.slice().reverse().slice(0, 100) : []);
+    } catch (_) {
+      setActivity([]);
+    }
+  }, []);
+
+  useEffect(() => { void loadActivity(); }, [loadActivity]);
+
+  const changeApprovalMode = useCallback(async (mode: 'balanced' | 'strict') => {
+    const api = (window as any).electronAPI;
+    if (!api?.setMcpApprovalMode) return;
+    setApprovalMode(await api.setMcpApprovalMode(mode));
   }, []);
 
   const saveSiteRules = useCallback(async (next: Array<{ domain: string; mode: 'ask' | 'block' }>) => {
@@ -387,6 +413,74 @@ export const McpSection: React.FC<McpSectionProps> = ({
           })}
         </div>
       </div>
+      {/* Approval mode */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-800 dark:text-slate-100">Approval mode</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              <strong>Balanced</strong> asks for sensitive actions only (purchases, sending, deleting, sign-in and similar).
+              <strong> Strict</strong> asks for every agent action, including reading a page. Sensitive actions always ask in both modes.
+            </p>
+          </div>
+          <select
+            value={approvalMode}
+            onChange={(event) => void changeApprovalMode(event.target.value === 'strict' ? 'strict' : 'balanced')}
+            aria-label="Approval mode"
+            className="shrink-0 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
+          >
+            <option value="balanced">Balanced</option>
+            <option value="strict">Strict</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Activity log */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="font-semibold text-slate-800 dark:text-slate-100">Agent activity ({activity.length})</p>
+          <div className="flex items-center gap-2">
+            <select
+              value={activityFilter}
+              onChange={(event) => setActivityFilter(event.target.value as typeof activityFilter)}
+              aria-label="Filter activity"
+              className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100"
+            >
+              <option value="all">All</option>
+              <option value="completed">Completed</option>
+              <option value="rejected">Rejected</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button onClick={() => void loadActivity()} className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs hover:bg-slate-200 dark:hover:bg-slate-600">Refresh</button>
+          </div>
+        </div>
+        {(() => {
+          const rows = activity.filter(entry => activityFilter === 'all' || entry.status === activityFilter);
+          if (rows.length === 0) return <p className="text-xs text-slate-400">No activity to show.</p>;
+          return (
+            <div className="max-h-[300px] overflow-y-auto pr-1">
+              <table className="w-full text-xs text-left">
+                <thead className="text-slate-500">
+                  <tr><th className="py-1 pr-2 font-medium">Time</th><th className="py-1 pr-2 font-medium">Tool</th><th className="py-1 pr-2 font-medium">Site</th><th className="py-1 pr-2 font-medium">Result</th></tr>
+                </thead>
+                <tbody>
+                  {rows.map(entry => (
+                    <tr key={entry.id} className="border-t border-slate-100 dark:border-slate-700/50 align-top" title={entry.reason || undefined}>
+                      <td className="py-1 pr-2 whitespace-nowrap text-slate-500">{entry.requestedAt ? new Date(entry.requestedAt).toLocaleString() : ''}</td>
+                      <td className="py-1 pr-2"><code className="text-blue-600 dark:text-blue-400">{entry.tool}</code></td>
+                      <td className="py-1 pr-2 text-slate-600 dark:text-slate-300 break-all">{entry.domain}</td>
+                      <td className={`py-1 pr-2 font-medium ${entry.status === 'completed' ? 'text-green-600' : entry.status === 'rejected' ? 'text-amber-600' : 'text-red-600'}`}>{entry.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+        <p className="text-[11px] text-slate-400">Showing the latest 100 saved actions. Hover a row for the reason. Export the full log from the Agent Control panel.</p>
+      </div>
+
       {/* Isolated agent profile */}
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
         <div className="flex items-center justify-between gap-4">

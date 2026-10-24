@@ -89,6 +89,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyMcpConfig: (kind?: 'generic' | 'opencode') => ipcRenderer.invoke('copy-mcp-config', kind),
   getMcpTokenStatus: () => ipcRenderer.invoke('get-mcp-token-status'),
   rotateMcpToken: () => ipcRenderer.invoke('rotate-mcp-token'),
+  getMcpApprovalMode: () => ipcRenderer.invoke('get-mcp-approval-mode'),
+  setMcpApprovalMode: (mode: 'balanced' | 'strict') => ipcRenderer.invoke('set-mcp-approval-mode', mode),
   getMcpSiteRules: () => ipcRenderer.invoke('get-mcp-site-rules'),
   setMcpSiteRules: (rules: Array<{ domain: string; mode: 'ask' | 'block' }>) => ipcRenderer.invoke('set-mcp-site-rules', rules),
   getMcpToolSettings: () => ipcRenderer.invoke('get-mcp-tool-settings'),
