@@ -2172,6 +2172,22 @@ export class KingSyncService {
         // restored by supabase-js from its storage adapter re-hydrate this
         // service after a restart.
         if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+          // A restored JWT arrives stale: INITIAL_SESSION replays whatever the
+          // storage adapter last persisted, and a second account can sign in on
+          // this process without an intervening logout. Adopting a session for
+          // a different user than the active one would clobber in-memory
+          // identity mid-login (the key re-derivation yield lets the event slip
+          // in) and — through fire-and-forget key persistence — write this
+          // identity's sync key into the other account's slot. Cross-account
+          // events are ignored; a deliberate account switch always goes
+          // through login()/register().
+          if (this.currentUser && this.currentUser.id !== session.user.id) {
+            logger.warn(
+              'SyncService:initSupabaseListener',
+              `Ignoring ${event} for user ${session.user.id}; ${this.currentUser.id} is the active account.`
+            );
+            return;
+          }
           const userMeta = session.user.user_metadata || {};
           this.currentUser = {
             id: session.user.id,
