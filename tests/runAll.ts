@@ -104,6 +104,7 @@ import './injection_corpus.test';
 import './agent_profile_settings.test';
 import './recordings.test';
 import './translation_text.test';
+import './adblock_whitelist.test';
 import './agent_login.test';
 import './mcp_engine_wiring.test';
 import './mcp_single_approval_authority.test';
