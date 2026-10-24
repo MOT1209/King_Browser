@@ -47,6 +47,25 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.3',
+    date: 'October 2026',
+    title: 'Element refs, strict approval mode and an honest injection check',
+    badge: 'Pre-release',
+    lede: 'The agent can now name page elements by short refs instead of guessing CSS selectors, you can make it ask before every action, and the activity log is visible in settings.',
+    highlights: [
+      'browser_snapshot lists the page\'s interactive elements with refs such as e12; click, type and the other element tools accept a ref.',
+      'Strict approval mode asks before every agent action (sensitive actions always ask, in both modes).',
+      'Settings > MCP shows the latest saved agent actions with a status filter.',
+      'The prompt-injection check is a tripwire that catches about two thirds of our own test attacks; the approval gate is the real protection.',
+    ],
+    changes: [
+      { category: 'feature', text: 'browser_snapshot tool and element refs for the element tools.' },
+      { category: 'security', text: 'Strict approval mode (no looser mode exists).' },
+      { category: 'improvement', text: 'Agent activity table with a status filter in Settings > MCP.' },
+      { category: 'security', text: 'Prompt-injection corpus test (13 of 20 attack texts caught); limits documented in SECURITY.md.' },
+    ],
+  },
+  {
     version: '0.0.2',
     date: 'October 2026',
     title: 'Agent control: site rules, activity log and isolated profile',
