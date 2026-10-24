@@ -104,6 +104,22 @@ let currentConfigKey = '';
 // a single dynamic import + createClient call; reset when config changes.
 let clientPromise: Promise<SupabaseClient> | null = null;
 
+// Test-only client factory override. The auth behavior suite substitutes the
+// real supabase-js client so register/login/logout/vault round-trips run
+// through the unperturbed service code without touching a live project.
+// Always null outside tests; setting it also drops any cached client so a
+// following getSupabaseClient() call picks the override up immediately.
+let clientFactoryForTests: (() => Promise<SupabaseClient>) | null = null;
+
+export const setSupabaseClientFactoryForTests = (
+  factory: (() => Promise<SupabaseClient>) | null
+): void => {
+  clientFactoryForTests = factory;
+  cachedClient = null;
+  currentConfigKey = '';
+  clientPromise = null;
+};
+
 export const getSupabaseConfig = (): SupabaseConfig => {
   try {
     // Renderer-only storage. Server-side renders and the Node test harness have
@@ -178,6 +194,7 @@ const electronSecureStorage = {
  * share one in-flight construction; a config change invalidates the cache.
  */
 export const getSupabaseClient = (): Promise<SupabaseClient> => {
+  if (clientFactoryForTests) return clientFactoryForTests();
   const config = getSupabaseConfig();
   const configKey = `${config.url}_${config.anonKey}`;
 

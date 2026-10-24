@@ -110,3 +110,12 @@ import './runtime_error_fixes.test';
 import './website_login_fixes.test';
 // Renders the §10 control panel in jsdom with its own window/document globals.
 import './agent_control_panel.test';
+
+// Very last on purpose. This behaviour-level auth suite (register, login,
+// logout, restore and cross-account isolation driven through the real service
+// paths) is the longest PBKDF2-heavy suite in the tree and installs its own
+// window/localStorage globals. Placed after every other module body, this
+// import gets the final say on the shared globals, and the suite's own
+// reassertGlobals() calls defend each of its phases against suites that still
+// swap globals from running async mains.
+import './king_cloud_auth_behaviour.test';
