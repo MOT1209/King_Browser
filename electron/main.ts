@@ -142,6 +142,7 @@ import {
 } from './main/adblockManager.js';
 import { BrowserMCPServer } from './mcpServer.js';
 import { registerEngineIpc } from './main/engineIpc.js';
+import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
@@ -4648,20 +4649,12 @@ ipcMain.handle('copy-mcp-token', (event) => {
   return false;
 });
 let clipboardConfigClearTimer: NodeJS.Timeout | null = null;
-ipcMain.handle('copy-mcp-config', (event) => {
+ipcMain.handle('copy-mcp-config', (event, kind?: unknown) => {
   if (!isTrustedSender(event)) return false;
   const token = mcpServer?.getToken() || '';
   const port = mcpServer ? mcpServer.getPort() : 3020;
-  const config = JSON.stringify({
-    mcpServers: {
-      "king-browser": {
-        url: `http://localhost:${port}/sse`,
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    }
-  }, null, 2);
+  const clientKind: McpClientKind = kind === 'opencode' ? 'opencode' : 'generic';
+  const config = buildMcpClientConfig(clientKind, port, token);
   clipboard.writeText(config);
   // Security: Auto-clear Bearer-bearing config from clipboard after 15s (same as copy-mcp-token)
   if (clipboardConfigClearTimer) clearTimeout(clipboardConfigClearTimer);

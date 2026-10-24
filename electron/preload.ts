@@ -86,7 +86,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('mcp-status-changed', handler);
   },
   copyMcpToken: () => ipcRenderer.invoke('copy-mcp-token'),
-  copyMcpConfig: () => ipcRenderer.invoke('copy-mcp-config'),
+  copyMcpConfig: (kind?: 'generic' | 'opencode') => ipcRenderer.invoke('copy-mcp-config', kind),
   getMcpTokenStatus: () => ipcRenderer.invoke('get-mcp-token-status'),
   rotateMcpToken: () => ipcRenderer.invoke('rotate-mcp-token'),
   getMcpSiteRules: () => ipcRenderer.invoke('get-mcp-site-rules'),
