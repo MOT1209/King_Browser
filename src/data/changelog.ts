@@ -47,6 +47,21 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.5',
+    date: 'October 2026',
+    title: 'Google sign-in compatibility',
+    badge: 'Pre-release',
+    lede: 'An opt-in setting lets you sign in to Google, YouTube and Gmail, and use "Sign in with Google", inside King Browser.',
+    highlights: [
+      'Google sign-in compatibility (Settings > Privacy): presents a Firefox user agent on accounts.google.com only. Off by default; Google can stop accepting it at any time.',
+      'The "Google blocked sign-in" dialog also appears in sign-in popup windows and points to the new setting.',
+    ],
+    changes: [
+      { category: 'feature', text: 'Opt-in Google sign-in compatibility mode, limited to accounts.google.com.' },
+      { category: 'fix', text: 'Google sign-in rejection is handled in popup windows as well as tabs.' },
+    ],
+  },
+  {
     version: '0.0.4',
     date: 'October 2026',
     title: 'Record and replay, a persistent agent profile and automatic releases',
