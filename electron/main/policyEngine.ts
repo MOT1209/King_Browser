@@ -42,7 +42,8 @@ export type ApprovalTrigger =
   | 'arbitrary_code'
   | 'login'
   | 'site_rule'
-  | 'prompt_injection';
+  | 'prompt_injection'
+  | 'strict_mode';
 
 export interface PolicyInput {
   toolName: string;
@@ -349,6 +350,7 @@ const TRIGGER_CONSEQUENCES: Record<ApprovalTrigger, string> = {
   arbitrary_code: 'This executes arbitrary code inside the page with full page privileges.',
   login: 'This signs in to the site with a saved account. The password is filled by the browser and is never shown to the agent.',
   site_rule: 'You marked this site as "always ask", so every agent action on it needs your approval.',
+  strict_mode: 'Strict approval mode is on: every agent action needs your approval.',
   prompt_injection: 'A page the agent read contains text that looks like instructions aimed at AI agents. Check that this action is what you asked for, not something the page told the agent to do.'
 };
 
@@ -366,7 +368,8 @@ const TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
   arbitrary_code: 'Execute arbitrary code',
   login: 'Sign in with a saved account',
   site_rule: 'Action on a site you marked "always ask"',
-  prompt_injection: 'Action after suspicious page text'
+  prompt_injection: 'Action after suspicious page text',
+  strict_mode: 'Action in strict approval mode'
 };
 
 function describePageUrl(url: string | undefined): string | undefined {

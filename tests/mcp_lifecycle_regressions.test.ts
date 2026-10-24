@@ -97,6 +97,7 @@ async function run() {
   // §11/§12 modules are real dependencies of mcpServer.ts now — load them with
   // the same sandbox so the "Unexpected dependency" guard stays honest.
   const executionEngineModule = loadSource('electron/main/executionEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const approvalModeModule = loadSource('electron/main/approvalMode.ts', {}, { 'node:fs': fs });
   const elementRefsModule = loadSource('electron/main/elementRefs.ts', {}, {});
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
@@ -111,6 +112,7 @@ async function run() {
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
     './main/elementRefs.js': elementRefsModule,
+    './main/approvalMode.js': approvalModeModule,
     './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }
   });
   for (const change of ['stop', 'rotateToken', 'lock'] as const) {

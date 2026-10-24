@@ -32,6 +32,7 @@ async function run() {
   const contextRequests: Array<string | undefined> = [];
 
   const executionEngineModule = loadSource('electron/main/executionEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const approvalModeModule = loadSource('electron/main/approvalMode.ts', {}, { 'node:fs': fs });
   const elementRefsModule = loadSource('electron/main/elementRefs.ts', {}, {});
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
@@ -76,6 +77,7 @@ async function run() {
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
     './main/elementRefs.js': elementRefsModule,
+    './main/approvalMode.js': approvalModeModule,
     './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }
   });
 
@@ -313,6 +315,38 @@ async function run() {
     const snap = await server.executeTool('browser_snapshot', {});
     assert.equal(snap, 'ok:browser_snapshot');
     console.log('[PASS] Wiring — element refs resolve before policy, stay gated, and reject malformed input');
+  }
+
+  // 6g) strict approval mode asks for every action except metadata-only tools
+  {
+    const server = makeServer();
+    server.firstUseApproved = true;
+    server.setPolicyEnforcement(true);
+    pageContext = { url: 'https://example.com/', elementText: '' };
+    dialogResponse = 0;
+    let mode = 'strict';
+    server.approvalModeStoreInstance = { get: () => mode, set: (m: string) => (mode = m) };
+
+    const calls = dialogCalls;
+    await server.executeTool('browser_read_page', {});
+    assert.ok(dialogCalls > calls, 'strict mode asks even for reading a page');
+    assert.match(lastDialogDetail, /strict approval mode/i, 'the reason is shown');
+
+    const calls2 = dialogCalls;
+    await server.executeTool('browser_list_tabs', {});
+    assert.equal(dialogCalls, calls2, 'metadata-only tools stay unprompted');
+
+    dialogResponse = 1;
+    const before = forwarded.length;
+    await assert.rejects(server.executeTool('browser_read_page', {}), /./, 'a rejected action in strict mode fails');
+    assert.equal(forwarded.length, before, 'and never reaches the renderer');
+
+    mode = 'balanced';
+    dialogResponse = 0;
+    const calls3 = dialogCalls;
+    await server.executeTool('browser_read_page', {});
+    assert.equal(dialogCalls, calls3, 'balanced mode is unchanged');
+    console.log('[PASS] Wiring — strict approval mode gates every page action, balanced is unchanged');
   }
 
   // 7) STOP NOW: queue/execution blocked until an explicit resume

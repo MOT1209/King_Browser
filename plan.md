@@ -37,8 +37,8 @@
 - **القبول:** اختبارات: صيغة المرجع، التحويل، رفض المراجع المشوهة، المسح الضوئي للحقن؛ التوثيق في README.
 - الصعوبة: متوسطة. الوقت: 1-2 أسبوع. **الحد:** لا أستطيع قياس تحسن النجاح على مواقع حقيقية (لا إنترنت هنا).
 
-### WP3 — إعدادات أمان جاهزة وواجهة سجل النشاط (أنا)
-- ثلاثة مستويات: **صارم** (كل إجراء يحتاج موافقة)، **متوازن** (الحالي)، **مرن** (لا موافقة إلا للحساس الصريح)، مع بقاء الحساس يسأل دائماً في كل المستويات (لا مستوى يعطّل بوابة الموافقة).
+### WP3 — إعدادات أمان جاهزة وواجهة سجل النشاط (أنا) — **منفَّذ بنمطين فقط**
+- **تعديل عن الاقتراح:** نمطان فقط، **متوازن** (الحالي) و**صارم** (كل إجراء يحتاج موافقة عدا أدوات البيانات الوصفية). حذفتُ نمط "مرن" عمداً: لا نمط يخفف بوابة الموافقة. النمط يُحفظ في العملية الرئيسية ولا يُزامَن بين الأجهزة. السجل يظهر في الإعدادات > MCP مع تصفية.
 - عرض السجل في الواجهة (جدول: الوقت، الأداة، الموقع، القرار، السبب) مع تصفية.
 - الصعوبة: منخفضة-متوسطة. الوقت: أسبوع.
 
@@ -117,8 +117,8 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - **Abnahme:** Tests zu Referenzformat, Umwandlung, Ablehnung fehlerhafter Referenzen, Injection-Scan; Doku im README.
 - Schwierigkeit: mittel. Zeit: 1–2 Wochen. **Grenze:** Ich kann die Erfolgsverbesserung an echten Seiten nicht messen (hier kein Internet).
 
-### WP3 — Sicherheitsprofile und Oberfläche für das Protokoll (ich)
-- Drei Stufen: **Streng** (jede Aktion braucht Freigabe), **Ausgewogen** (heute), **Locker** (nur ausdrücklich Sensibles); sensible Aktionen fragen in jeder Stufe immer (keine Stufe schaltet das Freigabe-Tor ab).
+### WP3 — Sicherheitsprofile und Oberfläche für das Protokoll (ich) — **mit nur zwei Modi umgesetzt**
+- **Abweichung vom Vorschlag:** Nur zwei Modi, **Ausgewogen** (heute) und **Streng** (jede Aktion braucht Freigabe, außer reinen Metadaten-Werkzeugen). Den Modus „Locker“ habe ich bewusst weggelassen: kein Modus darf das Freigabe-Tor lockern. Der Modus liegt im Hauptprozess und wird nicht zwischen Geräten synchronisiert. Das Protokoll steht unter Einstellungen > MCP mit Filter.
 - Protokollansicht in der Oberfläche (Zeit, Werkzeug, Seite, Entscheidung, Grund) mit Filter.
 - Schwierigkeit: niedrig–mittel. Zeit: eine Woche.
 

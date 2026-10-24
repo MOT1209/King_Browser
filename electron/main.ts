@@ -4693,6 +4693,14 @@ ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolea
   return true;
 });
 
+ipcMain.handle('get-mcp-approval-mode', (event) => {
+  if (!isTrustedSender(event)) return 'balanced';
+  return mcpServer?.getApprovalMode() ?? 'balanced';
+});
+ipcMain.handle('set-mcp-approval-mode', (event, mode: unknown) => {
+  if (!isTrustedSender(event)) return 'balanced';
+  return mcpServer?.setApprovalMode(mode) ?? 'balanced';
+});
 ipcMain.handle('get-mcp-site-rules', (event) => {
   if (!isTrustedSender(event)) return [];
   return mcpServer?.getSiteRules() ?? [];

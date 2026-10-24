@@ -13,6 +13,7 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
 import { resolveElementRef } from './main/elementRefs.js';
+import { createApprovalModeStore, strictModeRequiresApproval, type ApprovalMode, type ApprovalModeStore } from './main/approvalMode.js';
 import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
 import { createSiteRuleStore, matchSiteRule, type SiteRule, type SiteRuleStore } from './main/siteRules.js';
 import { createActivityStore, type ActivityStore } from './main/activityStore.js';
@@ -531,6 +532,7 @@ export class BrowserMCPServer {
   private policyEnforced: boolean = false;
   /** Set when page text the agent read looked like an injection; cleared once the user is asked. */
   private injectionSuspect: { reasons: string[] } | null = null;
+  private approvalModeStoreInstance: ApprovalModeStore | null | undefined;
   private siteRuleStoreInstance: SiteRuleStore | null | undefined;
   private activityStoreInstance: ActivityStore | null | undefined;
   private engineInstance: ExecutionEngine | null = null;
@@ -812,6 +814,25 @@ export class BrowserMCPServer {
       }
     }
     return this.siteRuleStoreInstance;
+  }
+
+  private approvalModeStore(): ApprovalModeStore | null {
+    if (this.approvalModeStoreInstance === undefined) {
+      try {
+        this.approvalModeStoreInstance = createApprovalModeStore(path.join(electronApp.getPath('userData'), 'agent-approval-mode.json'));
+      } catch {
+        this.approvalModeStoreInstance = null;
+      }
+    }
+    return this.approvalModeStoreInstance;
+  }
+
+  public getApprovalMode(): ApprovalMode {
+    return this.approvalModeStore()?.get() ?? 'balanced';
+  }
+
+  public setApprovalMode(mode: unknown): ApprovalMode {
+    return this.approvalModeStore()?.set(mode) ?? 'balanced';
   }
 
   public getSiteRules(): SiteRule[] {
@@ -1167,6 +1188,12 @@ export class BrowserMCPServer {
       decision.risk = 'sensitive';
       decision.triggers = ['site_rule'];
       decision.reasons = [...decision.reasons, 'This site has an "always ask" rule.'];
+      decision.domain = decision.domain ?? siteRuleHost;
+    }
+    if (decision.risk === 'safe' && strictModeRequiresApproval(this.getApprovalMode(), canonicalTool)) {
+      decision.risk = 'sensitive';
+      decision.triggers = ['strict_mode'];
+      decision.reasons = [...decision.reasons, 'Strict approval mode is on.'];
       decision.domain = decision.domain ?? siteRuleHost;
     }
     if (this.injectionSuspect && INJECTION_GATED_TOOLS.has(canonicalTool)) {
