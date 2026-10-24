@@ -30,7 +30,7 @@
 - **معيار النجاح:** مطوّر جديد يوصل OpenCode في أقل من 5 دقائق وينفّذ الوكيل مهمة حقيقية بلا تدخل مني.
 - الصعوبة: منخفضة. الوقت: أسبوعان. **هذه الحزمة تحدد أولويات الباقي؛ لا تتجاوزها.**
 
-### WP2 — استهداف العناصر بلقطة وصول بدل محددات CSS (أنا)
+### WP2 — استهداف العناصر بلقطة وصول بدل محددات CSS (أنا) — **منفَّذ، لم يُقَس على مواقع حقيقية**
 - **المشكلة:** الوكلاء يفشلون كثيراً لأنهم يخمّنون محددات CSS **[افتراض]**.
 - **الحل:** أداة جديدة `browser_snapshot` تُرجع قائمة العناصر التفاعلية (دور + اسم + مرجع مثل `e12`). تقبل أدوات النقر والكتابة والاختيار الوسيط `ref` وتحوّله الطبقة الرئيسية إلى محدد قبل التصنيف، فتبقى سياسة الموافقة وسجل النشاط وقواعد المواقع كما هي دون تغيير.
 - **الأمان:** ناتج اللقطة نص صفحة غير موثوق: يمر عبر كاشف الحقن؛ المراجع تُختم على العناصر ولا تُقبل إلا بصيغة `e<رقم>`.
@@ -110,7 +110,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - **Erfolgskriterium:** Ein neuer Entwickler verbindet OpenCode in unter 5 Minuten, der Agent erledigt eine echte Aufgabe, ohne dass ich eingreife.
 - Schwierigkeit: niedrig. Zeit: zwei Wochen. **Dieses Paket bestimmt die Prioritäten der übrigen; nicht überspringen.**
 
-### WP2 — Elemente über Zugänglichkeits-Snapshot statt CSS-Selektoren (ich)
+### WP2 — Elemente über Zugänglichkeits-Snapshot statt CSS-Selektoren (ich) — **umgesetzt, an echten Seiten nicht gemessen**
 - **Problem:** Agenten scheitern oft, weil sie CSS-Selektoren raten **[Annahme]**.
 - **Lösung:** Neues Werkzeug `browser_snapshot` liefert interaktive Elemente (Rolle + Name + Referenz wie `e12`). Klick-, Eingabe- und Auswahl-Werkzeuge akzeptieren `ref`; der Hauptprozess wandelt es vor der Klassifizierung in einen Selektor um, sodass Freigabe-Policy, Aktivitätsprotokoll und Site-Regeln unverändert greifen.
 - **Sicherheit:** Die Snapshot-Ausgabe ist nicht vertrauenswürdiger Seitentext: sie läuft durch den Injection-Detektor; Referenzen werden auf Elemente gestempelt und nur im Format `e<Zahl>` akzeptiert.

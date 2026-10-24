@@ -1,5 +1,6 @@
 import * as sensitiveFieldModule from '../src/utils/sensitiveField';
 import * as agentLoginModule from '../src/utils/agentLogin';
+import * as elementSnapshotModule from '../src/utils/elementSnapshot';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -53,6 +54,7 @@ async function run() {
     '../utils/mcpActionTiming': mcpActionTiming,
     '../utils/searchHistoryBookmarks': { searchHistoryAndBookmarks: () => [] },
     '../utils/sensitiveField': sensitiveFieldModule,
+    '../utils/elementSnapshot': elementSnapshotModule,
     '../utils/agentLogin': agentLoginModule,
   };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/hooks/useBrowserAgentBridge.ts', 'utf8'), {

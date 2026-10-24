@@ -32,6 +32,7 @@ async function run() {
   const contextRequests: Array<string | undefined> = [];
 
   const executionEngineModule = loadSource('electron/main/executionEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const elementRefsModule = loadSource('electron/main/elementRefs.ts', {}, {});
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
@@ -74,6 +75,7 @@ async function run() {
     './main/policyEngine.js': policyEngineModule,
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
+    './main/elementRefs.js': elementRefsModule,
     './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }
   });
 
@@ -279,6 +281,38 @@ async function run() {
     assert.match(lastDialogDetail, /Element: "Delete account forever"/, 'the element text is shown on one line');
     pageContext = { url: 'https://example.com/', elementText: '' };
     console.log('[PASS] Wiring — approval dialog shows page and target element text');
+  }
+
+  // 6f) element refs: a ref reaches the renderer as the equivalent selector
+  {
+    const server = makeServer();
+    server.firstUseApproved = true;
+    server.setPolicyEnforcement(true);
+    dialogResponse = 0;
+    pageContext = { url: 'https://example.com/', elementText: 'Read more' };
+    await server.executeTool('browser_click', { ref: 'e5' });
+    const sent = forwarded[forwarded.length - 1];
+    assert.equal(sent.tool, 'browser_click');
+    assert.equal(sent.args.selector, '[data-king-ref="e5"]', 'the ref becomes a selector before dispatch');
+    assert.ok(!('ref' in sent.args), 'the renderer only ever sees a selector');
+    assert.ok(contextRequests.includes('[data-king-ref="e5"]'), 'policy context is read for the resolved element');
+    await assert.rejects(server.executeTool('browser_click', { ref: 'e5"] , body' }), /Invalid element ref/, 'a malformed ref never reaches a selector');
+    await assert.rejects(server.executeTool('browser_type', { text: 'x' }), /needs a "ref"/, 'a target is required');
+
+    // A sensitive element is still gated when it is named by ref.
+    pageContext = { url: 'https://example.com/', elementText: 'Delete account' };
+    dialogResponse = 1;
+    const before = forwarded.length;
+    await assert.rejects(server.executeTool('browser_click', { ref: 'e6' }), /./, 'a refused sensitive click by ref fails');
+    assert.equal(forwarded.length, before, 'and never reaches the renderer');
+    dialogResponse = 0;
+    pageContext = { url: 'https://example.com/', elementText: '' };
+
+    // The snapshot output is untrusted page text and goes through the injection scan.
+    rendererPageText = null;
+    const snap = await server.executeTool('browser_snapshot', {});
+    assert.equal(snap, 'ok:browser_snapshot');
+    console.log('[PASS] Wiring — element refs resolve before policy, stay gated, and reject malformed input');
   }
 
   // 7) STOP NOW: queue/execution blocked until an explicit resume

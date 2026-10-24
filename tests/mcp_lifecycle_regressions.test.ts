@@ -1,5 +1,6 @@
 import * as sensitiveFieldModule from '../src/utils/sensitiveField';
 import * as agentLoginModule from '../src/utils/agentLogin';
+import * as elementSnapshotModule from '../src/utils/elementSnapshot';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -63,6 +64,7 @@ async function run() {
     '../utils/mcpActionTiming': mcpActionTiming,
     '../utils/searchHistoryBookmarks': { searchHistoryAndBookmarks: () => [] },
     '../utils/sensitiveField': sensitiveFieldModule,
+    '../utils/elementSnapshot': elementSnapshotModule,
     '../utils/agentLogin': agentLoginModule
   });
   hook.useBrowserAgentBridge({ activeTabId: 'tab', tabs: [], history: [], bookmarks: [], settingsRef,
@@ -95,6 +97,7 @@ async function run() {
   // §11/§12 modules are real dependencies of mcpServer.ts now — load them with
   // the same sandbox so the "Unexpected dependency" guard stays honest.
   const executionEngineModule = loadSource('electron/main/executionEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const elementRefsModule = loadSource('electron/main/elementRefs.ts', {}, {});
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
@@ -107,6 +110,7 @@ async function run() {
     './main/policyEngine.js': policyEngineModule,
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
+    './main/elementRefs.js': elementRefsModule,
     './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }
   });
   for (const change of ['stop', 'rotateToken', 'lock'] as const) {

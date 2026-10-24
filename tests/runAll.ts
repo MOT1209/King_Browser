@@ -98,6 +98,7 @@ import './activity_store.test';
 import './site_rules.test';
 import './injection_detector.test';
 import './mcp_client_config.test';
+import './element_refs.test';
 import './agent_login.test';
 import './mcp_engine_wiring.test';
 import './mcp_single_approval_authority.test';

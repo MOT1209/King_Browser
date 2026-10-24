@@ -8,6 +8,7 @@ import { orchestrator } from '../services/agentOrchestrator';
 // navigation one: agent-supplied URLs are untrusted, and the general predicate
 // deliberately permits loopback/private hosts for real user navigation.
 import { isSafeAgentNavigationUrl } from '../utils/safeNavigation';
+import { buildSnapshotScript } from '../utils/elementSnapshot';
 import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS, MCP_POLICY_CONTEXT_ACTION } from '../utils/mcpActionTiming';
 
 /**
@@ -250,6 +251,12 @@ export function useBrowserAgentBridge({
                 return JSON.stringify({ text: text.substring(0, 10000), links: links.slice(0, 50), loginRequired });
               })();
             `);
+          }
+          return "Error: No active webview available.";
+
+        case 'browser_snapshot':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            return await activeWebview.executeJavaScript(buildSnapshotScript());
           }
           return "Error: No active webview available.";
 

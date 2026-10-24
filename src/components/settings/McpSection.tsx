@@ -16,6 +16,7 @@ export interface McpSectionProps {
 const MCP_TOOLS = [
   { name: 'browser_navigate', desc: 'Navigate to a URL', level: 'safe' },
   { name: 'browser_read_page', desc: 'Extract full page text + links', level: 'safe' },
+  { name: 'browser_snapshot', desc: 'List interactive elements with refs (e12) for click/type', level: 'safe' },
   { name: 'browser_screenshot', desc: 'Take a screenshot', level: 'safe' },
   { name: 'browser_list_tabs', desc: 'List all open tabs', level: 'safe' },
   { name: 'browser_get_url', desc: 'Get the current tab URL', level: 'safe' },
