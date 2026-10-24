@@ -9,6 +9,8 @@ export interface Tab {
   isMuted?: boolean;
   isPinned?: boolean;
   isIncognito?: boolean;
+  /** Opened by the agent while the isolated agent profile is on; uses its own cookies and storage. */
+  isAgentOwned?: boolean;
   thumbnail?: string;
   workspaceId?: string;
   folderId?: string;
@@ -106,6 +108,8 @@ export interface UserSettings {
   showBookmarksBar: boolean;
   useVerticalTabs: boolean;
   mcpServerEnabled: boolean;
+  /** Agent tabs get their own session, and the agent may only act on tabs it opened. */
+  agentIsolatedProfile?: boolean;
   showTasksWidget?: boolean;
   newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url' | 'aurora_waves' | 'cyber_grid' | 'hyper_space' | 'fireflies' | 'nebula' | 'matrix';
   backgroundCustomUrl?: string;
@@ -145,6 +149,7 @@ export const defaultSettings: UserSettings = {
   showTasksWidget: true,
   useVerticalTabs: false,
   mcpServerEnabled: false,
+  agentIsolatedProfile: false,
   newTabBackground: 'default',
   backgroundCustomUrl: '',
   startupBehavior: 'newTab',

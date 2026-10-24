@@ -11,6 +11,7 @@ import {
   getRestoreOriginalScript
 } from '../services/translationService';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
+import { AGENT_PARTITION } from '../utils/appConstants';
 
 const PasswordPromptModal = lazy(() => import('./PasswordPromptModal').then(m => ({ default: m.PasswordPromptModal })));
 const AILinkPreview = lazy(() => import('./AILinkPreview').then(m => ({ default: m.AILinkPreview })));
@@ -1347,7 +1348,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           <webview
             ref={webviewRef}
             data-tab-id={tab.id}
-            partition={isIncognito && tab?.id ? `incognito-${tab.id}` : undefined}
+            partition={isIncognito && tab?.id ? `incognito-${tab.id}` : tab?.isAgentOwned ? AGENT_PARTITION : undefined}
             src={webviewSrc}
             // Lets sign-in popups (window.open) reach setWindowOpenHandler in
             // main. React drops a boolean `true` on this element, so pass a string.

@@ -449,6 +449,8 @@ export { updateAdblockWhitelist };
 
 // Tracks which per-tab incognito partitions have already been hardened to avoid stacking listeners.
 const hardenedIncognitoPartitions = new Set<string>();
+/** Shared in-memory partition for agent tabs (isolated agent profile); cleared when the window closes. */
+const AGENT_PARTITION = 'incognito-king-agent';
 
 // Active Chromium proxy rules applied across default and all per-tab incognito sessions
 let activeChromiumProxyRules = 'direct://';
@@ -4734,9 +4736,10 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
       await sess.clearStorageData();
       await sess.clearCache();
     } else {
-      // Clear all active per-tab incognito partitions
-      const partitions = Array.from(hardenedIncognitoPartitions);
-      hardenedIncognitoPartitions.clear();
+      // Clear all active per-tab incognito partitions. The agent's shared
+      // partition is left alone: agent tabs may still be using it.
+      const partitions = Array.from(hardenedIncognitoPartitions).filter(name => name !== AGENT_PARTITION);
+      for (const partName of partitions) hardenedIncognitoPartitions.delete(partName);
       for (const partName of partitions) {
         try {
           const sess = session.fromPartition(partName, { cache: false });

@@ -145,7 +145,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
     if (isDemo) return;
     const handleBeforeUnload = () => {
       try {
-        const sessionTabs = tabsRef.current.filter(t => !t.isIncognito);
+        const sessionTabs = tabsRef.current.filter(t => !t.isIncognito && !t.isAgentOwned);
         const serializedTabs = JSON.stringify(sessionTabs);
         localStorage.setItem('nova_session_tabs', serializedTabs);
         getElectronAPI()?.storeSet?.('session_tabs', serializedTabs);
@@ -219,7 +219,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
   useEffect(() => {
     if (isDemo || !isHydrated) return;
     const sessionTabs = tabs
-      .filter(t => !t.isIncognito);
+      .filter(t => !t.isIncognito && !t.isAgentOwned);
     const signature = buildTabSignature(sessionTabs);
 
     // Already written, or already covered by a pending write. This is the hot

@@ -9,7 +9,7 @@ import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 const isMaskedToken = (v: string) => !v || v.includes('•') || v.includes('****');
 
 export interface McpSectionProps {
-  settings: Pick<UserSettings, 'mcpServerEnabled'>;
+  settings: Pick<UserSettings, 'mcpServerEnabled' | 'agentIsolatedProfile'>;
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
 }
 
@@ -63,6 +63,7 @@ const MCP_TOOLS = [
 ];
 
 export const McpSection: React.FC<McpSectionProps> = ({
+  settings,
   onUpdateSettings,
 }) => {
   // MCP Server state
@@ -386,6 +387,28 @@ export const McpSection: React.FC<McpSectionProps> = ({
           })}
         </div>
       </div>
+      {/* Isolated agent profile */}
+      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-800 dark:text-slate-100">Isolated agent profile</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              The agent works in its own session (separate cookies and storage) and can only see and use tabs it opened itself, never the tabs you are signed in to.
+              It starts signed out, and this session is cleared when you close the window.
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdateSettings({ agentIsolatedProfile: !settings.agentIsolatedProfile })}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.agentIsolatedProfile ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-600'}`}
+            role="switch"
+            aria-checked={Boolean(settings.agentIsolatedProfile)}
+            aria-label="Isolated agent profile"
+          >
+            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.agentIsolatedProfile ? 'translate-x-4' : 'translate-x-0'}`} />
+          </button>
+        </div>
+      </div>
+
       {/* Per-site rules */}
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
         <div className="flex items-center gap-2">
