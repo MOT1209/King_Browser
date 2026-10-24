@@ -47,6 +47,24 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.4',
+    date: 'October 2026',
+    title: 'Record and replay, a persistent agent profile and automatic releases',
+    badge: 'Pre-release',
+    lede: 'Record what an agent does and replay it without a model, let the agent keep its own logins if you choose, and every version bump on main now publishes a release by itself.',
+    highlights: [
+      'Record and replay (Settings > MCP): every replayed step still asks for approval, and text typed into password fields is never stored.',
+      'Optional persistent agent profile: sign in once in an agent tab; the agent never sees the password, and one button clears it.',
+      'Releases are now published automatically when a pull request that bumps the version is merged.',
+    ],
+    changes: [
+      { category: 'feature', text: 'Record and replay for agent actions, with the approval gate on every replayed step.' },
+      { category: 'security', text: 'Optional persistent agent profile; cannot be switched on through sync, with a clear button.' },
+      { category: 'improvement', text: 'Release workflow runs when package.json changes on main and the version has no tag yet.' },
+      { category: 'improvement', text: 'macOS test job in CI (non-blocking).' },
+    ],
+  },
+  {
     version: '0.0.3',
     date: 'October 2026',
     title: 'Element refs, strict approval mode and an honest injection check',
