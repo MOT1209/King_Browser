@@ -1,8 +1,13 @@
 name: Release
 
 # Builds installers for macOS, Windows and Linux and publishes them as a GitHub
-# release. Start it by pushing a tag such as v0.0.1, or run it manually: a manual
-# run releases the version in package.json as tag v<version> on the chosen branch.
+# release. It starts in three ways:
+#   - automatically when a push to main changes package.json and the tag
+#     v<version> does not exist yet (bump "version" in the pull request that
+#     ships the features, and merging it publishes the release);
+#   - by pushing a tag such as v0.0.1;
+#   - manually: a manual run releases the version in package.json as tag
+#     v<version> on the chosen branch.
 # The website links to /releases/latest/download/..., which only resolves for a
 # published (non-draft) release, so the release is published directly.
 #
@@ -15,13 +20,48 @@ name: Release
 on:
   push:
     tags: ['v*']
+    branches: [main]
+    paths: ['package.json']
   workflow_dispatch:
+
+# Two runs for the same ref (for example a merge and a manual start) must not
+# publish the same version twice.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
+  # A push to main only releases when its version has no tag yet. Tag pushes and
+  # manual runs always release.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decide
+        id: decide
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "push" ] || [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="$(node -p "require('./package.json').version")"
+          if git ls-remote --exit-code --tags origin "refs/tags/v${version}" >/dev/null 2>&1; then
+            echo "Tag v${version} already exists; nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version ${version} has no tag; releasing."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -76,7 +116,8 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: build
+    needs: [check, build]
+    if: needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

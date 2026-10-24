@@ -441,7 +441,7 @@ Project website: <https://king-browser.vercel.app> (deployed from `website/` on 
 
 > **Builds are not code-signed yet.** Windows SmartScreen: choose *More info* then *Run anyway*. macOS: right-click the app and choose *Open*, or run `xattr -cr "/Applications/King Browser.app"`. Automatic updates on macOS need a signed build.
 >
-> Releases are built and published by `.github/workflows/release.yml` (push a `v*` tag, or run it manually under *Actions → Release*; a manual run publishes `v<version from package.json>`). Signing turns on once the certificate secrets are configured (see the header of that file). If the Releases page is empty, use Option B.
+> Releases are built and published by `.github/workflows/release.yml`. Merging a change to `main` that raises `version` in `package.json` publishes `v<version>` automatically (once per version); you can also push a `v*` tag or run it manually under *Actions → Release*. Signing turns on once the certificate secrets are configured (see the header of that file). If the Releases page is empty, use Option B.
 
 Installers are available from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
 - **macOS**: `King-Browser-arm64.dmg` (Apple Silicon) or `King-Browser-x64.dmg` (Intel)
