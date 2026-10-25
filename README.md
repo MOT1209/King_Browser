@@ -217,7 +217,7 @@ Tab-targeted navigation lives on the dedicated tab tools: page tools act on the 
 
 ### Connecting External AI Agents
 
-King Browser exposes its tools through a local MCP server (`127.0.0.1`, bearer-token protected). Every agent connects through the same stdio bridge, `mcp-bridge.mjs`, so only the agent-side config differs.
+King Browser exposes its tools through a local MCP server (`127.0.0.1`, bearer-token protected). Every agent connects through the same stdio bridge, shipped as `resources/mcp-bridge.cjs` in the installed app and as `mcp-bridge.mjs` in a source checkout, so only the agent-side config differs.
 
 | Agent | Config location | Section |
 |---|---|---|
@@ -237,7 +237,10 @@ King Browser exposes its tools through a local MCP server (`127.0.0.1`, bearer-t
    - Windows (persistent, applies to newly started apps): `setx MCP_TOKEN "<your token>"`, then restart the agent.
    - macOS / Linux: `export MCP_TOKEN="<your token>"` in your shell profile. GUI apps on macOS do not inherit shell variables, so for desktop apps use the agent's own `env` setting instead.
 4. The token must match `[A-Za-z0-9._~-]{16,4096}`; the bridge rejects anything else. `MCP_PORT` defaults to `3020`.
-5. Use an absolute path to `mcp-bridge.mjs`. In JSON on Windows, escape backslashes (`C:\\path\\to\\mcp-bridge.mjs`) or use forward slashes.
+5. Use an absolute path to the bridge:
+   - **Installed app**: `resources/mcp-bridge.cjs` in the install directory (Windows: `%LOCALAPPDATA%\Programs\King Browser\resources\mcp-bridge.cjs`; macOS: `/Applications/King Browser.app/Contents/Resources/mcp-bridge.cjs`). The **OpenCode** and **Copy** buttons fill this in for you.
+   - **Source checkout**: `/ABSOLUTE_PATH_TO_KING_BROWSER/mcp-bridge.mjs` after `npm run build:electron`.
+   In JSON on Windows, escape backslashes (`C:\\path\\to\\mcp-bridge.cjs`) or use forward slashes.
 
 #### OpenCode
 
@@ -247,9 +250,9 @@ OpenCode must use the stdio bridge. Its `type: "remote"` transport speaks Stream
 king-browser  failed: Error POSTing to endpoint: ... Cannot POST /sse (HTTP 404)
 ```
 
-Pointing the Claude Desktop `url`/`headers` shape at `http://localhost:3020/sse` does not work for this reason. The **OpenCode** button in *Settings > MCP* copies a `remote` entry with the live port and token; that snippet hits the same 404, so use the manual stdio config below.
+Pointing the Claude Desktop `url`/`headers` shape at `http://localhost:3020/sse` does not work for this reason. The **OpenCode** button in *Settings > MCP* copies a ready `type: "local"` entry with the live port, token and bundled bridge path (the clipboard clears after 15 seconds). Paste it into `opencode.json` and restart OpenCode; Node.js must be on `PATH`.
 
-Add to `opencode.json` (project root) or your global OpenCode config. Keys (`type`, `command` as an array, `environment`, `enabled`) follow the [OpenCode MCP docs](https://opencode.ai/docs/mcp-servers/):
+Manual setup: add to `opencode.json` (project root) or your global OpenCode config. Keys (`type`, `command` as an array, `environment`, `enabled`) follow the [OpenCode MCP docs](https://opencode.ai/docs/mcp-servers/):
 
 ```json
 {
@@ -275,7 +278,7 @@ Then confirm the connection:
 opencode mcp list   # king-browser should report: connected
 ```
 
-> The OpenCode docs show `{env:VAR}` in remote-server examples but not inside a local server's `environment` block. If the token does not arrive, replace `"{env:MCP_TOKEN}"` with the literal token and keep that file out of version control. The `timeout` matters: a sensitive action waits up to 120s for your approval (`MCP_APPROVAL_WINDOW_MS`) and then up to 15s to execute (`MCP_ACTION_TIMEOUT_MS`), while the bridge allows 180s per call. A client timeout below that aborts the call before the approval can finish.
+> In an installed build, point `command[1]` at `resources/mcp-bridge.cjs` instead of `mcp-bridge.mjs`. The button writes the literal token into the copied config, so keep that file out of version control and rotate the token if it leaks; the clipboard clears after 15 seconds. In a manual config you can try `{env:MCP_TOKEN}` (set the variable first); if it does not arrive, use the literal token. The `timeout` matters: a sensitive action waits up to 120s for your approval (`MCP_APPROVAL_WINDOW_MS`) and then up to 15s to execute (`MCP_ACTION_TIMEOUT_MS`), while the bridge allows 180s per call. A client timeout below that aborts the call before the approval can finish.
 
 #### Claude Code (terminal and desktop app)
 
@@ -338,7 +341,7 @@ Any client that can launch a stdio MCP server works with these four values:
 | Setting | Value |
 |---|---|
 | Command | `node` |
-| Arguments | `/ABSOLUTE_PATH_TO_KING_BROWSER/mcp-bridge.mjs` |
+| Arguments | Installed app: `resources/mcp-bridge.cjs`; source checkout: `/ABSOLUTE_PATH_TO_KING_BROWSER/mcp-bridge.mjs` |
 | Environment | `MCP_TOKEN` (from King settings), optional `MCP_PORT` (default `3020`) |
 | Transport | stdio |
 
@@ -347,7 +350,7 @@ Any client that can launch a stdio MCP server works with these four values:
 | Symptom | Likely cause |
 |---|---|
 | `Set a valid MCP_TOKEN…` | The variable is missing or not in the allowed format. Copy the token from King settings again. |
-| `Cannot POST /sse` (HTTP 404) | A remote MCP entry points at the SSE URL. OpenCode's `remote` transport needs Streamable HTTP and King Browser does not serve it; use the stdio bridge (`type: "local"`). |
+| `Cannot POST /sse` (HTTP 404) | A remote MCP entry points at the SSE URL. OpenCode's `remote` transport needs Streamable HTTP and King Browser does not serve it; press the **OpenCode** button or use a `type: "local"` entry. |
 | `Make sure King Browser is running.` | King Browser is closed, or `MCP_PORT` does not match the port shown in its settings. |
 | Server missing in the agent after editing | Restart the agent (and the desktop app) so it re-reads the config and environment. |
 | Works in the terminal but not in a desktop app | The app did not inherit your shell variables; set `MCP_TOKEN` in the agent's `env` setting instead. |

@@ -248,9 +248,11 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const mcpConfigSnippet = `{
   "mcpServers": {
     "king-browser": {
-      "url": "http://localhost:${mcpStatus?.port || 3020}/sse",
-      "headers": {
-        "Authorization": "Bearer ${mcpToken}"
+      "command": "node",
+      "args": ["<King Browser install>/resources/mcp-bridge.cjs"],
+      "env": {
+        "MCP_TOKEN": "${mcpToken}",
+        "MCP_PORT": "${mcpStatus?.port || 3020}"
       }
     }
   }
@@ -445,11 +447,11 @@ export const McpSection: React.FC<McpSectionProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <p className="font-semibold text-slate-800 dark:text-slate-100">Setup Guide</p>
-            <p className="text-xs text-slate-500 mt-0.5">Add this to your AI tool's MCP config (e.g., claude_desktop_config.json)</p>
+            <p className="text-xs text-slate-500 mt-0.5">Add this to your AI tool's MCP config (e.g., claude_desktop_config.json). Copied configs run the bundled stdio bridge, so Node.js must be on PATH.</p>
           </div>
           <button
             onClick={handleCopyOpenCodeConfig}
-            title="Copies a ready opencode.json (type: remote). Paste it into opencode.json in your project or ~/.config/opencode/opencode.json."
+            title="Copies a ready opencode.json entry (type: local) that runs the bundled stdio bridge with the live port and token. Paste it into opencode.json in your project or ~/.config/opencode/opencode.json. Requires Node.js on PATH."
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
           >
             <Copy className="w-3.5 h-3.5" />

@@ -4532,12 +4532,23 @@ ipcMain.handle('copy-mcp-token', (event) => {
   return false;
 });
 let clipboardConfigClearTimer: NodeJS.Timeout | null = null;
+
+// The stdio bridge is a separate Node entry point. A child process cannot run a
+// file from inside app.asar, so packaged builds ship it through electron-builder
+// extraResources; in development it lives in dist-electron (npm run build:electron).
+function resolveMcpBridgePath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'mcp-bridge.cjs');
+  }
+  return path.join(app.getAppPath(), 'dist-electron', 'mcp-bridge.cjs');
+}
+
 ipcMain.handle('copy-mcp-config', (event, kind?: unknown) => {
   if (!isTrustedSender(event)) return false;
   const token = mcpServer?.getToken() || '';
   const port = mcpServer ? mcpServer.getPort() : 3020;
   const clientKind: McpClientKind = kind === 'opencode' ? 'opencode' : 'generic';
-  const config = buildMcpClientConfig(clientKind, port, token);
+  const config = buildMcpClientConfig(clientKind, port, token, resolveMcpBridgePath());
   clipboard.writeText(config);
   // Security: Auto-clear Bearer-bearing config from clipboard after 15s (same as copy-mcp-token)
   if (clipboardConfigClearTimer) clearTimeout(clipboardConfigClearTimer);

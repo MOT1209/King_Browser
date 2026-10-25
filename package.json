@@ -31,6 +31,12 @@
       "dist/**/*",
       "dist-electron/*.cjs"
     ],
+    "extraResources": [
+      {
+        "from": "dist-electron/mcp-bridge.cjs",
+        "to": "mcp-bridge.cjs"
+      }
+    ],
     "win": {
       "artifactName": "King-Browser-${version}-${arch}.${ext}",
       "target": [
@@ -134,7 +140,7 @@
   },
   "scripts": {
     "dev:web": "vite",
-    "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts electron/guest-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@ghostery/adblocker-electron --external:@ghostery/adblocker --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs",
+    "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts electron/guest-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@ghostery/adblocker-electron --external:@ghostery/adblocker --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs && esbuild mcp-bridge.mjs --outfile=dist-electron/mcp-bridge.cjs --platform=node --bundle --format=cjs",
     "build": "tsc && vite build && npm run build:electron",
     "test:integration": "node tests/integration/agent_e2e.mjs",
     "pretest": "node scripts/ensure-build-artifacts.cjs",

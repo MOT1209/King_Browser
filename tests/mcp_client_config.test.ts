@@ -1,21 +1,40 @@
 import assert from 'node:assert/strict';
-import { buildMcpClientConfig } from '../electron/main/mcpClientConfig';
+import { buildMcpClientConfig, MCP_CLIENT_TIMEOUT_MS } from '../electron/main/mcpClientConfig';
 
 console.log('\n--- MCP Client Config Test Suite ---');
 
 {
-  const open = JSON.parse(buildMcpClientConfig('opencode', 3020, 'tok_123'));
+  const bridge = 'C:\\Program Files\\King Browser\\resources\\mcp-bridge.cjs';
+
+  // OpenCode: local stdio through the bundled bridge. A `remote` entry is
+  // Streamable HTTP and always fails against King's SSE-only endpoint.
+  const open = JSON.parse(buildMcpClientConfig('opencode', 3020, 'tok_123', bridge));
   const server = open.mcp['king-browser'];
   assert.equal(open.$schema, 'https://opencode.ai/config.json');
-  assert.equal(server.type, 'remote');
-  assert.equal(server.url, 'http://localhost:3020/sse');
+  assert.equal(server.type, 'local');
+  assert.deepEqual(server.command, ['node', bridge]);
   assert.equal(server.enabled, true);
-  assert.equal(server.headers.Authorization, 'Bearer tok_123');
-  assert.equal(server.command, undefined, 'no local command / absolute path is needed');
-  const generic = JSON.parse(buildMcpClientConfig('generic', 4000, 'abc'));
-  assert.equal(generic.mcpServers['king-browser'].url, 'http://localhost:4000/sse');
-  assert.equal(generic.mcpServers['king-browser'].headers.Authorization, 'Bearer abc');
-  const tricky = JSON.parse(buildMcpClientConfig('opencode', 1, 'a"b\\c'));
-  assert.equal(tricky.mcp['king-browser'].headers.Authorization, 'Bearer a"b\\c', 'values are JSON-escaped');
-  console.log('[PASS] MCP client config — OpenCode (remote) and generic configs are valid JSON with the live port and token');
+  assert.equal(server.timeout, MCP_CLIENT_TIMEOUT_MS);
+  assert.equal(server.timeout, 180000);
+  assert.equal(server.environment.MCP_TOKEN, 'tok_123');
+  assert.equal(server.environment.MCP_PORT, '3020');
+  assert.equal(server.url, undefined, 'remote transport is not used: the server only serves SSE');
+  assert.equal(server.headers, undefined);
+
+  // Generic (Claude Desktop style): the same bridge in stdio command form.
+  const generic = JSON.parse(buildMcpClientConfig('generic', 4000, 'abc', bridge));
+  const genericServer = generic.mcpServers['king-browser'];
+  assert.equal(genericServer.command, 'node');
+  assert.deepEqual(genericServer.args, [bridge]);
+  assert.equal(genericServer.env.MCP_TOKEN, 'abc');
+  assert.equal(genericServer.env.MCP_PORT, '4000');
+  assert.equal(genericServer.url, undefined);
+
+  // Quotes and backslashes in the token must survive JSON serialisation.
+  const trickyToken = 'a"b\\c';
+  const tricky = JSON.parse(buildMcpClientConfig('opencode', 1, trickyToken, bridge));
+  assert.equal(tricky.mcp['king-browser'].environment.MCP_TOKEN, trickyToken, 'values are JSON-escaped');
+  assert.equal(tricky.mcp['king-browser'].environment.MCP_PORT, '1');
+
+  console.log('[PASS] MCP client config — local stdio configs carry the bridge path, live port and token');
 }

@@ -14,10 +14,11 @@
 4. لا تُلغِ التثبيت لاحقاً لتحدّث: ذلك يحذف بياناتك. ثبّت الجديد فوق القديم أو دع التطبيق يحدّث نفسه.
 
 ## 1) ربط OpenCode (معيار النجاح: أقل من 5 دقائق)
-1. الإعدادات ← **MCP**: شغّل الخادم. قد تظهر نافذة موافقة أول استخدام: وافق، ثم انسخ رمز الوصول (Bearer token).
-2. من مستودع المشروع: `npm install`، ثم أضف إلى `opencode.json` إعداداً من نوع `local` يشغّل `node <مسار المستودع>/mcp-bridge.mjs` مع `MCP_TOKEN` في `environment` (القالب الكامل في README، قسم OpenCode).
-3. شغّل OpenCode واسأله: *"اعرض أدوات king-browser"*. **المتوقع:** قائمة أدوات `browser_*`.
-4. زر **OpenCode** في الإعدادات ينسخ إعداداً من نوع `remote`؛ هذا النقل غير مدعوم (OpenCode يستخدم Streamable HTTP والخادم يقدّم SSE) ويفشل بـ `Cannot POST /sse (HTTP 404)`. استخدم الإعداد اليدوي أعلاه.
+1. الإعدادات ← **MCP**: شغّل الخادم. قد تظهر نافذة موافقة أول استخدام: وافق.
+2. اضغط زر **OpenCode** في القسم نفسه. ينسخ إعداداً من نوع `local` يشغّل الجسر المرفق مع التطبيق (`resources/mcp-bridge.cjs`) مع `MCP_TOKEN` و`MCP_PORT`، ويمسح الحافظة بعد 15 ثانية. يحتاج Node.js في `PATH`.
+3. الصق الإعداد في `opencode.json` (جذر المشروع أو `~/.config/opencode/opencode.json`) ثم أعد تشغيل OpenCode.
+4. اسأله: *"اعرض أدوات king-browser"*. **المتوقع:** قائمة أدوات `browser_*`، و`opencode mcp list` يقول `connected`.
+5. إن فشل الاتصال: تأكد أن Node.js مثبت (`node --version`)، وأن King Browser يعمل، وأن المنفذ في الإعداد يطابق المنفذ في الإعدادات. الإعداد اليدوي (`mcp-bridge.mjs` من المستودع) ما زال موثقاً في README.
 
 ## 2) سيناريوهات الاختبار
 لكل سيناريو: **المتوقع** ثم دوّن النتيجة (نجح / فشل + الخطأ).
@@ -59,10 +60,11 @@
 4. Zum Aktualisieren nicht deinstallieren: Das löscht deine Daten. Neue Version über die alte installieren oder die App sich selbst aktualisieren lassen.
 
 ## 1) OpenCode verbinden (Erfolgskriterium: unter 5 Minuten)
-1. Einstellungen → **MCP**: Server starten. Beim ersten Mal kann ein Freigabe-Dialog erscheinen: zustimmen, dann den Bearer-Token kopieren.
-2. Aus dem Repository: `npm install`, dann in `opencode.json` einen `local`-Eintrag anlegen, der `node <Repository-Pfad>/mcp-bridge.mjs` startet, mit `MCP_TOKEN` in `environment` (vollständige Vorlage im README, Abschnitt OpenCode).
-3. OpenCode starten und fragen: *„Liste die Werkzeuge von king-browser“*. **Erwartet:** Liste der `browser_*`-Werkzeuge.
-4. Der Button **OpenCode** in den Einstellungen kopiert einen `remote`-Eintrag; dieser Transport wird nicht unterstützt (OpenCode spricht Streamable HTTP, der Server liefert SSE) und scheitert mit `Cannot POST /sse (HTTP 404)`. Nutze die manuelle Konfiguration oben.
+1. Einstellungen → **MCP**: Server starten. Beim ersten Mal kann ein Freigabe-Dialog erscheinen: zustimmen.
+2. Den Button **OpenCode** im selben Bereich drücken. Er kopiert einen `local`-Eintrag, der die mitgelieferte Brücke (`resources/mcp-bridge.cjs`) mit `MCP_TOKEN` und `MCP_PORT` startet; die Zwischenablage wird nach 15 Sekunden geleert. Node.js muss in `PATH` liegen.
+3. Den Eintrag in `opencode.json` einfügen (Projektwurzel oder `~/.config/opencode/opencode.json`) und OpenCode neu starten.
+4. Fragen: *„Liste die Werkzeuge von king-browser“*. **Erwartet:** Liste der `browser_*`-Werkzeuge; `opencode mcp list` meldet `connected`.
+5. Wenn die Verbindung scheitert: prüfen, ob Node.js installiert ist (`node --version`), King Browser läuft und der Port im Eintrag zu den Einstellungen passt. Die manuelle Variante (`mcp-bridge.mjs` aus dem Repository) steht weiterhin im README.
 
 ## 2) Testszenarien
 Zu jedem: **Erwartet**, dann Ergebnis notieren (ok / Fehler + Meldung).
