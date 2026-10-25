@@ -28,12 +28,14 @@ if ! git rev-parse --verify "$PREV_SHA" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Compare changes in website directory and vercel configuration
-if git diff --quiet "$PREV_SHA" HEAD -- website/ vercel.json; then
+# Compare changes in the website, its Vercel configuration, this script, and
+# package.json: the site reads its version from package.json and builds the
+# versioned Windows download links from it, so a version bump must redeploy.
+if git diff --quiet "$PREV_SHA" HEAD -- website/ vercel.json package.json scripts/ignore-vercel-build.sh; then
   echo "[Vercel] No website changes detected between $PREV_SHA and HEAD. Skipping deployment."
   exit 0
 else
-  echo "[Vercel] Changes detected in website/ or vercel.json. Proceeding with deployment."
+  echo "[Vercel] Changes detected in website/, vercel.json or package.json. Proceeding with deployment."
   exit 1
 fi
 

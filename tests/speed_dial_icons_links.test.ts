@@ -45,6 +45,9 @@ const vercelConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../verc
 assert(Boolean(vercelConfig.ignoreCommand), 'vercel.json missing ignoreCommand');
 assert(vercelConfig.ignoreCommand.includes('ignore-vercel-build.sh'), 'vercel.json ignoreCommand must invoke ignore-vercel-build.sh');
 assert(fs.existsSync(path.resolve(__dirname, '../scripts/ignore-vercel-build.sh')), 'scripts/ignore-vercel-build.sh not found');
+// The site builds its Windows download links from the package.json version, so a
+// version bump alone must redeploy it; otherwise those links 404 after a release.
+assert(/git diff --quiet[^\n]*\bpackage\.json\b/.test(fs.readFileSync(path.resolve(__dirname, '../scripts/ignore-vercel-build.sh'), 'utf-8')), 'ignore-vercel-build.sh must redeploy when package.json changes');
 console.log('[PASS] [Vercel-Ignore-1] Vercel build ignore rule verified to prevent website redeploy on browser commits.');
 
 console.log('[PASS] All speed dial icon and link tests passed cleanly.');
