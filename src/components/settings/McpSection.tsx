@@ -4,6 +4,7 @@ import { UserSettings } from '../../types/browser';
 import { copyTextToClipboard } from '../../utils/clipboard';
 import { showConfirm } from '../../utils/confirmDialog';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
+import { useTranslation } from '../../services/i18n';
 
 // mcpToken from getMcpTokenStatus is only a display prefix (e.g. "king_mcp_••••").
 // Never treat a masked value as the real secret.
@@ -68,6 +69,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
   settings,
   onUpdateSettings,
 }) => {
+  const { l } = useTranslation();
   // MCP Server state
   const [mcpStatus, setMcpStatus] = useState<{ running: boolean; port: number; clientCount: number; clients: any[] } | null>(null);
   const [mcpToken, setMcpToken] = useState<string>('');
@@ -143,16 +145,16 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const stopRecording = useCallback(async () => {
     const result = await (window as any).electronAPI?.stopRecording?.(recName);
     setRecName('');
-    const skipped = result?.skipped?.length ? ` ${result.skipped.length} step(s) could not be recorded.` : '';
-    setRecMessage(result?.saved ? `Saved "${result.saved.name}" with ${result.saved.steps} step(s).${skipped}` : `Nothing to save: no repeatable steps were recorded.${skipped}`);
+    const skipped = result?.skipped?.length ? ' ' + l({ en: '{n} step(s) could not be recorded.', ar: 'تعذّر تسجيل {n} من الخطوات.', de: '{n} Schritt(e) konnten nicht aufgezeichnet werden.' }, { n: result.skipped.length }) : '';
+    setRecMessage(result?.saved ? l({ en: 'Saved "{name}" with {n} step(s).', ar: 'حُفظ "{name}" بعدد {n} من الخطوات.', de: '„{name}“ mit {n} Schritt(en) gespeichert.' }, { name: result.saved.name, n: result.saved.steps }) + skipped : l({ en: 'Nothing to save: no repeatable steps were recorded.', ar: 'لا شيء للحفظ: لم تُسجَّل خطوات قابلة للإعادة.', de: 'Nichts zu speichern: Es wurden keine wiederholbaren Schritte aufgezeichnet.' }) + skipped);
     await loadRecordings();
   }, [recName, loadRecordings]);
 
   const replayRecording = useCallback(async (id: string) => {
-    setRecMessage('Replaying... approvals appear as usual.');
+    setRecMessage(l({ en: 'Replaying... approvals appear as usual.', ar: 'جارٍ الإعادة... تظهر طلبات الموافقة كالمعتاد.', de: 'Wird wiedergegeben... Freigaben erscheinen wie gewohnt.' }));
     setRecState(prev => ({ ...prev, replaying: true }));
     const report = await (window as any).electronAPI?.replayRecording?.(id);
-    setRecMessage(report?.message ?? 'Replay finished.');
+    setRecMessage(report?.message ?? l({ en: 'Replay finished.', ar: 'انتهت الإعادة.', de: 'Wiedergabe beendet.' }));
     await loadRecordings();
   }, [loadRecordings]);
 
@@ -322,9 +324,9 @@ export const McpSection: React.FC<McpSectionProps> = ({
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
             <Cpu className="w-6 h-6 text-blue-500" />
-            MCP Server
+            {l({ en: 'MCP Server', ar: 'خادم MCP', de: 'MCP-Server' })}
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Model Context Protocol — Let AI tools control King Browser</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">{l({ en: 'Model Context Protocol — Let AI tools control King Browser', ar: 'بروتوكول سياق النموذج (MCP): اسمح لأدوات الذكاء الاصطناعي بالتحكم في King Browser', de: 'Model Context Protocol – KI-Werkzeuge steuern King Browser' })}</p>
         </div>
         <button
           onClick={handleToggleMcp}
@@ -335,7 +337,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
           }`}
         >
           {mcpStatus?.running ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          {mcpStatus?.running ? 'Stop Server' : 'Start Server'}
+          {mcpStatus?.running ? l({ en: 'Stop Server', ar: 'إيقاف الخادم', de: 'Server stoppen' }) : l({ en: 'Start Server', ar: 'تشغيل الخادم', de: 'Server starten' })}
         </button>
       </div>
 
@@ -345,7 +347,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
           <div className="flex items-center gap-3">
             <div className={`w-3 h-3 rounded-full ${mcpStatus?.running ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />
             <span className="font-semibold text-slate-800 dark:text-slate-100">
-              {mcpStatus?.running ? 'Running' : 'Stopped'}
+              {mcpStatus?.running ? l({ en: 'Running', ar: 'يعمل', de: 'Läuft' }) : l({ en: 'Stopped', ar: 'متوقف', de: 'Gestoppt' })}
             </span>
             {mcpStatus?.running && (
               <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">
@@ -355,14 +357,14 @@ export const McpSection: React.FC<McpSectionProps> = ({
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <Users className="w-4 h-4" />
-            <span>{mcpStatus?.clientCount || 0} connected</span>
+            <span>{l({ en: '{n} connected', ar: '{n} متصل', de: '{n} verbunden' }, { n: mcpStatus?.clientCount || 0 })}</span>
           </div>
         </div>
 
         {/* Connected clients list */}
         {(mcpStatus?.clients?.length || 0) > 0 && (
           <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Connected Clients</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{l({ en: 'Connected Clients', ar: 'العملاء المتصلون', de: 'Verbundene Clients' })}</p>
             {mcpStatus?.clients?.map((c: any) => (
               <div key={c.id} className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-green-400" />
@@ -380,7 +382,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
         <div className="flex items-center gap-2">
           <Key className="w-4 h-4 text-purple-500" />
-          <p className="font-semibold text-slate-800 dark:text-slate-100">API Token Authentication</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'API Token Authentication', ar: 'المصادقة برمز API', de: 'API-Token-Authentifizierung' })}</p>
         </div>
         <div className="flex items-center gap-2 mt-2">
           <input
@@ -392,7 +394,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
           <button
             onClick={() => setMcpTokenVisible(!mcpTokenVisible)}
             className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-            title={mcpTokenVisible ? "Hide Token" : "Show Token"}
+            title={mcpTokenVisible ? l({ en: 'Hide Token', ar: 'إخفاء الرمز', de: 'Token verbergen' }) : l({ en: 'Show Token', ar: 'إظهار الرمز', de: 'Token anzeigen' })}
           >
             {mcpTokenVisible ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
           </button>
@@ -405,21 +407,21 @@ export const McpSection: React.FC<McpSectionProps> = ({
           <button
             onClick={handleRotateToken}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 text-sm hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
-            title="Revoke old token and generate a new one"
+            title={l({ en: 'Revoke old token and generate a new one', ar: 'إلغاء الرمز القديم وإنشاء رمز جديد', de: 'Altes Token widerrufen und ein neues erzeugen' })}
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            Rotate
+            {l({ en: 'Rotate', ar: 'تجديد', de: 'Erneuern' })}
           </button>
         </div>
-        <p className="text-xs text-slate-500">This token is required for all MCP clients to connect securely.</p>
+        <p className="text-xs text-slate-500">{l({ en: 'This token is required for all MCP clients to connect securely.', ar: 'هذا الرمز مطلوب لاتصال كل عملاء MCP بأمان.', de: 'Dieses Token benötigen alle MCP-Clients für eine sichere Verbindung.' })}</p>
       </div>
 
       {/* Activity Log */}
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-semibold text-slate-800 dark:text-slate-100">Agent Activity Log</p>
-            <p className="text-xs text-slate-500 mt-0.5">Export every executed/declined action with reason (JSON or CSV). Stored in memory.</p>
+            <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Agent Activity Log', ar: 'سجل نشاط الوكيل', de: 'Agent-Aktivitätsprotokoll' })}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{l({ en: 'Export every executed/declined action with reason (JSON or CSV). Stored in memory.', ar: 'صدّر كل إجراء نُفّذ أو رُفض مع السبب (JSON أو CSV). يُحفظ في الذاكرة.', de: 'Jede ausgeführte oder abgelehnte Aktion mit Grund exportieren (JSON oder CSV). Im Arbeitsspeicher gespeichert.' })}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -428,7 +430,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
             >
               <Copy className="w-3.5 h-3.5" />
-              {logExporting ? 'Exporting…' : 'Export JSON'}
+              {logExporting ? l({ en: 'Exporting…', ar: 'جارٍ التصدير…', de: 'Wird exportiert…' }) : l({ en: 'Export JSON', ar: 'تصدير JSON', de: 'JSON exportieren' })}
             </button>
             <button
               onClick={() => handleExportLog('csv')}
@@ -436,7 +438,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
             >
               <Copy className="w-3.5 h-3.5" />
-              {logExporting ? 'Exporting…' : 'Export CSV'}
+              {logExporting ? l({ en: 'Exporting…', ar: 'جارٍ التصدير…', de: 'Wird exportiert…' }) : l({ en: 'Export CSV', ar: 'تصدير CSV', de: 'CSV exportieren' })}
             </button>
           </div>
         </div>
@@ -446,12 +448,12 @@ export const McpSection: React.FC<McpSectionProps> = ({
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-semibold text-slate-800 dark:text-slate-100">Setup Guide</p>
-            <p className="text-xs text-slate-500 mt-0.5">Add this to your AI tool's MCP config (e.g., claude_desktop_config.json). Copied configs run the bundled stdio bridge, so Node.js must be on PATH.</p>
+            <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Setup Guide', ar: 'دليل الإعداد', de: 'Einrichtungsanleitung' })}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{l({ en: 'Add this to your AI tool\'s MCP config (e.g., claude_desktop_config.json). Copied configs run the bundled stdio bridge, so Node.js must be on PATH.', ar: 'أضف هذا إلى إعدادات MCP في أداة الذكاء الاصطناعي (مثل claude_desktop_config.json). تشغّل الإعدادات المنسوخة جسر stdio المرفق، لذا يجب أن يكون Node.js ضمن PATH.', de: 'Fügen Sie dies der MCP-Konfiguration Ihres KI-Werkzeugs hinzu (z. B. claude_desktop_config.json). Kopierte Konfigurationen starten die mitgelieferte stdio-Bridge; Node.js muss im PATH sein.' })}</p>
           </div>
           <button
             onClick={handleCopyOpenCodeConfig}
-            title="Copies a ready opencode.json entry (type: local) that runs the bundled stdio bridge with the live port and token. Paste it into opencode.json in your project or ~/.config/opencode/opencode.json. Requires Node.js on PATH."
+            title={l({ en: 'Copies a ready opencode.json entry (type: local) that runs the bundled stdio bridge with the live port and token. Paste it into opencode.json in your project or ~/.config/opencode/opencode.json. Requires Node.js on PATH.', ar: 'ينسخ إدخالاً جاهزاً لملف opencode.json (type: local) يشغّل جسر stdio المرفق بالمنفذ والرمز الحاليين. الصقه في opencode.json في مشروعك أو في ~/.config/opencode/opencode.json. يتطلب وجود Node.js ضمن PATH.', de: 'Kopiert einen fertigen opencode.json-Eintrag (type: local), der die mitgelieferte stdio-Bridge mit aktuellem Port und Token startet. Fügen Sie ihn in opencode.json Ihres Projekts oder in ~/.config/opencode/opencode.json ein. Node.js muss im PATH sein.' })}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
           >
             <Copy className="w-3.5 h-3.5" />
@@ -462,7 +464,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
           >
             {mcpCopied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-            {mcpCopied ? 'Copied!' : 'Copy'}
+            {mcpCopied ? l({ en: 'Copied!', ar: 'تم النسخ!', de: 'Kopiert!' }) : l({ en: 'Copy', ar: 'نسخ', de: 'Kopieren' })}
           </button>
         </div>
         <pre className="bg-slate-950 text-green-400 text-sm rounded-xl p-4 font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">
@@ -474,20 +476,20 @@ export const McpSection: React.FC<McpSectionProps> = ({
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-orange-500" />
-          <p className="font-semibold text-slate-800 dark:text-slate-100">Tool Permissions ({MCP_TOOLS.length})</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Tool Permissions ({n})', ar: 'أذونات الأدوات ({n})', de: 'Werkzeugberechtigungen ({n})' }, { n: MCP_TOOLS.length })}</p>
         </div>
-        <p className="text-xs text-slate-500 mb-2">Enable or disable specific browser capabilities. Sensitive actions are disabled by default.</p>
+        <p className="text-xs text-slate-500 mb-2">{l({ en: 'Enable or disable specific browser capabilities. Sensitive actions are disabled by default.', ar: 'فعّل أو عطّل قدرات معيّنة في المتصفح. الإجراءات الحساسة معطّلة افتراضياً.', de: 'Bestimmte Browserfunktionen aktivieren oder deaktivieren. Sensible Aktionen sind standardmäßig deaktiviert.' })}</p>
         <div className="grid grid-cols-1 gap-1.5 max-h-[400px] overflow-y-auto pr-1">
           {MCP_TOOLS.map(tool => {
             const isDisabled = disabledTools.includes(tool.name);
             let badgeClass = "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400";
-            let badgeText = "Safe";
+            let badgeText = l({ en: 'Safe', ar: 'آمن', de: 'Sicher' });
             if (tool.level === 'medium') {
               badgeClass = "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
-              badgeText = "Medium";
+              badgeText = l({ en: 'Medium', ar: 'متوسط', de: 'Mittel' });
             } else if (tool.level === 'sensitive') {
               badgeClass = "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400";
-              badgeText = "Sensitive";
+              badgeText = l({ en: 'Sensitive', ar: 'حساس', de: 'Sensibel' });
             }
 
             return (
@@ -517,9 +519,9 @@ export const McpSection: React.FC<McpSectionProps> = ({
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="font-semibold text-slate-800 dark:text-slate-100">Keep the agent's logins</p>
+              <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Keep the agent\'s logins', ar: 'الاحتفاظ بتسجيلات دخول الوكيل', de: 'Anmeldungen des Agenten behalten' })}</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Saves the agent session (cookies and logins) on this computer so you only sign in once: open a tab with the agent, sign in yourself, then let the agent work. The agent never sees your password. Anyone with access to this computer, and any instruction the agent follows, can use those logins until you clear them. Applies to tabs the agent opens from now on.
+                {l({ en: 'Saves the agent session (cookies and logins) on this computer so you only sign in once: open a tab with the agent, sign in yourself, then let the agent work. The agent never sees your password. Anyone with access to this computer, and any instruction the agent follows, can use those logins until you clear them. Applies to tabs the agent opens from now on.', ar: 'يحفظ جلسة الوكيل (ملفات تعريف الارتباط وتسجيلات الدخول) على هذا الحاسوب لتسجّل الدخول مرة واحدة فقط: افتح تبويباً للوكيل، وسجّل الدخول بنفسك، ثم دع الوكيل يعمل. لا يرى الوكيل كلمة مرورك أبداً. يستطيع أي شخص يصل إلى هذا الحاسوب، وأي تعليمات ينفذها الوكيل، استخدام تسجيلات الدخول هذه حتى تمسحها. ينطبق على التبويبات التي يفتحها الوكيل من الآن فصاعداً.', de: 'Speichert die Agent-Sitzung (Cookies und Anmeldungen) auf diesem Computer, damit Sie sich nur einmal anmelden: Öffnen Sie einen Tab mit dem Agenten, melden Sie sich selbst an und lassen Sie dann den Agenten arbeiten. Der Agent sieht Ihr Passwort nie. Jeder mit Zugriff auf diesen Computer und jede Anweisung, der der Agent folgt, kann diese Anmeldungen nutzen, bis Sie sie löschen. Gilt für Tabs, die der Agent ab jetzt öffnet.' })}
               </p>
             </div>
             <button
@@ -527,59 +529,58 @@ export const McpSection: React.FC<McpSectionProps> = ({
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.agentPersistentProfile ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-600'}`}
               role="switch"
               aria-checked={Boolean(settings.agentPersistentProfile)}
-              aria-label="Keep the agent's logins"
+              aria-label={l({ en: 'Keep the agent\'s logins', ar: 'الاحتفاظ بتسجيلات دخول الوكيل', de: 'Anmeldungen des Agenten behalten' })}
             >
               <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.agentPersistentProfile ? 'translate-x-4' : 'translate-x-0'}`} />
             </button>
           </div>
           <button
             onClick={async () => {
-              if (!await showConfirm({ message: 'Clear everything the agent has stored (cookies, logins, caches)?', confirmLabel: 'Clear' })) return;
+              if (!await showConfirm({ message: l({ en: 'Clear everything the agent has stored (cookies, logins, caches)?', ar: 'هل تريد مسح كل ما خزّنه الوكيل (ملفات تعريف الارتباط، تسجيلات الدخول، الذاكرة المؤقتة)؟', de: 'Alles löschen, was der Agent gespeichert hat (Cookies, Anmeldungen, Caches)?' }), confirmLabel: l({ en: 'Clear', ar: 'مسح', de: 'Löschen' }) })) return;
               await (window as any).electronAPI?.clearAgentProfile?.();
             }}
             className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm hover:bg-red-50 dark:hover:bg-red-950/40"
           >
-            Clear the agent's session
+            {l({ en: 'Clear the agent\'s session', ar: 'مسح جلسة الوكيل', de: 'Agent-Sitzung löschen' })}
           </button>
         </div>
       )}
 
       {/* Record and replay */}
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
-        <p className="font-semibold text-slate-800 dark:text-slate-100">Record and replay</p>
+        <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Record and replay', ar: 'التسجيل والإعادة', de: 'Aufzeichnen und wiedergeben' })}</p>
         <p className="text-xs text-slate-500">
-          Record what an agent does, then replay it later without any AI model. Every replayed step goes through the same approval as a live action.
-          Text typed into password-like fields is never stored; a replay stops there and waits for you. Steps that used a page element are found again by their role and name, and the replay stops if the page no longer has them.
+          {l({ en: 'Record what an agent does, then replay it later without any AI model. Every replayed step goes through the same approval as a live action. Text typed into password-like fields is never stored; a replay stops there and waits for you. Steps that used a page element are found again by their role and name, and the replay stops if the page no longer has them.', ar: 'سجّل ما يفعله الوكيل ثم أعده لاحقاً دون أي نموذج ذكاء اصطناعي. تمرّ كل خطوة مُعادة بالموافقة نفسها التي يمرّ بها الإجراء المباشر. لا يُحفظ أي نص يُكتب في حقول كلمات المرور؛ تتوقف الإعادة هناك وتنتظرك. يُعاد العثور على عناصر الصفحة بدورها واسمها، وتتوقف الإعادة إن لم تعد الصفحة تحتويها.', de: 'Zeichnen Sie auf, was ein Agent tut, und spielen Sie es später ohne KI-Modell ab. Jeder wiedergegebene Schritt durchläuft dieselbe Freigabe wie eine Live-Aktion. In passwortähnliche Felder eingegebener Text wird nie gespeichert; die Wiedergabe hält dort an und wartet auf Sie. Seitenelemente werden über Rolle und Namen wiedergefunden; fehlen sie, stoppt die Wiedergabe.' })}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {!recState.recording ? (
-            <button onClick={() => void startRecording()} disabled={recState.replaying} className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600 disabled:opacity-40">Start recording</button>
+            <button onClick={() => void startRecording()} disabled={recState.replaying} className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600 disabled:opacity-40">{l({ en: 'Start recording', ar: 'بدء التسجيل', de: 'Aufnahme starten' })}</button>
           ) : (
             <>
               <input
                 value={recName}
                 onChange={(event) => setRecName(event.target.value)}
-                placeholder="Name this recording"
-                aria-label="Recording name"
+                placeholder={l({ en: 'Name this recording', ar: 'سمِّ هذا التسجيل', de: 'Aufzeichnung benennen' })}
+                aria-label={l({ en: 'Recording name', ar: 'اسم التسجيل', de: 'Name der Aufzeichnung' })}
                 maxLength={80}
                 className="flex-1 min-w-[160px] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
               />
-              <button onClick={() => void stopRecording()} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm hover:bg-red-600">Stop and save</button>
-              <button onClick={() => void loadRecordings()} className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs">{recState.steps} step(s) so far</button>
+              <button onClick={() => void stopRecording()} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm hover:bg-red-600">{l({ en: 'Stop and save', ar: 'إيقاف وحفظ', de: 'Stoppen und speichern' })}</button>
+              <button onClick={() => void loadRecordings()} className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs">{l({ en: '{n} step(s) so far', ar: '{n} خطوة حتى الآن', de: '{n} Schritt(e) bisher' }, { n: recState.steps })}</button>
             </>
           )}
         </div>
         {recMessage && <p className="text-xs text-slate-600 dark:text-slate-300" role="status">{recMessage}</p>}
         {recState.recordings.length === 0 ? (
-          <p className="text-xs text-slate-400">No recordings yet.</p>
+          <p className="text-xs text-slate-400">{l({ en: 'No recordings yet.', ar: 'لا توجد تسجيلات بعد.', de: 'Noch keine Aufzeichnungen.' })}</p>
         ) : (
           <ul className="space-y-1.5">
             {recState.recordings.map(rec => (
               <li key={rec.id} className="flex items-center justify-between gap-2 py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
-                <span className="min-w-0 truncate text-sm text-slate-700 dark:text-slate-200">{rec.name} <span className="text-xs text-slate-400">({rec.steps} steps)</span></span>
+                <span className="min-w-0 truncate text-sm text-slate-700 dark:text-slate-200">{rec.name} <span className="text-xs text-slate-400">({l({ en: '{n} steps', ar: '{n} خطوات', de: '{n} Schritte' }, { n: rec.steps })})</span></span>
                 <span className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => void replayRecording(rec.id)} disabled={recState.replaying || recState.recording} className="text-xs text-blue-600 hover:underline disabled:opacity-40">Replay</button>
-                  <button onClick={() => void deleteRecording(rec.id)} aria-label={`Delete ${rec.name}`} className="text-xs text-slate-500 hover:text-red-600">Delete</button>
+                  <button onClick={() => void replayRecording(rec.id)} disabled={recState.replaying || recState.recording} className="text-xs text-blue-600 hover:underline disabled:opacity-40">{l({ en: 'Replay', ar: 'إعادة', de: 'Wiedergeben' })}</button>
+                  <button onClick={() => void deleteRecording(rec.id)} aria-label={l({ en: 'Delete {name}', ar: 'حذف {name}', de: '{name} löschen' }, { name: rec.name })} className="text-xs text-slate-500 hover:text-red-600">{l({ en: 'Delete', ar: 'حذف', de: 'Löschen' })}</button>
                 </span>
               </li>
             ))}
@@ -591,20 +592,19 @@ export const McpSection: React.FC<McpSectionProps> = ({
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="font-semibold text-slate-800 dark:text-slate-100">Approval mode</p>
+            <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Approval mode', ar: 'وضع الموافقة', de: 'Freigabemodus' })}</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              <strong>Balanced</strong> asks for sensitive actions only (purchases, sending, deleting, sign-in and similar).
-              <strong> Strict</strong> asks for every agent action, including reading a page. Sensitive actions always ask in both modes.
+              {l({ en: 'Balanced asks for sensitive actions only (purchases, sending, deleting, sign-in and similar). Strict asks for every agent action, including reading a page. Sensitive actions always ask in both modes.', ar: '«متوازن» يطلب الموافقة على الإجراءات الحساسة فقط (الشراء، الإرسال، الحذف، تسجيل الدخول وما شابه). «صارم» يطلبها لكل إجراء يقوم به الوكيل، حتى قراءة الصفحة. الإجراءات الحساسة تطلب الموافقة دائماً في الوضعين.', de: '„Ausgewogen“ fragt nur bei sensiblen Aktionen (Käufe, Senden, Löschen, Anmelden und Ähnliches). „Streng“ fragt bei jeder Agent-Aktion, auch beim Lesen einer Seite. Sensible Aktionen fragen in beiden Modi immer nach.' })}
             </p>
           </div>
           <select
             value={approvalMode}
             onChange={(event) => void changeApprovalMode(event.target.value === 'strict' ? 'strict' : 'balanced')}
-            aria-label="Approval mode"
+            aria-label={l({ en: 'Approval mode', ar: 'وضع الموافقة', de: 'Freigabemodus' })}
             className="shrink-0 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
           >
-            <option value="balanced">Balanced</option>
-            <option value="strict">Strict</option>
+            <option value="balanced">{l({ en: 'Balanced', ar: 'متوازن', de: 'Ausgewogen' })}</option>
+            <option value="strict">{l({ en: 'Strict', ar: 'صارم', de: 'Streng' })}</option>
           </select>
         </div>
       </div>
@@ -612,31 +612,31 @@ export const McpSection: React.FC<McpSectionProps> = ({
       {/* Activity log */}
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="font-semibold text-slate-800 dark:text-slate-100">Agent activity ({activity.length})</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Agent activity ({n})', ar: 'نشاط الوكيل ({n})', de: 'Agent-Aktivität ({n})' }, { n: activity.length })}</p>
           <div className="flex items-center gap-2">
             <select
               value={activityFilter}
               onChange={(event) => setActivityFilter(event.target.value as typeof activityFilter)}
-              aria-label="Filter activity"
+              aria-label={l({ en: 'Filter activity', ar: 'تصفية النشاط', de: 'Aktivität filtern' })}
               className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100"
             >
-              <option value="all">All</option>
-              <option value="completed">Completed</option>
-              <option value="rejected">Rejected</option>
-              <option value="failed">Failed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="all">{l({ en: 'All', ar: 'الكل', de: 'Alle' })}</option>
+              <option value="completed">{l({ en: 'Completed', ar: 'مكتمل', de: 'Abgeschlossen' })}</option>
+              <option value="rejected">{l({ en: 'Rejected', ar: 'مرفوض', de: 'Abgelehnt' })}</option>
+              <option value="failed">{l({ en: 'Failed', ar: 'فشل', de: 'Fehlgeschlagen' })}</option>
+              <option value="cancelled">{l({ en: 'Cancelled', ar: 'ملغى', de: 'Abgebrochen' })}</option>
             </select>
-            <button onClick={() => void loadActivity()} className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs hover:bg-slate-200 dark:hover:bg-slate-600">Refresh</button>
+            <button onClick={() => void loadActivity()} className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs hover:bg-slate-200 dark:hover:bg-slate-600">{l({ en: 'Refresh', ar: 'تحديث', de: 'Aktualisieren' })}</button>
           </div>
         </div>
         {(() => {
           const rows = activity.filter(entry => activityFilter === 'all' || entry.status === activityFilter);
-          if (rows.length === 0) return <p className="text-xs text-slate-400">No activity to show.</p>;
+          if (rows.length === 0) return <p className="text-xs text-slate-400">{l({ en: 'No activity to show.', ar: 'لا يوجد نشاط لعرضه.', de: 'Keine Aktivität vorhanden.' })}</p>;
           return (
             <div className="max-h-[300px] overflow-y-auto pr-1">
-              <table className="w-full text-xs text-left">
+              <table className="w-full text-xs text-start">
                 <thead className="text-slate-500">
-                  <tr><th className="py-1 pr-2 font-medium">Time</th><th className="py-1 pr-2 font-medium">Tool</th><th className="py-1 pr-2 font-medium">Site</th><th className="py-1 pr-2 font-medium">Result</th></tr>
+                  <tr><th className="py-1 pr-2 font-medium">{l({ en: 'Time', ar: 'الوقت', de: 'Zeit' })}</th><th className="py-1 pr-2 font-medium">{l({ en: 'Tool', ar: 'الأداة', de: 'Werkzeug' })}</th><th className="py-1 pr-2 font-medium">{l({ en: 'Site', ar: 'الموقع', de: 'Website' })}</th><th className="py-1 pr-2 font-medium">{l({ en: 'Result', ar: 'النتيجة', de: 'Ergebnis' })}</th></tr>
                 </thead>
                 <tbody>
                   {rows.map(entry => (
@@ -644,7 +644,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
                       <td className="py-1 pr-2 whitespace-nowrap text-slate-500">{entry.requestedAt ? new Date(entry.requestedAt).toLocaleString() : ''}</td>
                       <td className="py-1 pr-2"><code className="text-blue-600 dark:text-blue-400">{entry.tool}</code></td>
                       <td className="py-1 pr-2 text-slate-600 dark:text-slate-300 break-all">{entry.domain}</td>
-                      <td className={`py-1 pr-2 font-medium ${entry.status === 'completed' ? 'text-green-600' : entry.status === 'rejected' ? 'text-amber-600' : 'text-red-600'}`}>{entry.status}</td>
+                      <td className={`py-1 pr-2 font-medium ${entry.status === 'completed' ? 'text-green-600' : entry.status === 'rejected' ? 'text-amber-600' : 'text-red-600'}`}>{({ completed: l({ en: 'completed', ar: 'مكتمل', de: 'abgeschlossen' }), rejected: l({ en: 'rejected', ar: 'مرفوض', de: 'abgelehnt' }), failed: l({ en: 'failed', ar: 'فشل', de: 'fehlgeschlagen' }), cancelled: l({ en: 'cancelled', ar: 'ملغى', de: 'abgebrochen' }) } as Record<string, string>)[entry.status] ?? entry.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -652,17 +652,16 @@ export const McpSection: React.FC<McpSectionProps> = ({
             </div>
           );
         })()}
-        <p className="text-[11px] text-slate-400">Showing the latest 100 saved actions. Hover a row for the reason. Export the full log from the Agent Control panel.</p>
+        <p className="text-[11px] text-slate-400">{l({ en: 'Showing the latest 100 saved actions. Hover a row for the reason. Export the full log from the Agent Control panel.', ar: 'يُعرض آخر 100 إجراء محفوظ. مرّر المؤشر فوق صف لمعرفة السبب. صدّر السجل الكامل من لوحة التحكم بالوكيل.', de: 'Die letzten 100 gespeicherten Aktionen. Fahren Sie über eine Zeile, um den Grund zu sehen. Das vollständige Protokoll exportieren Sie im Agent-Steuerungsfeld.' })}</p>
       </div>
 
       {/* Isolated agent profile */}
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="font-semibold text-slate-800 dark:text-slate-100">Isolated agent profile</p>
+            <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Isolated agent profile', ar: 'ملف تعريف معزول للوكيل', de: 'Isoliertes Agent-Profil' })}</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              The agent works in its own session (separate cookies and storage) and can only see and use tabs it opened itself, never the tabs you are signed in to.
-              It starts signed out. By default this session is cleared when you close the window.
+              {l({ en: 'The agent works in its own session (separate cookies and storage) and can only see and use tabs it opened itself, never the tabs you are signed in to. It starts signed out. By default this session is cleared when you close the window.', ar: 'يعمل الوكيل في جلسته الخاصة (ملفات تعريف ارتباط وتخزين منفصلين) ولا يرى ولا يستخدم إلا التبويبات التي فتحها بنفسه، وليس أبداً التبويبات التي سجّلت فيها دخولك. يبدأ دون تسجيل دخول، وتُمسح هذه الجلسة افتراضياً عند إغلاق النافذة.', de: 'Der Agent arbeitet in einer eigenen Sitzung (getrennte Cookies und Speicher) und sieht und nutzt nur Tabs, die er selbst geöffnet hat, nie Tabs, in denen Sie angemeldet sind. Er startet abgemeldet. Standardmäßig wird diese Sitzung beim Schließen des Fensters gelöscht.' })}
             </p>
           </div>
           <button
@@ -670,7 +669,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
             className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.agentIsolatedProfile ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-600'}`}
             role="switch"
             aria-checked={Boolean(settings.agentIsolatedProfile)}
-            aria-label="Isolated agent profile"
+            aria-label={l({ en: 'Isolated agent profile', ar: 'ملف تعريف معزول للوكيل', de: 'Isoliertes Agent-Profil' })}
           >
             <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.agentIsolatedProfile ? 'translate-x-4' : 'translate-x-0'}`} />
           </button>
@@ -681,11 +680,10 @@ export const McpSection: React.FC<McpSectionProps> = ({
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-red-500" />
-          <p className="font-semibold text-slate-800 dark:text-slate-100">Site Rules ({siteRules.length})</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Site Rules ({n})', ar: 'قواعد المواقع ({n})', de: 'Website-Regeln ({n})' }, { n: siteRules.length })}</p>
         </div>
         <p className="text-xs text-slate-500">
-          <strong>Always ask</strong> requires your approval for every agent action on a site (for example your bank).
-          <strong> Block</strong> stops the agent from reading, using or opening it. Rules also apply to subdomains and can only make the agent more restricted.
+          {l({ en: 'Always ask requires your approval for every agent action on a site (for example your bank). Block stops the agent from reading, using or opening it. Rules also apply to subdomains and can only make the agent more restricted.', ar: '«اسأل دائماً» يتطلب موافقتك على كل إجراء للوكيل في الموقع (مثل موقع البنك). «حظر» يمنع الوكيل من قراءة الموقع أو استخدامه أو فتحه. تنطبق القواعد على النطاقات الفرعية أيضاً، ولا يمكنها إلا زيادة تقييد الوكيل.', de: '„Immer fragen“ verlangt Ihre Freigabe für jede Agent-Aktion auf einer Website (z. B. Ihrer Bank). „Blockieren“ hindert den Agenten daran, sie zu lesen, zu nutzen oder zu öffnen. Regeln gelten auch für Subdomains und können den Agenten nur stärker einschränken.' })}
         </p>
         <form
           className="flex flex-wrap gap-2"
@@ -700,7 +698,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
             value={ruleDomain}
             onChange={(event) => setRuleDomain(event.target.value)}
             placeholder="bank.example.com"
-            aria-label="Site domain"
+            aria-label={l({ en: 'Site domain', ar: 'نطاق الموقع', de: 'Website-Domain' })}
             maxLength={253}
             className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
           />
@@ -710,13 +708,13 @@ export const McpSection: React.FC<McpSectionProps> = ({
             aria-label="Rule"
             className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
           >
-            <option value="ask">Always ask</option>
-            <option value="block">Block</option>
+            <option value="ask">{l({ en: 'Always ask', ar: 'اسأل دائماً', de: 'Immer fragen' })}</option>
+            <option value="block">{l({ en: 'Block', ar: 'حظر', de: 'Blockieren' })}</option>
           </select>
-          <button type="submit" className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600">Add</button>
+          <button type="submit" className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600">{l({ en: 'Add', ar: 'إضافة', de: 'Hinzufügen' })}</button>
         </form>
         {siteRules.length === 0 ? (
-          <p className="text-xs text-slate-400">No site rules yet.</p>
+          <p className="text-xs text-slate-400">{l({ en: 'No site rules yet.', ar: 'لا توجد قواعد مواقع بعد.', de: 'Noch keine Website-Regeln.' })}</p>
         ) : (
           <ul className="space-y-1.5">
             {siteRules.map(rule => (
@@ -724,15 +722,15 @@ export const McpSection: React.FC<McpSectionProps> = ({
                 <code className="text-xs font-mono text-slate-700 dark:text-slate-200 truncate">{rule.domain}</code>
                 <span className="flex items-center gap-2 shrink-0">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${rule.mode === 'block' ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400'}`}>
-                    {rule.mode === 'block' ? 'Block' : 'Always ask'}
+                    {rule.mode === 'block' ? l({ en: 'Block', ar: 'حظر', de: 'Blockieren' }) : l({ en: 'Always ask', ar: 'اسأل دائماً', de: 'Immer fragen' })}
                   </span>
                   <button
                     type="button"
                     onClick={() => void saveSiteRules(siteRules.filter(r => r.domain !== rule.domain))}
-                    aria-label={`Remove rule for ${rule.domain}`}
+                    aria-label={l({ en: 'Remove rule for {domain}', ar: 'إزالة قاعدة {domain}', de: 'Regel für {domain} entfernen' }, { domain: rule.domain })}
                     className="text-xs text-slate-500 hover:text-red-600"
                   >
-                    Remove
+                    {l({ en: 'Remove', ar: 'إزالة', de: 'Entfernen' })}
                   </button>
                 </span>
               </li>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Key, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
+import { useTranslation } from '../../services/i18n';
 
 function safeParseArray<T>(raw: string | null): T[] {
   if (!raw) return [];
@@ -16,6 +17,7 @@ function safeParseArray<T>(raw: string | null): T[] {
 const getPasswordKey = (p: any) => `${p?.origin || p?.hostname || ''}\0${p?.username || ''}`;
 
 const PasswordList = () => {
+  const { l } = useTranslation();
   const [passwords, setPasswords] = useState<any[]>([]);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
 
@@ -43,10 +45,10 @@ const PasswordList = () => {
     if (!target) return;
 
     const confirmed = await showConfirm({
-      title: 'Delete Password',
-      message: `Are you sure you want to delete the password for ${target.username} on ${target.hostname}?`,
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel'
+      title: l({ en: 'Delete Password', ar: 'حذف كلمة المرور', de: 'Passwort löschen' }),
+      message: l({ en: 'Delete the password for {user} on {host}?', ar: 'هل تريد حذف كلمة مرور {user} على {host}؟', de: 'Passwort für {user} auf {host} löschen?' }, { user: target.username, host: target.hostname }),
+      confirmLabel: l({ en: 'Delete', ar: 'حذف', de: 'Löschen' }),
+      cancelLabel: l({ en: 'Cancel', ar: 'إلغاء', de: 'Abbrechen' })
     });
     if (!confirmed) return;
 
@@ -79,7 +81,7 @@ const PasswordList = () => {
   };
 
   if (passwords.length === 0) {
-    return <div className="p-6 text-center text-slate-500">No saved passwords yet.</div>;
+    return <div className="p-6 text-center text-slate-500">{l({ en: 'No saved passwords yet.', ar: 'لا توجد كلمات مرور محفوظة بعد.', de: 'Noch keine gespeicherten Passwörter.' })}</div>;
   }
 
   return (
@@ -120,11 +122,12 @@ const PasswordList = () => {
 };
 
 export const PasswordsSection: React.FC = () => {
+  const { l } = useTranslation();
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <section>
         <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Saved Passwords</h2>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Saved Passwords', ar: 'كلمات المرور المحفوظة', de: 'Gespeicherte Passwörter' })}</h2>
         </div>
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
           <PasswordList />

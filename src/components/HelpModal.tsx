@@ -22,6 +22,7 @@ import {
   Volume2
 } from 'lucide-react';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { useTranslation } from '../services/i18n';
 
 const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -49,50 +50,50 @@ function formatKeyForPlatform(key: string, mac: boolean): string {
 
 const SHORTCUT_GROUPS = [
   {
-    title: 'Tabs & Windows',
+    title: { en: 'Tabs & Windows', ar: 'التبويبات والنوافذ', de: 'Tabs & Fenster' },
     shortcuts: [
-      { keys: ['⌘', 'T'], desc: 'New tab' },
-      { keys: ['⌘', 'N'], desc: 'New window' },
-      { keys: ['⇧', '⌘', 'N'], desc: 'New Incognito tab' },
-      { keys: ['⌘', 'W'], desc: 'Close active tab' },
-      { keys: ['⇧', '⌘', 'T'], desc: 'Reopen closed tab' },
-      { keys: ['^', 'Tab'], desc: 'Next tab' },
-      { keys: ['^', '⇧', 'Tab'], desc: 'Previous tab' },
-      { keys: ['⌘', '1-9'], desc: 'Switch to tab 1-9' },
+      { keys: ['⌘', 'T'], desc: { en: 'New tab', ar: 'تبويب جديد', de: 'Neuer Tab' } },
+      { keys: ['⌘', 'N'], desc: { en: 'New window', ar: 'نافذة جديدة', de: 'Neues Fenster' } },
+      { keys: ['⇧', '⌘', 'N'], desc: { en: 'New Incognito tab', ar: 'تبويب تصفح خفي جديد', de: 'Neuer Inkognito-Tab' } },
+      { keys: ['⌘', 'W'], desc: { en: 'Close active tab', ar: 'إغلاق التبويب الحالي', de: 'Aktiven Tab schließen' } },
+      { keys: ['⇧', '⌘', 'T'], desc: { en: 'Reopen closed tab', ar: 'إعادة فتح التبويب المغلق', de: 'Geschlossenen Tab wieder öffnen' } },
+      { keys: ['^', 'Tab'], desc: { en: 'Next tab', ar: 'التبويب التالي', de: 'Nächster Tab' } },
+      { keys: ['^', '⇧', 'Tab'], desc: { en: 'Previous tab', ar: 'التبويب السابق', de: 'Vorheriger Tab' } },
+      { keys: ['⌘', '1-9'], desc: { en: 'Switch to tab 1-9', ar: 'الانتقال إلى التبويب 1-9', de: 'Zu Tab 1–9 wechseln' } },
     ]
   },
   {
-    title: 'Navigation & Search',
+    title: { en: 'Navigation & Search', ar: 'التنقل والبحث', de: 'Navigation & Suche' },
     shortcuts: [
-      { keys: ['⌘', 'L'], desc: 'Focus address / search bar' },
-      { keys: ['⌘', 'K'], desc: 'Open Quick Search / Spotlight' },
-      { keys: ['⌘', 'R'], desc: 'Reload page' },
-      { keys: ['⇧', '⌘', 'R'], desc: 'Force reload (ignore cache)' },
-      { keys: ['⌘', '['], desc: 'Go back' },
-      { keys: ['⌘', ']'], desc: 'Go forward' },
-      { keys: ['⌘', 'F'], desc: 'Find in page' },
-      { keys: ['⌘', 'P'], desc: 'Print / Save as PDF' },
+      { keys: ['⌘', 'L'], desc: { en: 'Focus address / search bar', ar: 'التركيز على شريط العنوان والبحث', de: 'Adress-/Suchleiste fokussieren' } },
+      { keys: ['⌘', 'K'], desc: { en: 'Open Quick Search / Spotlight', ar: 'فتح البحث السريع', de: 'Schnellsuche öffnen' } },
+      { keys: ['⌘', 'R'], desc: { en: 'Reload page', ar: 'إعادة تحميل الصفحة', de: 'Seite neu laden' } },
+      { keys: ['⇧', '⌘', 'R'], desc: { en: 'Force reload (ignore cache)', ar: 'إعادة تحميل كاملة (تجاهل الذاكرة المؤقتة)', de: 'Neu laden ohne Cache' } },
+      { keys: ['⌘', '['], desc: { en: 'Go back', ar: 'رجوع', de: 'Zurück' } },
+      { keys: ['⌘', ']'], desc: { en: 'Go forward', ar: 'تقدّم', de: 'Vorwärts' } },
+      { keys: ['⌘', 'F'], desc: { en: 'Find in page', ar: 'البحث في الصفحة', de: 'Auf Seite suchen' } },
+      { keys: ['⌘', 'P'], desc: { en: 'Print / Save as PDF', ar: 'طباعة / حفظ بصيغة PDF', de: 'Drucken / Als PDF speichern' } },
     ]
   },
   {
-    title: 'Zoom & Display',
+    title: { en: 'Zoom & Display', ar: 'التكبير والعرض', de: 'Zoom & Anzeige' },
     shortcuts: [
-      { keys: ['⌘', '+'], desc: 'Zoom in' },
-      { keys: ['⌘', '-'], desc: 'Zoom out' },
-      { keys: ['⌘', '0'], desc: 'Reset zoom to 100%' },
-      { keys: ['^', '⌘', 'F'], desc: 'Toggle full screen' },
-      { keys: ['⌘', 'S'], desc: 'Toggle vertical sidebar' },
-      { keys: ['⌥', '⌘', 'I'], desc: 'Toggle Developer Tools' },
+      { keys: ['⌘', '+'], desc: { en: 'Zoom in', ar: 'تكبير', de: 'Vergrößern' } },
+      { keys: ['⌘', '-'], desc: { en: 'Zoom out', ar: 'تصغير', de: 'Verkleinern' } },
+      { keys: ['⌘', '0'], desc: { en: 'Reset zoom to 100%', ar: 'إعادة التكبير إلى 100%', de: 'Zoom auf 100 % zurücksetzen' } },
+      { keys: ['^', '⌘', 'F'], desc: { en: 'Toggle full screen', ar: 'تبديل ملء الشاشة', de: 'Vollbild umschalten' } },
+      { keys: ['⌘', 'S'], desc: { en: 'Toggle vertical sidebar', ar: 'تبديل الشريط الجانبي العمودي', de: 'Vertikale Seitenleiste umschalten' } },
+      { keys: ['⌥', '⌘', 'I'], desc: { en: 'Toggle Developer Tools', ar: 'تبديل أدوات المطوّر', de: 'Entwicklertools umschalten' } },
     ]
   },
   {
-    title: 'Features & Tools',
+    title: { en: 'Features & Tools', ar: 'الميزات والأدوات', de: 'Funktionen & Werkzeuge' },
     shortcuts: [
-      { keys: ['⌘', 'D'], desc: 'Bookmark current tab' },
-      { keys: ['⌘', 'Y'], desc: 'Open History page' },
-      { keys: isMac ? ['⇧', '⌘', 'J'] : ['Ctrl', 'J'], desc: 'Open Downloads page' },
-      { keys: ['⌘', ','], desc: 'Open Settings' },
-      { keys: ['F1'], desc: 'Open Help Center' },
+      { keys: ['⌘', 'D'], desc: { en: 'Bookmark current tab', ar: 'إضافة التبويب الحالي إلى الإشارات المرجعية', de: 'Aktuellen Tab als Lesezeichen speichern' } },
+      { keys: ['⌘', 'Y'], desc: { en: 'Open History page', ar: 'فتح صفحة السجل', de: 'Verlauf öffnen' } },
+      { keys: isMac ? ['⇧', '⌘', 'J'] : ['Ctrl', 'J'], desc: { en: 'Open Downloads page', ar: 'فتح صفحة التنزيلات', de: 'Downloads öffnen' } },
+      { keys: ['⌘', ','], desc: { en: 'Open Settings', ar: 'فتح الإعدادات', de: 'Einstellungen öffnen' } },
+      { keys: ['F1'], desc: { en: 'Open Help Center', ar: 'فتح مركز المساعدة', de: 'Hilfecenter öffnen' } },
     ]
   }
 ];
@@ -102,6 +103,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
   onClose,
   initialTab = 'help'
 }) => {
+  const { l, language } = useTranslation();
   const [activeTab, setActiveTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>(initialTab);
   const [shortcutSearch, setShortcutSearch] = useState('');
   const [appVersion, setAppVersion] = useState<string>(() => {
@@ -140,11 +142,11 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
     return SHORTCUT_GROUPS.map(group => ({
       ...group,
       shortcuts: group.shortcuts.filter(sc => 
-        sc.desc.toLowerCase().includes(q) || 
+        l(sc.desc).toLowerCase().includes(q) || 
         sc.keys.some(k => k.toLowerCase().includes(q))
       )
     })).filter(group => group.shortcuts.length > 0);
-  }, [shortcutSearch]);
+  }, [shortcutSearch, language, l]);
 
   return (
     <AnimatePresence>
@@ -171,17 +173,17 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    King Browser Help & Documentation
+                    {l({ en: 'King Browser Help & Documentation', ar: 'مساعدة King Browser ووثائقه', de: 'King Browser Hilfe & Dokumentation' })}
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Keyboard shortcuts, AI features, and user guide
+                    {l({ en: 'Keyboard shortcuts, AI features, and user guide', ar: 'اختصارات لوحة المفاتيح وميزات الذكاء الاصطناعي ودليل الاستخدام', de: 'Tastenkürzel, KI-Funktionen und Benutzerhandbuch' })}
                   </p>
                 </div>
               </div>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                title="Close (Esc)"
+                title={l({ en: 'Close (Esc)', ar: 'إغلاق (Esc)', de: 'Schließen (Esc)' })}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -198,7 +200,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                 }`}
               >
                 <BookOpen className="w-3.5 h-3.5" />
-                <span>Guide</span>
+                <span>{l({ en: 'Guide', ar: 'الدليل', de: 'Anleitung' })}</span>
               </button>
 
               <button
@@ -210,7 +212,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                 }`}
               >
                 <Keyboard className="w-3.5 h-3.5" />
-                <span>Shortcuts</span>
+                <span>{l({ en: 'Shortcuts', ar: 'الاختصارات', de: 'Tastenkürzel' })}</span>
               </button>
 
               <button
@@ -222,7 +224,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>AI & Copilot</span>
+                <span>{l({ en: 'AI & Copilot', ar: 'الذكاء الاصطناعي والمساعد', de: 'KI & Copilot' })}</span>
               </button>
 
               <button
@@ -234,7 +236,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                 }`}
               >
                 <Shield className="w-3.5 h-3.5" />
-                <span>Privacy</span>
+                <span>{l({ en: 'Privacy', ar: 'الخصوصية', de: 'Datenschutz' })}</span>
               </button>
 
               <button
@@ -246,7 +248,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                 }`}
               >
                 <Info className="w-3.5 h-3.5" />
-                <span>About</span>
+                <span>{l({ en: 'About', ar: 'حول', de: 'Über' })}</span>
               </button>
             </div>
 
@@ -258,9 +260,9 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                   <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-start gap-3">
                     <Sparkles className="w-5 h-5 text-cyan-500 shrink-0 mt-0.5" />
                     <div className="text-xs space-y-1">
-                      <h4 className="font-bold text-slate-900 dark:text-cyan-300">Welcome to King Browser</h4>
+                      <h4 className="font-bold text-slate-900 dark:text-cyan-300">{l({ en: 'Welcome to King Browser', ar: 'مرحباً بك في King Browser', de: 'Willkommen bei King Browser' })}</h4>
                       <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                        King combines privacy-first browsing, local WebGPU AI models, Model Context Protocol (MCP), and split-screen workspaces into a lightweight desktop browser.
+                        {l({ en: 'King combines privacy-first browsing, local WebGPU AI models, Model Context Protocol (MCP), and split-screen workspaces into a lightweight desktop browser.', ar: 'يجمع King بين تصفح يضع الخصوصية أولاً، ونماذج ذكاء اصطناعي محلية عبر WebGPU، وبروتوكول MCP، ومساحات عمل بشاشة مقسومة، في متصفح سطح مكتب خفيف.', de: 'King vereint datenschutzorientiertes Surfen, lokale KI-Modelle per WebGPU, das Model Context Protocol (MCP) und Arbeitsbereiche mit geteiltem Bildschirm in einem schlanken Desktop-Browser.' })}
                       </p>
                     </div>
                   </div>
@@ -269,60 +271,60 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1.5">
                       <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
                         <Layers className="w-4 h-4 text-cyan-500" />
-                        <span>Split View & Workspaces</span>
+                        <span>{l({ en: 'Split View & Workspaces', ar: 'العرض المقسوم ومساحات العمل', de: 'Geteilte Ansicht & Arbeitsbereiche' })}</span>
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        Drag any tab into the browser area to split screen horizontally or vertically. Organize tabs into distinct Workspaces.
+                        {l({ en: 'Drag any tab into the browser area to split screen horizontally or vertically. Organize tabs into distinct Workspaces.', ar: 'اسحب أي تبويب إلى منطقة المتصفح لتقسيم الشاشة أفقياً أو عمودياً، ونظّم تبويباتك في مساحات عمل مستقلة.', de: 'Ziehen Sie einen Tab in den Browserbereich, um den Bildschirm horizontal oder vertikal zu teilen. Ordnen Sie Tabs in eigene Arbeitsbereiche.' })}
                       </p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1.5">
                       <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
                         <Command className="w-4 h-4 text-purple-500" />
-                        <span>Command Palette (⌘K)</span>
+                        <span>{l({ en: 'Command Palette (⌘K)', ar: 'لوحة الأوامر (⌘K)', de: 'Befehlspalette (⌘K)' })}</span>
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        Press ⌘K or ⌘L to quickly search open tabs, history, bookmarks, or run commands with instant keyboard navigation.
+                        {l({ en: 'Press ⌘K or ⌘L to quickly search open tabs, history, bookmarks, or run commands with instant keyboard navigation.', ar: 'اضغط ⌘K أو ⌘L للبحث سريعاً في التبويبات المفتوحة والسجل والإشارات المرجعية، أو لتنفيذ الأوامر من لوحة المفاتيح.', de: 'Drücken Sie ⌘K oder ⌘L, um offene Tabs, Verlauf und Lesezeichen zu durchsuchen oder Befehle per Tastatur auszuführen.' })}
                       </p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1.5">
                       <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
                         <Shield className="w-4 h-4 text-emerald-500" />
-                        <span>Privacy Shield & AdBlock</span>
+                        <span>{l({ en: 'Privacy Shield & AdBlock', ar: 'درع الخصوصية وحاجب الإعلانات', de: 'Privacy Shield & Werbeblocker' })}</span>
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        Built-in engine blocks trackers, banner ads, and malware scripts automatically without third-party extensions.
+                        {l({ en: 'Built-in engine blocks trackers, banner ads, and malware scripts automatically without third-party extensions.', ar: 'محرك مدمج يحظر أدوات التتبّع والإعلانات والسكربتات الضارة تلقائياً دون إضافات خارجية.', de: 'Die integrierte Engine blockiert Tracker, Werbebanner und Schadskripte automatisch, ohne Erweiterungen von Drittanbietern.' })}
                       </p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1.5">
                       <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
                         <Globe className="w-4 h-4 text-blue-500" />
-                        <span>Chrome Extensions</span>
+                        <span>{l({ en: 'Chrome Extensions', ar: 'إضافات Chrome', de: 'Chrome-Erweiterungen' })}</span>
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        Install Chrome extensions directly from the Chrome Web Store or load unpacked development extensions.
+                        {l({ en: 'Install Chrome extensions directly from the Chrome Web Store or load unpacked development extensions.', ar: 'ثبّت إضافات Chrome مباشرة من Chrome Web Store أو حمّل إضافات غير مضغوطة قيد التطوير.', de: 'Installieren Sie Chrome-Erweiterungen direkt aus dem Chrome Web Store oder laden Sie entpackte Entwicklungserweiterungen.' })}
                       </p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1.5">
                       <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
                         <Volume2 className="w-4 h-4 text-amber-500" />
-                        <span>Reader Mode & Voice TTS</span>
+                        <span>{l({ en: 'Reader Mode & Voice TTS', ar: 'وضع القراءة والقراءة الصوتية', de: 'Lesemodus & Vorlesen' })}</span>
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        Distraction-free article reader mode with native OS speech synthesis to read web articles aloud.
+                        {l({ en: 'Distraction-free article reader mode with native OS speech synthesis to read web articles aloud.', ar: 'وضع قراءة خالٍ من المشتتات، مع قراءة المقالات بصوت عالٍ عبر محرك الكلام في نظامك.', de: 'Ablenkungsfreier Lesemodus mit Sprachausgabe des Betriebssystems, die Artikel vorliest.' })}
                       </p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1.5">
                       <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
                         <Sliders className="w-4 h-4 text-rose-500" />
-                        <span>Themes & Customization</span>
+                        <span>{l({ en: 'Themes & Customization', ar: 'السمات والتخصيص', de: 'Designs & Anpassung' })}</span>
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        Customize accent colors, vertical tab styles, start page animations (Nebula, Cyber Grid, Aurora Waves), and dark themes.
+                        {l({ en: 'Customize accent colors, vertical tab styles, start page animations (Nebula, Cyber Grid, Aurora Waves), and dark themes.', ar: 'خصّص ألوان التمييز وأنماط التبويبات العمودية وحركات صفحة البداية (Nebula وCyber Grid وAurora Waves) والسمات الداكنة.', de: 'Passen Sie Akzentfarben, vertikale Tab-Stile, Startseiten-Animationen (Nebula, Cyber Grid, Aurora Waves) und dunkle Designs an.' })}
                       </p>
                     </div>
                   </div>
@@ -337,7 +339,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                     <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      placeholder="Search shortcuts (e.g. tab, zoom, reload, find)..."
+                      placeholder={l({ en: 'Search shortcuts (e.g. tab, zoom, reload, find)...', ar: 'ابحث في الاختصارات (مثلاً: تبويب، تكبير، تحميل، بحث)...', de: 'Tastenkürzel suchen (z. B. Tab, Zoom, Neu laden, Suchen)...' })}
                       value={shortcutSearch}
                       onChange={(e) => setShortcutSearch(e.target.value)}
                       className="w-full ps-10 pe-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
@@ -346,13 +348,13 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
 
                   {filteredShortcutGroups.length === 0 ? (
                     <div className="text-center py-8 text-xs text-slate-400">
-                      No shortcuts matching "{shortcutSearch}"
+                      {l({ en: 'No shortcuts matching "{q}"', ar: 'لا توجد اختصارات تطابق "{q}"', de: 'Keine Tastenkürzel für „{q}“' }, { q: shortcutSearch })}
                     </div>
                   ) : (
                     filteredShortcutGroups.map((group, idx) => (
                       <div key={idx} className="space-y-2">
                         <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          {group.title}
+                          {l(group.title)}
                         </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {group.shortcuts.map((sc, sIdx) => (
@@ -361,7 +363,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                               className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10"
                             >
                               <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                {sc.desc}
+                                {l(sc.desc)}
                               </span>
                               <div className="flex items-center gap-1">
                                 {sc.keys.map((k, kIdx) => (
@@ -388,29 +390,29 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                   <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 space-y-2">
                     <div className="flex items-center gap-2 font-bold text-sm text-purple-700 dark:text-purple-300">
                       <Cpu className="w-4 h-4" />
-                      <span>On-Device Local AI (Web-LLM) & Cloud Models</span>
+                      <span>{l({ en: 'On-Device Local AI (Web-LLM) & Cloud Models', ar: 'ذكاء اصطناعي محلي على جهازك (Web-LLM) ونماذج سحابية', de: 'Lokale KI auf dem Gerät (Web-LLM) & Cloud-Modelle' })}</span>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                      King Browser runs deep learning models directly on your device GPU using WebGPU, ensuring 100% privacy without sending web content to cloud servers.
+                      {l({ en: 'King Browser runs deep learning models directly on your device GPU using WebGPU, ensuring 100% privacy without sending web content to cloud servers.', ar: 'يشغّل King Browser نماذج التعلّم العميق مباشرة على معالج الرسوميات في جهازك عبر WebGPU، فتبقى خصوصيتك كاملة دون إرسال محتوى الصفحات إلى خوادم سحابية.', de: 'King Browser führt Deep-Learning-Modelle per WebGPU direkt auf der GPU Ihres Geräts aus – ohne Webinhalte an Cloud-Server zu senden.' })}
                     </p>
                   </div>
 
                   <div className="space-y-3">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      How to use AI Features
+                      {l({ en: 'How to use AI Features', ar: 'كيف تستخدم ميزات الذكاء الاصطناعي', de: 'So nutzen Sie die KI-Funktionen' })}
                     </h4>
                     <div className="space-y-2.5">
                       <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 text-xs space-y-1">
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">1. Address Bar Quick Trigger</p>
-                        <p className="text-slate-500 dark:text-slate-400">Type <code className="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded font-mono text-cyan-600 dark:text-cyan-400">@ai</code> followed by <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded font-mono">Tab</kbd> in the address bar to ask the AI assistant immediately.</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200">{l({ en: '1. Address Bar Quick Trigger', ar: '1. التشغيل السريع من شريط العنوان', de: '1. Schnellstart über die Adressleiste' })}</p>
+                        <p className="text-slate-500 dark:text-slate-400">{l({ en: 'Type @ai followed by Tab in the address bar to ask the AI assistant immediately.', ar: 'اكتب ‎@ai‎ ثم اضغط Tab في شريط العنوان لسؤال مساعد الذكاء الاصطناعي فوراً.', de: 'Geben Sie in der Adressleiste @ai ein und drücken Sie Tab, um sofort den KI-Assistenten zu fragen.' })}</p>
                       </div>
                       <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 text-xs space-y-1">
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">2. Side Panel Copilot</p>
-                        <p className="text-slate-500 dark:text-slate-400">Click the <strong>AI</strong> pill in the top bar to open the side panel for full-page summaries, interactive Q&A, and translations.</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200">{l({ en: '2. Side Panel Copilot', ar: '2. المساعد في اللوحة الجانبية', de: '2. Copilot in der Seitenleiste' })}</p>
+                        <p className="text-slate-500 dark:text-slate-400">{l({ en: 'Click the AI button in the top bar to open the side panel for page summaries, questions and answers, and translations.', ar: 'انقر زر AI في الشريط العلوي لفتح اللوحة الجانبية لتلخيص الصفحات وطرح الأسئلة والترجمة.', de: 'Klicken Sie oben auf die Schaltfläche AI, um die Seitenleiste für Zusammenfassungen, Fragen und Übersetzungen zu öffnen.' })}</p>
                       </div>
                       <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 text-xs space-y-1">
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">3. Model Context Protocol (MCP)</p>
-                        <p className="text-slate-500 dark:text-slate-400">Connect local tools, SQLite, code interpreters, and external agents directly to King Browser via standard MCP JSON-RPC on port 3020.</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200">{l({ en: '3. Model Context Protocol (MCP)', ar: '3. بروتوكول سياق النموذج (MCP)', de: '3. Model Context Protocol (MCP)' })}</p>
+                        <p className="text-slate-500 dark:text-slate-400">{l({ en: 'Connect local tools, SQLite, code interpreters, and external agents directly to King Browser via standard MCP JSON-RPC on port 3020.', ar: 'اربط الأدوات المحلية وSQLite ومفسّرات الأكواد والوكلاء الخارجيين مباشرة بـ King Browser عبر MCP JSON-RPC القياسي على المنفذ 3020.', de: 'Verbinden Sie lokale Werkzeuge, SQLite, Code-Interpreter und externe Agenten über Standard-MCP-JSON-RPC auf Port 3020 direkt mit King Browser.' })}</p>
                       </div>
                     </div>
                   </div>
@@ -423,29 +425,29 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                   <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
                     <div className="flex items-center gap-2 font-bold text-sm text-emerald-700 dark:text-emerald-300">
                       <Lock className="w-4 h-4" />
-                      <span>Security & Zero-Telemetry Architecture</span>
+                      <span>{l({ en: 'Security & Zero-Telemetry Architecture', ar: 'الأمان وبنية بلا قياس عن بُعد', de: 'Sicherheit & Architektur ohne Telemetrie' })}</span>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                      King Browser is designed with strict sandbox isolation. It does not track your browsing history, record search queries, or send telemetry to external servers.
+                      {l({ en: 'King Browser is designed with strict sandbox isolation. It does not track your browsing history, record search queries, or send telemetry to external servers.', ar: 'صُمّم King Browser بعزل صارم داخل بيئة معزولة. لا يتتبّع سجل تصفحك، ولا يسجّل عمليات بحثك، ولا يرسل بيانات قياس إلى خوادم خارجية.', de: 'King Browser ist mit strikter Sandbox-Isolation gebaut. Er verfolgt Ihren Verlauf nicht, speichert keine Suchanfragen und sendet keine Telemetrie an externe Server.' })}
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">Encrypted Password Vault</p>
-                      <p className="text-slate-500 dark:text-slate-400 text-[11px]">Passwords and credentials are encrypted using macOS Keychain / Windows DPAPI OS-level native cryptography.</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{l({ en: 'Encrypted Password Vault', ar: 'خزنة كلمات مرور مشفّرة', de: 'Verschlüsselter Passworttresor' })}</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-[11px]">{l({ en: 'Passwords and credentials are encrypted using macOS Keychain / Windows DPAPI OS-level native cryptography.', ar: 'تُشفَّر كلمات المرور وبيانات الدخول بتشفير النظام نفسه (Keychain في macOS وDPAPI في Windows).', de: 'Passwörter und Zugangsdaten werden mit der Verschlüsselung des Betriebssystems geschützt (macOS-Schlüsselbund / Windows DPAPI).' })}</p>
                     </div>
                     <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">Permission Check Isolation</p>
-                      <p className="text-slate-500 dark:text-slate-400 text-[11px]">Strict permission checks block background microphone/camera probing and fingerprinting exploits.</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{l({ en: 'Permission Check Isolation', ar: 'عزل فحص الأذونات', de: 'Isolierte Berechtigungsprüfung' })}</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-[11px]">{l({ en: 'Strict permission checks block background microphone/camera probing and fingerprinting exploits.', ar: 'فحوص أذونات صارمة تمنع المواقع من استخدام الميكروفون أو الكاميرا في الخلفية ومن محاولات بصمة المتصفح.', de: 'Strenge Berechtigungsprüfungen verhindern heimliche Mikrofon-/Kamerazugriffe und Fingerprinting.' })}</p>
                     </div>
                     <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">AdBlock & Tracking Shield</p>
-                      <p className="text-slate-500 dark:text-slate-400 text-[11px]">Hardware-accelerated adblocker strips tracking queries and malicious scripts before network execution.</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{l({ en: 'AdBlock & Tracking Shield', ar: 'حاجب الإعلانات ودرع التتبّع', de: 'Werbeblocker & Tracking-Schutz' })}</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-[11px]">{l({ en: 'Hardware-accelerated adblocker strips tracking queries and malicious scripts before network execution.', ar: 'يحذف حاجب الإعلانات معاملات التتبّع والسكربتات الضارة قبل تنفيذ الطلبات.', de: 'Der Werbeblocker entfernt Tracking-Parameter und Schadskripte, bevor Anfragen ausgeführt werden.' })}</p>
                     </div>
                     <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">Zero-Knowledge Encrypted Sync</p>
-                      <p className="text-slate-500 dark:text-slate-400 text-[11px]">Multi-device synchronization encrypted with client-side AES-256-GCM keys.</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{l({ en: 'Zero-Knowledge Encrypted Sync', ar: 'مزامنة مشفّرة دون اطلاع أحد', de: 'Verschlüsselte Zero-Knowledge-Synchronisierung' })}</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-[11px]">{l({ en: 'Multi-device synchronization encrypted with client-side AES-256-GCM keys.', ar: 'مزامنة بين الأجهزة مشفّرة بمفاتيح AES-256-GCM على جهازك.', de: 'Synchronisierung zwischen Geräten, verschlüsselt mit AES-256-GCM-Schlüsseln auf Ihrem Gerät.' })}</p>
                     </div>
                   </div>
 
@@ -454,14 +456,14 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 font-bold text-xs text-emerald-800 dark:text-emerald-300">
                         <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        <span>Binary Integrity Verification</span>
+                        <span>{l({ en: 'Binary Integrity Verification', ar: 'التحقق من سلامة ملفات التثبيت', de: 'Integritätsprüfung der Installationsdateien' })}</span>
                       </div>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                         SHA-256
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                      Every release publishes a SHA256SUMS.txt file. Verify your download with <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">sha256sum -c SHA256SUMS.txt</code> before installing.
+                      {l({ en: 'Every release publishes a SHA256SUMS.txt file. Verify your download with this command before installing:', ar: 'ينشر كل إصدار ملف SHA256SUMS.txt. تحقّق من الملف المنزّل بهذا الأمر قبل التثبيت:', de: 'Jedes Release enthält eine Datei SHA256SUMS.txt. Prüfen Sie Ihren Download vor der Installation mit diesem Befehl:' })} <code dir="ltr" className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">sha256sum -c SHA256SUMS.txt</code>
                     </p>
                     <div className="pt-1">
                       <a
@@ -470,7 +472,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
                       >
-                        <span>View Checksums on GitHub Releases</span>
+                        <span>{l({ en: 'View Checksums on GitHub Releases', ar: 'عرض البصمات في إصدارات GitHub', de: 'Prüfsummen auf GitHub Releases ansehen' })}</span>
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     </div>
@@ -492,40 +494,40 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                   
                   <div className="space-y-1">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">King Browser</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Version {appVersion} (Open Source Edition)</p>
-                    <p className="text-xs text-cyan-600 dark:text-cyan-400 font-medium font-mono">Fast • AI-Powered • Private</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{l({ en: 'Version {v} (Open Source Edition)', ar: 'الإصدار {v} (الإصدار مفتوح المصدر)', de: 'Version {v} (Open-Source-Edition)' }, { v: appVersion })}</p>
+                    <p className="text-xs text-cyan-600 dark:text-cyan-400 font-medium font-mono">{l({ en: 'Fast • AI-Powered • Private', ar: 'سريع • ذكي • خاص', de: 'Schnell • KI-gestützt • Privat' })}</p>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 max-w-md mx-auto text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                    Designed and built with modern web technologies: React, TypeScript, Tailwind CSS, Electron, Web-LLM, and Model Context Protocol.
+                    {l({ en: 'Designed and built with modern web technologies: React, TypeScript, Tailwind CSS, Electron, Web-LLM, and Model Context Protocol.', ar: 'صُمّم وبُني بتقنيات ويب حديثة: React وTypeScript وTailwind CSS وElectron وWeb-LLM وبروتوكول MCP.', de: 'Entwickelt mit modernen Webtechnologien: React, TypeScript, Tailwind CSS, Electron, Web-LLM und Model Context Protocol.' })}
                   </div>
 
                   {systemVersions && (
-                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 max-w-md mx-auto text-left">
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 max-w-md mx-auto text-start">
                       <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-1.5">
                         <Shield className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-                        <span>Engine & Security Patch Transparency</span>
+                        <span>{l({ en: 'Engine & Security Patch Transparency', ar: 'شفافية المحرك والتحديثات الأمنية', de: 'Transparenz zu Engine und Sicherheitspatches' })}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[11px]">
                         <div className="p-2 rounded-lg bg-white/60 dark:bg-black/20 border border-slate-200/50 dark:border-white/5">
-                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">Chromium Engine</span>
+                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">{l({ en: 'Chromium Engine', ar: 'محرك Chromium', de: 'Chromium-Engine' })}</span>
                           <span className="font-mono text-slate-800 dark:text-slate-200">{systemVersions.chrome || '134.0.6998'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-white/60 dark:bg-black/20 border border-slate-200/50 dark:border-white/5">
-                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">Electron Runtime</span>
+                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">{l({ en: 'Electron Runtime', ar: 'بيئة Electron', de: 'Electron-Laufzeit' })}</span>
                           <span className="font-mono text-slate-800 dark:text-slate-200">{systemVersions.electron}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-white/60 dark:bg-black/20 border border-slate-200/50 dark:border-white/5">
-                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">V8 JS Engine</span>
+                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">{l({ en: 'V8 JS Engine', ar: 'محرك V8 لـ JavaScript', de: 'V8-JS-Engine' })}</span>
                           <span className="font-mono text-slate-800 dark:text-slate-200">{systemVersions.v8}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-white/60 dark:bg-black/20 border border-slate-200/50 dark:border-white/5">
-                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">Architecture</span>
+                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">{l({ en: 'Architecture', ar: 'المعمارية', de: 'Architektur' })}</span>
                           <span className="font-mono text-slate-800 dark:text-slate-200">{systemVersions.platform} ({systemVersions.arch})</span>
                         </div>
                       </div>
                       <div className="mt-2 text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
-                        Security patch cadence tracked against upstream releases with zero-delay automated deployment.
+                        {l({ en: 'Security patch cadence tracked against upstream releases with zero-delay automated deployment.', ar: 'تُتابَع التحديثات الأمنية مقابل الإصدارات الأصلية وتُنشر آلياً دون تأخير.', de: 'Sicherheitspatches werden mit den Upstream-Releases abgeglichen und automatisch ohne Verzögerung ausgeliefert.' })}
                       </div>
                     </div>
                   )}
@@ -539,7 +541,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>What's New (Changelog)</span>
+                      <span>{l({ en: 'What\'s New (Changelog)', ar: 'ما الجديد (سجل التغييرات)', de: 'Neuigkeiten (Änderungsprotokoll)' })}</span>
                     </button>
                     <a
                       href="https://github.com/MOT1209/King_Browser"
@@ -548,17 +550,17 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs hover:opacity-90 transition-opacity shadow-sm cursor-pointer"
                     >
                       <GithubIcon className="w-4 h-4" />
-                      <span>GitHub Repository</span>
+                      <span>{l({ en: 'GitHub Repository', ar: 'مستودع GitHub', de: 'GitHub-Repository' })}</span>
                     </a>
                     <a
                       href="https://github.com/MOT1209/King_Browser/releases"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-semibold text-xs transition-colors cursor-pointer"
-                      title="Verify SHA-256 checksums on GitHub Releases"
+                      title={l({ en: 'Verify SHA-256 checksums on GitHub Releases', ar: 'التحقق من بصمات SHA-256 في إصدارات GitHub', de: 'SHA-256-Prüfsummen auf GitHub Releases prüfen' })}
                     >
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span>SHA-256 Checksums</span>
+                      <span>{l({ en: 'SHA-256 Checksums', ar: 'بصمات SHA-256', de: 'SHA-256-Prüfsummen' })}</span>
                     </a>
                     <a
                       href="https://github.com/MOT1209/King_Browser/issues"
@@ -567,7 +569,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors cursor-pointer border border-slate-200 dark:border-white/10"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Report Issue</span>
+                      <span>{l({ en: 'Report Issue', ar: 'الإبلاغ عن مشكلة', de: 'Problem melden' })}</span>
                     </a>
                   </div>
                 </div>
@@ -577,13 +579,13 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
             {/* Footer */}
             <div className="px-6 py-3.5 border-t border-slate-100 dark:border-white/[0.08] bg-slate-50/90 dark:bg-[#151924]/90 flex items-center justify-between text-xs text-slate-500 shrink-0">
               <span className="flex items-center gap-1.5 font-mono text-[11px]">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> King Browser Help Center
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {l({ en: 'King Browser Help Center', ar: 'مركز مساعدة King Browser', de: 'King Browser Hilfecenter' })}
               </span>
               <button
                 onClick={onClose}
                 className="px-4 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-slate-200 font-semibold transition-colors cursor-pointer"
               >
-                Close (Esc)
+                {l({ en: 'Close (Esc)', ar: 'إغلاق (Esc)', de: 'Schließen (Esc)' })}
               </button>
             </div>
           </motion.div>

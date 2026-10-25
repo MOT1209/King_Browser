@@ -7,6 +7,7 @@ import { safeParseArrayWithBackup, safeParseObjectWithBackup } from '../../utils
 import { getLocale } from '../../services/i18n';
 import { copyTextToClipboard } from '../../utils/clipboard';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
+import { useTranslation } from '../../services/i18n';
 
 function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
   return safeParseArrayWithBackup<T>(key, raw, []);
@@ -36,6 +37,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
   onPerformSync
 }) => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
+  const { l } = useTranslation();
   const [syncLoading, setSyncLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
@@ -60,10 +62,10 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-                King Cloud Sync
+                {l({ en: 'King Cloud Sync', ar: 'مزامنة King السحابية', de: 'King Cloud Sync' })}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Access your bookmarks, saved passwords, browsing history, and settings from any computer.
+                {l({ en: 'Access your bookmarks, saved passwords, browsing history, and settings from any computer.', ar: 'الوصول إلى إشاراتك المرجعية وكلمات مرورك المحفوظة وسجل تصفحك وإعداداتك من أي حاسوب.', de: 'Greifen Sie von jedem Computer auf Lesezeichen, gespeicherte Passwörter, Verlauf und Einstellungen zu.' })}
               </p>
             </div>
           </div>
@@ -93,16 +95,16 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">King Sync Active</h3>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{l({ en: 'King Sync Active', ar: 'مزامنة King مفعّلة', de: 'King Sync aktiv' })}</h3>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> E2EE Protected
+                      <ShieldCheck className="w-3 h-3" /> {l({ en: 'E2EE Protected', ar: 'محمي بتشفير تام', de: 'E2EE-geschützt' })}
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                    Code: <span className="font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{syncStatus.syncCode || 'Active Device'}</span>
+                    {l({ en: 'Code:', ar: 'الرمز:', de: 'Code:' })} <span className="font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{syncStatus.syncCode || l({ en: 'Active Device', ar: 'الجهاز الحالي', de: 'Aktives Gerät' })}</span>
                   </p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    Status: <span className="text-emerald-500 font-medium">● Connected</span> · Last synced: {syncStatus.lastSyncedAt ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString(getLocale(settings.language), { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                    {l({ en: 'Status:', ar: 'الحالة:', de: 'Status:' })} <span className="text-emerald-500 font-medium">● {l({ en: 'Connected', ar: 'متصل', de: 'Verbunden' })}</span> · {l({ en: 'Last synced:', ar: 'آخر مزامنة:', de: 'Zuletzt synchronisiert:' })} {syncStatus.lastSyncedAt ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString(getLocale(settings.language), { hour: '2-digit', minute: '2-digit' }) : l({ en: 'Just now', ar: 'الآن', de: 'Gerade eben' })}
                   </p>
                 </div>
               </div>
@@ -163,10 +165,10 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                         }
                       }
 
-                      setSyncMsg('Sync completed successfully!');
+                      setSyncMsg(l({ en: 'Sync completed successfully!', ar: 'اكتملت المزامنة بنجاح!', de: 'Synchronisierung erfolgreich abgeschlossen!' }));
                       setSafeTimeout(() => setSyncMsg(null), 3000);
                     } catch (e: any) {
-                      setSyncErr(e.message || 'Sync failed');
+                      setSyncErr(e.message || l({ en: 'Sync failed', ar: 'فشلت المزامنة', de: 'Synchronisierung fehlgeschlagen' }));
                     } finally {
                       setSyncLoading(false);
                     }
@@ -175,7 +177,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                   className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncLoading || syncStatus.isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{syncLoading || syncStatus.isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                  <span>{syncLoading || syncStatus.isSyncing ? l({ en: 'Syncing...', ar: 'جارٍ المزامنة...', de: 'Wird synchronisiert...' }) : l({ en: 'Sync Now', ar: 'زامن الآن', de: 'Jetzt synchronisieren' })}</span>
                 </button>
 
                 <button
@@ -186,10 +188,10 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                     setLogoutLoading(true);
                     try {
                       await syncService.logout();
-                      setSyncMsg('Signed out.');
+                      setSyncMsg(l({ en: 'Signed out.', ar: 'تم تسجيل الخروج.', de: 'Abgemeldet.' }));
                       setSafeTimeout(() => setSyncMsg(null), 3000);
                     } catch (e: any) {
-                      setSyncErr(e?.message || 'Sign out failed');
+                      setSyncErr(e?.message || l({ en: 'Sign out failed', ar: 'فشل تسجيل الخروج', de: 'Abmelden fehlgeschlagen' }));
                     } finally {
                       setLogoutLoading(false);
                     }
@@ -197,7 +199,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                   disabled={logoutLoading}
                   className="px-4 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 dark:bg-slate-700/50 dark:hover:bg-red-500/10 dark:text-slate-300 dark:hover:text-red-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  {logoutLoading ? 'Signing out…' : 'Leave Chain'}
+                  {logoutLoading ? l({ en: 'Signing out…', ar: 'جارٍ تسجيل الخروج…', de: 'Wird abgemeldet…' }) : l({ en: 'Leave Chain', ar: 'مغادرة سلسلة المزامنة', de: 'Kette verlassen' })}
                 </button>
               </div>
             </div>
@@ -211,8 +213,8 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                     <Laptop className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Pair Another Computer</h4>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">Use your unique sync code to link other laptops or desktops.</p>
+                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{l({ en: 'Pair Another Computer', ar: 'ربط حاسوب آخر', de: 'Weiteren Computer koppeln' })}</h4>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">{l({ en: 'Use your unique sync code to link other laptops or desktops.', ar: 'استخدم رمز المزامنة الخاص بك لربط أجهزة أخرى.', de: 'Verknüpfen Sie mit Ihrem Sync-Code weitere Laptops oder PCs.' })}</p>
                   </div>
                 </div>
 
@@ -238,19 +240,19 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                       const copied = await copyTextToClipboard(code);
                       if (copied) {
                         setCopiedSyncCode(true);
-                        setSyncMsg(`Sync Code Copied to Clipboard: ${code}`);
+                        setSyncMsg(l({ en: 'Sync code copied to clipboard: {code}', ar: 'نُسخ رمز المزامنة: {code}', de: 'Sync-Code in die Zwischenablage kopiert: {code}' }, { code }));
                         setSafeTimeout(() => setCopiedSyncCode(false), 3000);
                       } else {
-                        setSyncMsg(`Sync Code: ${code} (copy manually)`);
+                        setSyncMsg(l({ en: 'Sync code: {code} (copy it manually)', ar: 'رمز المزامنة: {code} (انسخه يدوياً)', de: 'Sync-Code: {code} (bitte manuell kopieren)' }, { code }));
                       }
                     } catch (err: any) {
-                      setSyncErr(err.message || 'Failed to generate code');
+                      setSyncErr(err.message || l({ en: 'Failed to generate code', ar: 'تعذّر إنشاء الرمز', de: 'Code konnte nicht erstellt werden' }));
                     }
                   }}
                   className="px-4 py-2 bg-slate-100 dark:bg-slate-700/60 hover:bg-cyan-500 hover:text-white dark:hover:bg-cyan-500 dark:hover:text-white text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Link2 className="w-3.5 h-3.5" />
-                  <span>{copiedSyncCode ? 'Code Copied!' : 'Copy Device Code'}</span>
+                  <span>{copiedSyncCode ? l({ en: 'Code Copied!', ar: 'تم نسخ الرمز!', de: 'Code kopiert!' }) : l({ en: 'Copy Device Code', ar: 'نسخ رمز الجهاز', de: 'Gerätecode kopieren' })}</span>
                 </button>
               </div>
             </div>
@@ -259,16 +261,16 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
             {/* Synced Categories List */}
             <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-4 shadow-sm">
               <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                Synchronized Data Categories
+                {l({ en: 'Synchronized Data Categories', ar: 'فئات البيانات المتزامنة', de: 'Synchronisierte Datenkategorien' })}
               </h4>
 
               <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
                 {[
-                  { key: 'syncBookmarks', label: 'Bookmarks & Folders', icon: Bookmark, desc: 'Your saved bookmarks and toolbar folders' },
-                  { key: 'syncPasswords', label: 'Saved Passwords (E2EE)', icon: Key, desc: 'Zero-knowledge client-side encrypted with AES-256' },
-                  { key: 'syncHistory', label: 'Browsing History', icon: Cloud, desc: 'Your visited page history across devices' },
-                  { key: 'syncSettings', label: 'Settings & Appearance', icon: Settings, desc: 'Themes, search engine, shortcuts' },
-                  { key: 'syncWorkspaces', label: 'Workspaces', icon: FolderTree, desc: 'Custom tab workspaces and icons' },
+                  { key: 'syncBookmarks', label: l({ en: 'Bookmarks & Folders', ar: 'الإشارات المرجعية والمجلدات', de: 'Lesezeichen & Ordner' }), icon: Bookmark, desc: l({ en: 'Your saved bookmarks and toolbar folders', ar: 'إشاراتك المرجعية المحفوظة ومجلدات الشريط', de: 'Ihre gespeicherten Lesezeichen und Ordner' }) },
+                  { key: 'syncPasswords', label: l({ en: 'Saved Passwords (E2EE)', ar: 'كلمات المرور المحفوظة (تشفير تام)', de: 'Gespeicherte Passwörter (E2EE)' }), icon: Key, desc: l({ en: 'Zero-knowledge client-side encrypted with AES-256', ar: 'مشفّرة على جهازك بمعيار AES-256 دون أن يطّلع عليها أحد', de: 'Auf Ihrem Gerät mit AES-256 verschlüsselt (Zero-Knowledge)' }) },
+                  { key: 'syncHistory', label: l({ en: 'Browsing History', ar: 'سجل التصفح', de: 'Browserverlauf' }), icon: Cloud, desc: l({ en: 'Your visited page history across devices', ar: 'سجل الصفحات التي زرتها عبر أجهزتك', de: 'Besuchte Seiten auf allen Geräten' }) },
+                  { key: 'syncSettings', label: l({ en: 'Settings & Appearance', ar: 'الإعدادات والمظهر', de: 'Einstellungen & Darstellung' }), icon: Settings, desc: l({ en: 'Themes, search engine, shortcuts', ar: 'السمات، محرك البحث، الاختصارات', de: 'Designs, Suchmaschine, Tastenkürzel' }) },
+                  { key: 'syncWorkspaces', label: l({ en: 'Workspaces', ar: 'مساحات العمل', de: 'Arbeitsbereiche' }), icon: FolderTree, desc: l({ en: 'Custom tab workspaces and icons', ar: 'مساحات عمل التبويبات وأيقوناتها', de: 'Eigene Tab-Arbeitsbereiche und Symbole' }) },
                 ].map(item => {
                   const isChecked = syncStatus.user?.syncPreferences[item.key as keyof SyncPreferences] ?? true;
                   const Icon = item.icon;
@@ -316,10 +318,10 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                   <Laptop className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                  I have a Sync Code
+                  {l({ en: 'I have a Sync Code', ar: 'لديّ رمز مزامنة', de: 'Ich habe einen Sync-Code' })}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Enter the pairing code generated from your other computer to sync all bookmarks, passwords, and history instantly.
+                  {l({ en: 'Enter the pairing code generated from your other computer to sync all bookmarks, passwords, and history instantly.', ar: 'أدخل رمز الربط الذي أنشأته على حاسوبك الآخر لمزامنة الإشارات المرجعية وكلمات المرور والسجل فوراً.', de: 'Geben Sie den Kopplungscode Ihres anderen Computers ein, um Lesezeichen, Passwörter und Verlauf sofort zu synchronisieren.' })}
                 </p>
               </div>
 
@@ -337,9 +339,9 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                     setSyncLoading(true);
                     try {
                       await syncService.joinSyncChain(input.value.trim());
-                      setSyncMsg('Device paired successfully! Data synced.');
+                      setSyncMsg(l({ en: 'Device paired successfully! Data synced.', ar: 'تم ربط الجهاز بنجاح ومزامنة البيانات!', de: 'Gerät erfolgreich gekoppelt! Daten synchronisiert.' }));
                     } catch (err: any) {
-                      setSyncErr(err.message || 'Invalid or expired sync code');
+                      setSyncErr(err.message || l({ en: 'Invalid or expired sync code', ar: 'رمز المزامنة غير صالح أو منتهي', de: 'Ungültiger oder abgelaufener Sync-Code' }));
                     } finally {
                       setSyncLoading(false);
                     }
@@ -359,10 +361,10 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                  Start New Encrypted Sync
+                  {l({ en: 'Start New Encrypted Sync', ar: 'بدء مزامنة مشفّرة جديدة', de: 'Neue verschlüsselte Synchronisierung starten' })}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Generate a secure 1-click pairing code on this computer to link your other laptops or desktops.
+                  {l({ en: 'Generate a secure 1-click pairing code on this computer to link your other laptops or desktops.', ar: 'أنشئ رمز ربط آمناً بنقرة واحدة على هذا الحاسوب لربط أجهزتك الأخرى.', de: 'Erstellen Sie auf diesem Computer mit einem Klick einen sicheren Kopplungscode für Ihre anderen Geräte.' })}
                 </p>
               </div>
 
@@ -389,19 +391,19 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                       const copied = await copyTextToClipboard(code);
                       if (copied) {
                         setCopiedSyncCode(true);
-                        setSyncMsg(`Sync Code: ${code} (Copied to clipboard!)`);
+                        setSyncMsg(l({ en: 'Sync code: {code} (copied to clipboard)', ar: 'رمز المزامنة: {code} (تم النسخ)', de: 'Sync-Code: {code} (in die Zwischenablage kopiert)' }, { code }));
                         setSafeTimeout(() => setCopiedSyncCode(false), 4000);
                       } else {
-                        setSyncMsg(`Sync Code: ${code} (copy manually)`);
+                        setSyncMsg(l({ en: 'Sync code: {code} (copy it manually)', ar: 'رمز المزامنة: {code} (انسخه يدوياً)', de: 'Sync-Code: {code} (bitte manuell kopieren)' }, { code }));
                       }
                     } catch (err: any) {
-                      setSyncErr(err.message || 'Failed to generate code');
+                      setSyncErr(err.message || l({ en: 'Failed to generate code', ar: 'تعذّر إنشاء الرمز', de: 'Code konnte nicht erstellt werden' }));
                     }
                   }}
                   className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 >
                   <Sparkles className="w-4 h-4 text-cyan-400 dark:text-cyan-600" />
-                  <span>{copiedSyncCode ? 'Sync Code Copied!' : 'Generate Sync Code'}</span>
+                  <span>{copiedSyncCode ? l({ en: 'Sync Code Copied!', ar: 'تم نسخ رمز المزامنة!', de: 'Sync-Code kopiert!' }) : l({ en: 'Generate Sync Code', ar: 'إنشاء رمز مزامنة', de: 'Sync-Code erstellen' })}</span>
                 </button>
               </div>
             </div>
@@ -415,11 +417,10 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                 <Laptop className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Sign in to sync this browser
+                {l({ en: 'Sign in to sync this browser', ar: 'سجّل الدخول لمزامنة هذا المتصفح', de: 'Anmelden, um diesen Browser zu synchronisieren' })}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
-                Your bookmarks, history, tabs and workspaces sync through your King Cloud
-                account. Pairing a second device with a sync code is not available yet.
+                {l({ en: 'Your bookmarks, history, tabs and workspaces sync through your King Cloud account. Pairing a second device with a sync code is not available yet.', ar: 'تتم مزامنة إشاراتك المرجعية وسجلّك وتبويباتك ومساحات عملك عبر حساب King Cloud. ربط جهاز ثانٍ برمز مزامنة غير متاح بعد.', de: 'Lesezeichen, Verlauf, Tabs und Arbeitsbereiche werden über Ihr King-Cloud-Konto synchronisiert. Das Koppeln eines zweiten Geräts per Sync-Code ist noch nicht verfügbar.' })}
               </p>
             </div>
             <KingCloudAuthForm
