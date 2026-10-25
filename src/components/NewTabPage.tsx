@@ -7,7 +7,7 @@ import { useLiveUnsplashPhoto } from '../utils/unsplash';
 import { UserSettings } from '../types/browser';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { generateId } from '../utils/idGenerator';
-import { useTranslation, getLocale } from '../services/i18n';
+import { useTranslation, getLocale, l } from '../services/i18n';
 import { SpeedDialIcon, getCleanDomain, normalizeNavigationUrl } from './SpeedDialIcon';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useSharedLocalStorageState } from '../hooks/useSharedLocalStorage';
@@ -355,7 +355,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     if (previewDomain) {
       return previewDomain.charAt(0).toUpperCase() + previewDomain.slice(1);
     }
-    return editingDial.id !== null ? 'Shortcut' : (language === 'tr' ? 'Kısayol Önizleme' : 'Shortcut Preview');
+    return editingDial.id !== null ? 'Shortcut' : (l({ en: 'Shortcut Preview', ar: 'معاينة الاختصار', de: 'Verknüpfungsvorschau' }));
   }, [editingDial.name, previewDomain, editingDial.id, language]);
 
   const [todos, setTodos] = useSharedLocalStorageState<Todo[]>(
@@ -504,18 +504,18 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   const handleAddSpeedDial = () => {
     if (!editingDial.url || !editingDial.url.trim()) {
-      setUrlError(language === 'tr' ? 'Lütfen bir web adresi girin.' : 'Please enter a web address.');
+      setUrlError(l({ en: 'Please enter a web address.', ar: 'يرجى إدخال عنوان ويب.', de: 'Bitte gib eine Webadresse ein.' }));
       return;
     }
     const url = normalizeNavigationUrl(editingDial.url);
     if (!isSafeNavigationUrl(url)) {
-      setUrlError(language === 'tr' ? 'Geçerli ve güvenli bir web adresi girin.' : 'Please enter a valid, safe URL.');
+      setUrlError(l({ en: 'Please enter a valid, safe URL.', ar: 'يرجى إدخال عنوان صالح وآمن.', de: 'Bitte gib eine gültige, sichere URL ein.' }));
       return;
     }
     try {
       const domain = getCleanDomain(url);
       if (!domain) {
-        setUrlError(language === 'tr' ? 'Geçerli bir alan adı bulunamadı.' : 'Could not determine a valid domain.');
+        setUrlError(l({ en: 'Could not determine a valid domain.', ar: 'تعذّر تحديد نطاق صالح.', de: 'Es konnte keine gültige Domain ermittelt werden.' }));
         return;
       }
       const rawName = (editingDial.name || '').trim();
@@ -525,9 +525,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         if (!updated) {
           // Another tab deleted the row while this editor was open. Say so
           // rather than appending a phantom shortcut under a stale position.
-          setUrlError(language === 'tr'
-            ? 'Bu kısayol başka bir sekmede silindi.'
-            : 'This shortcut was deleted in another tab.');
+          setUrlError(l({ en: 'This shortcut was deleted in another tab.', ar: 'حُذف هذا الاختصار في تبويب آخر.', de: 'Diese Verknüpfung wurde in einem anderen Tab gelöscht.' }));
           return;
         }
         setSpeedDials(updated);
@@ -535,7 +533,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         setSpeedDials(addSpeedDial(speedDials, { name, url, domain }));
       }
     } catch (e) {
-      setUrlError(language === 'tr' ? 'Adres işlenirken bir hata oluştu.' : 'Failed to process address.');
+      setUrlError(l({ en: 'Failed to process address.', ar: 'تعذّرت معالجة العنوان.', de: 'Die Adresse konnte nicht verarbeitet werden.' }));
       return;
     }
 
@@ -708,7 +706,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-cyan-500/10 cursor-pointer"
               >
                 <Compass className="w-4 h-4 text-cyan-400" />
-                <span>{language === 'tr' ? 'Normal Sekmeye Geç' : 'Switch to Normal Tab'}</span>
+                <span>{l({ en: 'Switch to Normal Tab', ar: 'التبديل إلى تبويب عادي', de: 'Zu normalem Tab wechseln' })}</span>
               </button>
             </motion.div>
           )}
@@ -1377,8 +1375,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                     {editingDial.id !== null
-                      ? (language === 'tr' ? 'Kısayol bilgilerini güncelleyin' : 'Update shortcut details')
-                      : (language === 'tr' ? 'Hızlı erişim için yeni bir web sitesi ekleyin' : 'Add a new website for quick access')}
+                      ? (l({ en: 'Update shortcut details', ar: 'تحديث بيانات الاختصار', de: 'Verknüpfungsdetails aktualisieren' }))
+                      : (l({ en: 'Add a new website for quick access', ar: 'أضف موقعاً جديداً للوصول السريع', de: 'Neue Website für den Schnellzugriff hinzufügen' }))}
                   </p>
                 </div>
               </div>
@@ -1406,7 +1404,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 </div>
               </div>
               <span className="text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-slate-300">
-                {language === 'tr' ? 'Önizleme' : 'Preview'}
+                {l({ en: 'Preview', ar: 'معاينة', de: 'Vorschau' })}
               </span>
             </div>
 
@@ -1425,7 +1423,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     if (urlError) setUrlError('');
                   }}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
-                  placeholder={language === 'tr' ? 'Örn. YouTube, GitHub...' : 'e.g. YouTube, GitHub...'}
+                  placeholder={l({ en: 'e.g. YouTube, GitHub...', ar: 'مثلاً YouTube أو GitHub...', de: 'z. B. YouTube, GitHub...' })}
                   className="w-full px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20 transition-all"
                 />
               </div>
@@ -1442,7 +1440,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     if (urlError) setUrlError('');
                   }}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
-                  placeholder={language === 'tr' ? 'Örn. https://youtube.com veya youtube.com' : 'e.g. https://youtube.com or youtube.com'}
+                  placeholder={l({ en: 'e.g. https://youtube.com or youtube.com', ar: 'مثلاً https://youtube.com أو youtube.com', de: 'z. B. https://youtube.com oder youtube.com' })}
                   className={`w-full px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-800/90 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all ${
                     urlError
                       ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'

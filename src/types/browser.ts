@@ -135,10 +135,16 @@ export interface UserSettings {
   smoothScrollingEnabled?: boolean;
   passwordManagerEnabled?: boolean;
   defaultTranslationLanguage?: string;
-  language?: 'en' | 'tr' | 'ar' | 'de';
+  language?: 'en' | 'ar' | 'de';
 }
 
-export function detectSystemLanguage(): 'en' | 'tr' | 'ar' | 'de' {
+/** Interface language for a first run: Arabic or German when the OS uses them, otherwise English. */
+export function detectSystemLanguage(): 'en' | 'ar' | 'de' {
+  try {
+    const code = (typeof navigator !== 'undefined' && navigator.language || '').toLowerCase();
+    if (code === 'ar' || code.startsWith('ar-')) return 'ar';
+    if (code === 'de' || code.startsWith('de-')) return 'de';
+  } catch (_) {}
   return 'en';
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, Moon, Monitor, Search, Shield, Ban, EyeOff, Bug, ArrowRight } from 'lucide-react';
 import { useTitlebarInsets } from '../hooks/useTitlebarInsets';
+import { useTranslation } from '../services/i18n';
 
 interface OnboardingProps {
   onComplete: (prefs: {
@@ -16,7 +17,7 @@ const SEARCH_ENGINES = [
   {
     id: 'google' as const,
     name: 'Google',
-    desc: 'Search with Google',
+    desc: { en: 'Search with Google', ar: 'البحث باستخدام Google', de: 'Mit Google suchen' },
     icon: (
       <svg viewBox="0 0 48 48" className="w-8 h-8">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -29,7 +30,7 @@ const SEARCH_ENGINES = [
   {
     id: 'duckduckgo' as const,
     name: 'DuckDuckGo',
-    desc: 'Privacy-focused search',
+    desc: { en: 'Privacy-focused search', ar: 'بحث يركّز على الخصوصية', de: 'Datenschutzorientierte Suche' },
     icon: (
       <div className="w-8 h-8 rounded-full bg-[#DE5833] flex items-center justify-center">
         <Shield className="w-5 h-5 text-white" />
@@ -39,7 +40,7 @@ const SEARCH_ENGINES = [
   {
     id: 'brave' as const,
     name: 'Brave Search',
-    desc: 'Independent search index',
+    desc: { en: 'Independent search index', ar: 'فهرس بحث مستقل', de: 'Unabhängiger Suchindex' },
     icon: (
       <div className="w-8 h-8 rounded-full bg-[#FB542B] flex items-center justify-center">
         <Search className="w-5 h-5 text-white" />
@@ -49,7 +50,7 @@ const SEARCH_ENGINES = [
   {
     id: 'bing' as const,
     name: 'Bing',
-    desc: 'Search with Microsoft Bing',
+    desc: { en: 'Search with Microsoft Bing', ar: 'البحث باستخدام Microsoft Bing', de: 'Mit Microsoft Bing suchen' },
     icon: (
       <svg viewBox="0 0 48 48" className="w-8 h-8">
         <path fill="#0078D4" d="M10 5l8 3v26l-8-5z"/>
@@ -62,7 +63,7 @@ const SEARCH_ENGINES = [
   {
     id: 'ecosia' as const,
     name: 'Ecosia',
-    desc: 'Search with Ecosia',
+    desc: { en: 'Search with Ecosia', ar: 'البحث باستخدام Ecosia', de: 'Mit Ecosia suchen' },
     icon: (
       <div className="w-8 h-8 rounded-full bg-[#00894A] flex items-center justify-center">
         <Search className="w-5 h-5 text-white" />
@@ -74,7 +75,7 @@ const SEARCH_ENGINES = [
 const THEMES = [
   {
     id: 'light' as const,
-    name: 'Light',
+    name: { en: 'Light', ar: 'فاتح', de: 'Hell' },
     icon: <Sun className="w-4 h-4 inline-block -mt-0.5" />,
     preview: 'bg-white border-2 border-slate-200',
     dot: 'bg-slate-800',
@@ -82,7 +83,7 @@ const THEMES = [
   },
   {
     id: 'dark' as const,
-    name: 'Dark',
+    name: { en: 'Dark', ar: 'داكن', de: 'Dunkel' },
     icon: <Moon className="w-4 h-4 inline-block -mt-0.5" />,
     preview: 'bg-slate-900 border-2 border-slate-700',
     dot: 'bg-white',
@@ -90,7 +91,7 @@ const THEMES = [
   },
   {
     id: 'system' as const,
-    name: 'System',
+    name: { en: 'System', ar: 'حسب النظام', de: 'System' },
     icon: <Monitor className="w-4 h-4 inline-block -mt-0.5" />,
     preview: 'bg-gradient-to-br from-white to-slate-900 border-2 border-slate-400',
     dot: 'bg-slate-500',
@@ -107,6 +108,7 @@ const slideVariants = {
 };
 
 export function Onboarding({ onComplete }: OnboardingProps) {
+  const { l } = useTranslation();
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
@@ -174,7 +176,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.3 }}
         className="text-5xl font-bold text-white mb-4 tracking-tight select-none"
       >
-        Welcome to<br />
+        {l({ en: 'Welcome to', ar: 'مرحباً بك في', de: 'Willkommen bei' })}<br />
         <span className="text-cyan-400">King Browser</span>
       </motion.h1>
       <motion.p
@@ -183,7 +185,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.45 }}
         className="text-slate-300 text-lg max-w-md leading-relaxed mb-10 font-normal select-none"
       >
-        Choose your theme, search engine, and privacy settings before you start.
+        {l({ en: 'Choose your theme, search engine, and privacy settings before you start.', ar: 'اختر السمة ومحرك البحث وإعدادات الخصوصية قبل أن تبدأ.', de: 'Wählen Sie Design, Suchmaschine und Datenschutzeinstellungen, bevor Sie loslegen.' })}
       </motion.p>
       <motion.button
         initial={{ y: 20, opacity: 0 }}
@@ -195,7 +197,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all  no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        Let&apos;s Get Started
+        {l({ en: 'Let&apos;s Get Started', ar: 'لنبدأ', de: 'Los geht’s' })}
       </motion.button>
     </motion.div>,
 
@@ -206,9 +208,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
         </svg>
       </div>
-      <h2 className="text-4xl font-bold text-white mb-3 select-none">Import from Your Old Browser</h2>
+      <h2 className="text-4xl font-bold text-white mb-3 select-none">{l({ en: 'Import from Your Old Browser', ar: 'الاستيراد من متصفحك السابق', de: 'Aus Ihrem bisherigen Browser importieren' })}</h2>
       <p className="text-slate-300 text-base max-w-md mb-8 select-none">
-        You can import your bookmarks from Google Chrome (and other Chromium-based browsers) to King with a single click.
+        {l({ en: 'You can import your bookmarks from Google Chrome (and other Chromium-based browsers) to King with a single click.', ar: 'يمكنك استيراد إشاراتك المرجعية من Google Chrome (والمتصفحات الأخرى المبنية على Chromium) إلى King بنقرة واحدة.', de: 'Sie können Ihre Lesezeichen aus Google Chrome (und anderen Chromium-Browsern) mit einem Klick in King importieren.' })}
       </p>
       
       {importStatus === 'idle' && (
@@ -223,21 +225,21 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           ) : (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
           )}
-          {isImporting ? 'Importing...' : 'Import Chrome Bookmarks'}
+          {isImporting ? l({ en: 'Importing...', ar: 'جارٍ الاستيراد...', de: 'Wird importiert...' }) : l({ en: 'Import Chrome Bookmarks', ar: 'استيراد إشارات Chrome المرجعية', de: 'Chrome-Lesezeichen importieren' })}
         </button>
       )}
 
       {importStatus === 'success' && (
         <div className="bg-emerald-500/20 text-emerald-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-emerald-500/30 text-sm no-drag select-none" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          Bookmarks imported successfully!
+          {l({ en: 'Bookmarks imported successfully!', ar: 'تم استيراد الإشارات المرجعية بنجاح!', de: 'Lesezeichen erfolgreich importiert!' })}
         </div>
       )}
 
       {importStatus === 'error' && (
         <div className="bg-red-500/20 text-red-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-red-500/30 text-sm no-drag select-none" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          Chrome data could not be found or read.
+          {l({ en: 'Chrome data could not be found or read.', ar: 'تعذّر العثور على بيانات Chrome أو قراءتها.', de: 'Chrome-Daten wurden nicht gefunden oder konnten nicht gelesen werden.' })}
         </div>
       )}
 
@@ -246,14 +248,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         className="text-slate-400 hover:text-white transition-colors underline decoration-slate-600 underline-offset-4 text-xs no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        {importStatus === 'success' ? 'Continue' : 'Skip for now'}
+        {importStatus === 'success' ? l({ en: 'Continue', ar: 'متابعة', de: 'Weiter' }) : l({ en: 'Skip for now', ar: 'تخطٍّ الآن', de: 'Vorerst überspringen' })}
       </button>
     </motion.div>,
 
     // Step 2 — Theme
     <motion.div key="theme" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <h2 className="text-4xl font-bold text-white mb-3 select-none">Choose a Theme</h2>
-      <p className="text-slate-300 text-base mb-10 select-none">Personalize the look of King Browser.</p>
+      <h2 className="text-4xl font-bold text-white mb-3 select-none">{l({ en: 'Choose a Theme', ar: 'اختر سمة', de: 'Design wählen' })}</h2>
+      <p className="text-slate-300 text-base mb-10 select-none">{l({ en: 'Personalize the look of King Browser.', ar: 'خصّص مظهر King Browser.', de: 'Passen Sie das Aussehen von King Browser an.' })}</p>
       <div className="flex gap-5 mb-12 flex-wrap justify-center no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {THEMES.map(t => (
           <button
@@ -274,9 +276,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 <div className={`w-2 h-2 rounded-full ${t.dot} opacity-20`}></div>
               </div>
             </div>
-            <span className="text-white font-semibold text-xs">{t.icon} {t.name}</span>
+            <span className="text-white font-semibold text-xs">{t.icon} {l(t.name)}</span>
             {theme === t.id && (
-              <span className="text-cyan-400 text-[11px] font-bold">Selected</span>
+              <span className="text-cyan-400 text-[11px] font-bold">{l({ en: 'Selected', ar: 'محدّد', de: 'Ausgewählt' })}</span>
             )}
           </button>
         ))}
@@ -285,8 +287,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     // Step 3 — Search Engine
     <motion.div key="search" className="flex flex-col items-center justify-center h-full text-center px-8 w-full max-w-2xl mx-auto relative">
-      <h2 className="text-4xl font-bold text-white mb-3 select-none">Your Search Engine</h2>
-      <p className="text-slate-300 text-base mb-8 select-none">Select your default search engine. You can change this later in settings.</p>
+      <h2 className="text-4xl font-bold text-white mb-3 select-none">{l({ en: 'Your Search Engine', ar: 'محرك البحث', de: 'Ihre Suchmaschine' })}</h2>
+      <p className="text-slate-300 text-base mb-8 select-none">{l({ en: 'Select your default search engine. You can change this later in settings.', ar: 'اختر محرك البحث الافتراضي. يمكنك تغييره لاحقاً من الإعدادات.', de: 'Wählen Sie Ihre Standardsuchmaschine. Sie können sie später in den Einstellungen ändern.' })}</p>
       <div className="flex flex-col gap-2.5 w-full mb-8 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {SEARCH_ENGINES.map(engine => (
           <button
@@ -304,7 +306,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             </div>
             <div className="flex-1 text-left">
               <div className="text-white font-semibold text-sm">{engine.name}</div>
-              <div className="text-slate-400 text-xs">{engine.desc}</div>
+              <div className="text-slate-400 text-xs">{l(engine.desc)}</div>
             </div>
             {searchEngine === engine.id && (
               <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center shrink-0">
@@ -325,21 +327,21 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
         </svg>
       </div>
-      <h2 className="text-4xl font-bold text-white mb-3 select-none">Privacy Shield</h2>
+      <h2 className="text-4xl font-bold text-white mb-3 select-none">{l({ en: 'Privacy Shield', ar: 'درع الخصوصية', de: 'Privacy Shield' })}</h2>
       <p className="text-slate-300 text-base max-w-md mb-8 leading-relaxed select-none">
-        King Browser's built-in privacy shield automatically blocks ads, trackers, and malicious content.
+        {l({ en: 'King Browser\'s built-in privacy shield automatically blocks ads, trackers, and malicious content.', ar: 'يحظر درع الخصوصية المدمج في King Browser الإعلانات وأدوات التتبّع والمحتوى الضار تلقائياً.', de: 'Der integrierte Privacy Shield von King Browser blockiert Werbung, Tracker und schädliche Inhalte automatisch.' })}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 max-w-lg w-full no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {[
-          { icon: <Ban className="w-7 h-7 text-slate-400" />, label: 'Ads' },
-          { icon: <EyeOff className="w-7 h-7 text-slate-400" />, label: 'Trackers' },
-          { icon: <Bug className="w-7 h-7 text-slate-400" />, label: 'Malware' },
+          { icon: <Ban className="w-7 h-7 text-slate-400" />, label: l({ en: 'Ads', ar: 'الإعلانات', de: 'Werbung' }) },
+          { icon: <EyeOff className="w-7 h-7 text-slate-400" />, label: l({ en: 'Trackers', ar: 'أدوات التتبّع', de: 'Tracker' }) },
+          { icon: <Bug className="w-7 h-7 text-slate-400" />, label: l({ en: 'Malware', ar: 'البرمجيات الضارة', de: 'Malware' }) },
         ].map(item => (
           <div key={item.label} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-4 flex flex-col items-center gap-2.5 transition-colors hover:bg-white/10 select-none">
             {item.icon}
             <span className="text-slate-300 text-xs font-semibold">{item.label}</span>
             <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${privacyShield ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20' : 'text-red-400 bg-red-400/10 border border-red-400/20'}`}>
-              {privacyShield ? 'Blocked' : 'Allowed'}
+              {privacyShield ? l({ en: 'Blocked', ar: 'محظور', de: 'Blockiert' }) : l({ en: 'Allowed', ar: 'مسموح', de: 'Erlaubt' })}
             </span>
           </div>
         ))}
@@ -349,7 +351,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           type="button"
           role="switch"
           aria-checked={privacyShield}
-          aria-label="Toggle Privacy Shield"
+          aria-label={l({ en: 'Toggle Privacy Shield', ar: 'تشغيل أو إيقاف درع الخصوصية', de: 'Privacy Shield umschalten' })}
           onClick={() => setPrivacyShield(!privacyShield)}
           className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 cursor-pointer ${privacyShield ? 'bg-emerald-500' : 'bg-slate-700'}`}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -357,7 +359,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${privacyShield ? 'translate-x-8' : 'translate-x-1'}`} />
         </button>
         <span className="text-white font-medium text-base select-none">
-          {privacyShield ? 'Privacy Shield Active' : 'Privacy Shield Off'}
+          {privacyShield ? l({ en: 'Privacy Shield Active', ar: 'درع الخصوصية مفعّل', de: 'Privacy Shield aktiv' }) : l({ en: 'Privacy Shield Off', ar: 'درع الخصوصية متوقف', de: 'Privacy Shield aus' })}
         </span>
       </div>
     </motion.div>,
@@ -380,7 +382,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.3 }}
         className="text-4xl font-bold text-white mb-3 select-none"
       >
-        You're all set!
+        {l({ en: 'You\'re all set!', ar: 'كل شيء جاهز!', de: 'Alles bereit!' })}
       </motion.h2>
       <motion.p
         initial={{ y: 20, opacity: 0 }}
@@ -388,7 +390,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.45 }}
         className="text-slate-300 text-base max-w-md leading-relaxed mb-4 select-none"
       >
-        King Browser is ready. All your settings are saved and can be changed anytime.
+        {l({ en: 'King Browser is ready. All your settings are saved and can be changed anytime.', ar: 'King Browser جاهز. حُفظت كل إعداداتك ويمكن تغييرها في أي وقت.', de: 'King Browser ist bereit. Alle Einstellungen sind gespeichert und jederzeit änderbar.' })}
       </motion.p>
       <motion.div
         initial={{ y: 20, opacity: 0 }}
@@ -396,11 +398,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.55 }}
         className="flex gap-6 mb-10 text-xs text-slate-400 select-none"
       >
-        <span>Theme: <strong className="text-white capitalize">{theme}</strong></span>
+        <span>{l({ en: 'Theme:', ar: 'السمة:', de: 'Design:' })} <strong className="text-white capitalize">{theme}</strong></span>
         <span>·</span>
-        <span>Search: <strong className="text-white capitalize">{searchEngine}</strong></span>
+        <span>{l({ en: 'Search:', ar: 'البحث:', de: 'Suche:' })} <strong className="text-white capitalize">{searchEngine}</strong></span>
         <span>·</span>
-        <span>Shield: <strong className={privacyShield ? 'text-emerald-400' : 'text-red-400'}>{privacyShield ? 'On' : 'Off'}</strong></span>
+        <span>{l({ en: 'Shield:', ar: 'الدرع:', de: 'Schild:' })} <strong className={privacyShield ? 'text-emerald-400' : 'text-red-400'}>{privacyShield ? l({ en: 'On', ar: 'مفعّل', de: 'An' }) : l({ en: 'Off', ar: 'متوقف', de: 'Aus' })}</strong></span>
       </motion.div>
       <motion.button
         initial={{ y: 20, opacity: 0 }}
@@ -412,7 +414,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         className="flex items-center gap-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-10 py-3.5 rounded-2xl font-bold text-base transition-all  no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        <span>Start Browsing</span>
+        <span>{l({ en: 'Start Browsing', ar: 'ابدأ التصفح', de: 'Lossurfen' })}</span>
         <ArrowRight className="w-5 h-5" />
       </motion.button>
     </motion.div>,
@@ -436,7 +438,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           } as React.CSSProperties}
         >
           <span className="text-[11px] font-semibold text-slate-500 tracking-wider uppercase">
-            King Browser Setup
+            {l({ en: 'King Browser Setup', ar: 'إعداد King Browser', de: 'King Browser einrichten' })}
           </span>
         </div>
         <div className="flex items-center gap-2 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
@@ -445,7 +447,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             className="text-xs text-slate-400 hover:text-white transition-colors px-3 py-1 rounded-lg hover:bg-white/5 cursor-pointer no-drag select-none font-medium"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
-            Skip Setup
+            {l({ en: 'Skip Setup', ar: 'تخطّي الإعداد', de: 'Einrichtung überspringen' })}
           </button>
         </div>
       </div>

@@ -47,6 +47,23 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.6',
+    date: 'October 2026',
+    title: 'Arabic, English and German',
+    badge: 'Pre-release',
+    lede: 'Choose the interface language in Settings > General. Arabic uses a right-to-left layout.',
+    highlights: [
+      'Interface language picker (Settings > General): Arabic, English or German, applied immediately. First run follows the system language.',
+      'Translated: the toolbar, tabs, main menu, page right-click menu, settings (General, Appearance, Privacy, updates), first-run setup, downloads and permission prompts.',
+      'Websites receive the chosen language in Accept-Language, so they can answer in it too.',
+    ],
+    changes: [
+      { category: 'feature', text: 'Arabic (right-to-left) and German interface, alongside English.' },
+      { category: 'improvement', text: 'Turkish interface removed; old settings that still say Turkish fall back to English.' },
+      { category: 'improvement', text: 'Help, MCP, Advanced and Reader screens are still English; they follow in a later release.' },
+    ],
+  },
+  {
     version: '0.0.5',
     date: 'October 2026',
     title: 'Google sign-in compatibility',

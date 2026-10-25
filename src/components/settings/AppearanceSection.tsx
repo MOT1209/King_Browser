@@ -5,6 +5,7 @@ import { useLiveUnsplashPhoto } from '../../utils/unsplash';
 import { TabAnimationPreviewBox } from './TabAnimationPreviewBox';
 import { ToggleSwitch } from './ToggleSwitch';
 import { BackgroundPreviewCard, BACKGROUND_OPTIONS } from './BackgroundPreviewCard';
+import { useTranslation } from '../../services/i18n';
 
 export interface AppearanceSectionProps {
   settings: UserSettings;
@@ -12,6 +13,7 @@ export interface AppearanceSectionProps {
 }
 
 const DailyWallpaperSection = () => {
+  const { l } = useTranslation();
   const { 
     photo: currentPhoto, 
     photos, 
@@ -27,19 +29,19 @@ const DailyWallpaperSection = () => {
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Daily 4K Wallpaper (Ultra HD)
+              {l({ en: 'Daily 4K Wallpaper (Ultra HD)', ar: 'خلفية يومية بدقة 4K (Ultra HD)', de: 'Tägliches 4K-Hintergrundbild (Ultra HD)' })}
             </h3>
             <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-500/10 text-blue-500 rounded-full border border-blue-500/20">
               3840 × 2160 UHD
             </span>
             {isUserOverride && (
               <span className="px-2 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20">
-                Custom Choice
+                {l({ en: 'Custom Choice', ar: 'اختيار مخصّص', de: 'Eigene Auswahl' })}
               </span>
             )}
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Automatically updates daily with curated 4K photography. Synchronized across all tabs.
+            {l({ en: 'Automatically updates daily with curated 4K photography. Synchronized across all tabs.', ar: 'تتجدد يومياً تلقائياً بصور مختارة بدقة 4K، ومتزامنة في كل التبويبات.', de: 'Wird täglich automatisch mit ausgewählten 4K-Fotos aktualisiert. In allen Tabs synchron.' })}
           </p>
         </div>
 
@@ -49,10 +51,10 @@ const DailyWallpaperSection = () => {
               type="button"
               onClick={resetToDaily}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shadow-sm"
-              title="Reset to today's official wallpaper"
+              title={l({ en: 'Reset to today\'s official wallpaper', ar: 'العودة إلى خلفية اليوم الرسمية', de: 'Auf das offizielle Hintergrundbild von heute zurücksetzen' })}
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset to Today</span>
+              <span>{l({ en: 'Reset to Today', ar: 'العودة إلى خلفية اليوم', de: 'Auf heute zurücksetzen' })}</span>
             </button>
           )}
           <button
@@ -61,7 +63,7 @@ const DailyWallpaperSection = () => {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors shadow-sm border border-blue-200/50 dark:border-blue-700/50"
           >
             <Shuffle className="w-3.5 h-3.5" />
-            <span>Shuffle Next</span>
+            <span>{l({ en: 'Shuffle Next', ar: 'التالية عشوائياً', de: 'Nächstes zufällig' })}</span>
           </button>
         </div>
       </div>
@@ -100,7 +102,7 @@ const DailyWallpaperSection = () => {
               4K Wallpaper Gallery ({photos.length} photos)
             </span>
             <span className="text-[11px] text-slate-400">
-              Click any photo to set it immediately across all tabs
+              {l({ en: 'Click any photo to set it immediately across all tabs', ar: 'انقر أي صورة لتعيينها فوراً في كل التبويبات', de: 'Klicken Sie auf ein Foto, um es sofort in allen Tabs zu verwenden' })}
             </span>
           </div>
 
@@ -132,7 +134,7 @@ const DailyWallpaperSection = () => {
                   {isActive && (
                     <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-blue-600 text-white text-[9px] font-bold flex items-center gap-0.5 shadow">
                       <Check className="w-2.5 h-2.5" />
-                      <span>Active</span>
+                      <span>{l({ en: 'Active', ar: 'مفعّلة', de: 'Aktiv' })}</span>
                     </div>
                   )}
                 </button>
@@ -149,15 +151,16 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
   settings,
   onUpdateSettings,
 }) => {
+  const { l } = useTranslation();
   return (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section>
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Theme Mode</h2>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'Theme Mode', ar: 'وضع السمة', de: 'Farbmodus' })}</h2>
                 <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex gap-2">
                   {[
-                    { id: 'light', label: 'Light' },
-                    { id: 'dark', label: 'Dark' },
-                    { id: 'system', label: 'System Default' }
+                    { id: 'light', label: l({ en: 'Light', ar: 'فاتح', de: 'Hell' }) },
+                    { id: 'dark', label: l({ en: 'Dark', ar: 'داكن', de: 'Dunkel' }) },
+                    { id: 'system', label: l({ en: 'System Default', ar: 'حسب النظام', de: 'Systemstandard' }) }
                   ].map(opt => (
                     <button
                       key={opt.id}
@@ -175,12 +178,12 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
               </section>
 
               <section>
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Tab Style</h2>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'Tab Style', ar: 'نمط التبويبات', de: 'Tab-Stil' })}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[
-                    { id: 'floating', name: 'Floating', desc: 'Modern & Detached' },
-                    { id: 'rounded', name: 'Rounded', desc: 'Classic Chrome Style' },
-                    { id: 'square', name: 'Square', desc: 'Compact & Sharp' }
+                    { id: 'floating', name: l({ en: 'Floating', ar: 'عائم', de: 'Schwebend' }), desc: l({ en: 'Modern & Detached', ar: 'عصري ومنفصل', de: 'Modern und losgelöst' }) },
+                    { id: 'rounded', name: l({ en: 'Rounded', ar: 'مستدير', de: 'Abgerundet' }), desc: l({ en: 'Classic Chrome Style', ar: 'نمط Chrome الكلاسيكي', de: 'Klassischer Chrome-Stil' }) },
+                    { id: 'square', name: l({ en: 'Square', ar: 'مربّع', de: 'Eckig' }), desc: l({ en: 'Compact & Sharp', ar: 'مدمج وحاد', de: 'Kompakt und scharf' }) }
                   ].map(ts => (
                     <button
                       key={ts.id}
@@ -208,16 +211,16 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
               <section>
                 <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Tab Animation</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Select a tab opening physics preset and preview its motion</p>
+                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Tab Animation', ar: 'حركة التبويبات', de: 'Tab-Animation' })}</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{l({ en: 'Select a tab opening physics preset and preview its motion', ar: 'اختر نمط حركة فتح التبويب وعاين حركته', de: 'Wählen Sie eine Animation für das Öffnen von Tabs und sehen Sie sich die Vorschau an' })}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    { id: 'chrome', name: 'Chrome (Native)', desc: 'Smooth horizontal width expansion & collapse', badge: 'Default' },
-                    { id: 'smooth', name: 'Fluid Spring', desc: 'Soft floating lift with cushioned spring physics' },
-                    { id: 'snappy', name: 'Snappy', desc: 'Crisp, high-velocity responsive motion' },
-                    { id: 'none', name: 'Instant (No Motion)', desc: 'Immediate tab opening for maximum speed' }
+                    { id: 'chrome', name: l({ en: 'Chrome (Native)', ar: 'Chrome (أصلي)', de: 'Chrome (nativ)' }), desc: l({ en: 'Smooth horizontal width expansion & collapse', ar: 'توسّع وانكماش أفقي سلس', de: 'Sanftes horizontales Aus- und Einklappen' }), badge: l({ en: 'Default', ar: 'افتراضي', de: 'Standard' }) },
+                    { id: 'smooth', name: l({ en: 'Fluid Spring', ar: 'نابض انسيابي', de: 'Fließende Feder' }), desc: l({ en: 'Soft floating lift with cushioned spring physics', ar: 'ارتفاع ناعم بحركة نابضية مخففة', de: 'Weiches Anheben mit gedämpfter Federphysik' }) },
+                    { id: 'snappy', name: l({ en: 'Snappy', ar: 'سريع', de: 'Zackig' }), desc: l({ en: 'Crisp, high-velocity responsive motion', ar: 'حركة سريعة وحادة الاستجابة', de: 'Knackige, schnelle Bewegung' }) },
+                    { id: 'none', name: l({ en: 'Instant (No Motion)', ar: 'فوري (بدون حركة)', de: 'Sofort (ohne Animation)' }), desc: l({ en: 'Immediate tab opening for maximum speed', ar: 'فتح فوري للتبويب لأقصى سرعة', de: 'Sofortiges Öffnen für maximale Geschwindigkeit' }) }
                   ].map(ta => {
                     const isSelected = (settings.tabAnimation ?? 'chrome') === ta.id;
                     return (
@@ -252,26 +255,26 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                 <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Browser Color (Full UI Theme)</h2>
+                      <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Browser Color (Full UI Theme)', ar: 'لون المتصفح (سمة الواجهة كاملة)', de: 'Browserfarbe (gesamte Oberfläche)' })}</h2>
                       <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full">
-                        Beta
+                        {l({ en: 'Beta', ar: 'تجريبي', de: 'Beta' })}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Customize the entire browser chrome, frame, navigation bar, and tab surfaces</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{l({ en: 'Customize the entire browser chrome, frame, navigation bar, and tab surfaces', ar: 'خصّص إطار المتصفح وشريط التنقل وأسطح التبويبات بالكامل', de: 'Passen Sie Rahmen, Navigationsleiste und Tab-Flächen des gesamten Browsers an' })}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                   {[
-                    { id: 'default', name: 'Classic Slate', desc: 'Default King aesthetic', darkPreview: '#151122', lightPreview: '#f1f5f9', badge: 'Default' },
-                    { id: 'midnight', name: 'Midnight Navy', desc: 'Deep galactic space blue', darkPreview: '#0a0f1d', lightPreview: '#eef3f9' },
-                    { id: 'cyberpunk', name: 'Cyberpunk Violet', desc: 'Futuristic neon purple tone', darkPreview: '#0d071a', lightPreview: '#f7f2fe' },
-                    { id: 'forest', name: 'Emerald Forest', desc: 'Rich organic botanical green', darkPreview: '#04140e', lightPreview: '#f0f7f4' },
-                    { id: 'crimson', name: 'Crimson Ruby', desc: 'Velvet burgundy wine red', darkPreview: '#160509', lightPreview: '#fcf1f3' },
-                    { id: 'warm', name: 'Warm Mocha', desc: 'Cozy espresso coffee tone', darkPreview: '#140e0b', lightPreview: '#f8f4f0' },
-                    { id: 'ocean', name: 'Deep Ocean', desc: 'Calm abyssal teal & cyan', darkPreview: '#041217', lightPreview: '#eef7f9' },
-                    { id: 'sunset', name: 'Sunset Amber', desc: 'Warm dusk twilight glow', darkPreview: '#170b03', lightPreview: '#faf3ec' },
-                    { id: 'custom', name: 'Custom Color', desc: 'Choose your own hex color', darkPreview: settings.customBrowserColor || '#6366f1', lightPreview: settings.customBrowserColor || '#6366f1' }
+                    { id: 'default', name: l({ en: 'Classic Slate', ar: 'أردوازي كلاسيكي', de: 'Klassisch Schiefer' }), desc: l({ en: 'Default King aesthetic', ar: 'مظهر King الافتراضي', de: 'Standard-Look von King' }), darkPreview: '#151122', lightPreview: '#f1f5f9', badge: l({ en: 'Default', ar: 'افتراضي', de: 'Standard' }) },
+                    { id: 'midnight', name: l({ en: 'Midnight Navy', ar: 'أزرق منتصف الليل', de: 'Mitternachtsblau' }), desc: l({ en: 'Deep galactic space blue', ar: 'أزرق فضائي عميق', de: 'Tiefes Weltraumblau' }), darkPreview: '#0a0f1d', lightPreview: '#eef3f9' },
+                    { id: 'cyberpunk', name: l({ en: 'Cyberpunk Violet', ar: 'بنفسجي سايبربانك', de: 'Cyberpunk-Violett' }), desc: l({ en: 'Futuristic neon purple tone', ar: 'درجة أرجوانية نيونية مستقبلية', de: 'Futuristisches Neonviolett' }), darkPreview: '#0d071a', lightPreview: '#f7f2fe' },
+                    { id: 'forest', name: l({ en: 'Emerald Forest', ar: 'غابة زمردية', de: 'Smaragdwald' }), desc: l({ en: 'Rich organic botanical green', ar: 'أخضر نباتي غني', de: 'Sattes, natürliches Grün' }), darkPreview: '#04140e', lightPreview: '#f0f7f4' },
+                    { id: 'crimson', name: l({ en: 'Crimson Ruby', ar: 'ياقوتي قرمزي', de: 'Karminrubin' }), desc: l({ en: 'Velvet burgundy wine red', ar: 'أحمر نبيذي مخملي', de: 'Samtiges Weinrot' }), darkPreview: '#160509', lightPreview: '#fcf1f3' },
+                    { id: 'warm', name: l({ en: 'Warm Mocha', ar: 'موكا دافئ', de: 'Warmes Mokka' }), desc: l({ en: 'Cozy espresso coffee tone', ar: 'درجة قهوة إسبريسو دافئة', de: 'Gemütlicher Espresso-Ton' }), darkPreview: '#140e0b', lightPreview: '#f8f4f0' },
+                    { id: 'ocean', name: l({ en: 'Deep Ocean', ar: 'محيط عميق', de: 'Tiefsee' }), desc: l({ en: 'Calm abyssal teal & cyan', ar: 'أزرق مخضرّ هادئ', de: 'Ruhiges Petrol und Cyan' }), darkPreview: '#041217', lightPreview: '#eef7f9' },
+                    { id: 'sunset', name: l({ en: 'Sunset Amber', ar: 'كهرماني الغروب', de: 'Sonnenuntergang' }), desc: l({ en: 'Warm dusk twilight glow', ar: 'وهج غروب دافئ', de: 'Warmes Abendrot' }), darkPreview: '#170b03', lightPreview: '#faf3ec' },
+                    { id: 'custom', name: l({ en: 'Custom Color', ar: 'لون مخصّص', de: 'Eigene Farbe' }), desc: l({ en: 'Choose your own hex color', ar: 'اختر لونك الخاص (hex)', de: 'Eigene Hex-Farbe wählen' }), darkPreview: settings.customBrowserColor || '#6366f1', lightPreview: settings.customBrowserColor || '#6366f1' }
                   ].map(bc => {
                     const isSelected = (settings.browserColor ?? 'default') === bc.id;
                     return (
@@ -322,7 +325,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
 
                 {settings.browserColor === 'custom' && (
                   <div className="mt-4 p-4 rounded-2xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Custom Browser Color Picker:</label>
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{l({ en: 'Custom Browser Color Picker:', ar: 'منتقي لون المتصفح:', de: 'Browserfarbe wählen:' })}</label>
                     <div className="flex items-center gap-3">
                       <input 
                         type="color" 
@@ -344,14 +347,14 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                       />
                     </div>
                     <span className="text-xs text-slate-500 dark:text-slate-400">
-                      The browser automatically calculates frame, toolbar, and tab surfaces with optimal contrast.
+                      {l({ en: 'The browser automatically calculates frame, toolbar, and tab surfaces with optimal contrast.', ar: 'يحسب المتصفح تلقائياً ألوان الإطار وشريط الأدوات والتبويبات بأفضل تباين.', de: 'Der Browser berechnet Rahmen, Symbolleiste und Tab-Flächen automatisch mit optimalem Kontrast.' })}
                     </span>
                   </div>
                 )}
               </section>
 
               <section>
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Accent Color</h2>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'Accent Color', ar: 'لون التمييز', de: 'Akzentfarbe' })}</h2>
                 <div className="flex gap-4 p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50">
                   {[
                     { id: 'blue', color: 'bg-[#3b82f6]' },
@@ -378,7 +381,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                 </div>
                 {settings.accentColor === 'custom' && (
                   <div className="mt-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Custom Color Picker:</label>
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{l({ en: 'Custom Color Picker:', ar: 'منتقي اللون:', de: 'Farbe wählen:' })}</label>
                     <input 
                       type="color" 
                       value={settings.customAccentColor || '#3b82f6'}
@@ -390,7 +393,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
               </section>
 
               <section>
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">New Tab Background</h2>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'New Tab Background', ar: 'خلفية التبويب الجديد', de: 'Hintergrund für neue Tabs' })}</h2>
 
                 <div className="grid grid-cols-2 gap-4">
                   {BACKGROUND_OPTIONS.map(bg => (
@@ -408,28 +411,28 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                 )}
                 {settings.newTabBackground === 'custom_url' && (
                   <div className="mt-4 animate-in fade-in slide-in-from-top-2">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Video / Image URL:</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{l({ en: 'Video / Image URL:', ar: 'رابط الفيديو أو الصورة:', de: 'Video- oder Bild-URL:' })}</label>
                     <input 
                       type="text" 
                       value={settings.backgroundCustomUrl || ''}
                       onChange={(e) => onUpdateSettings({ backgroundCustomUrl: e.target.value })}
                       className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-blue-500"
-                      placeholder="e.g. https://example.com/video.mp4"
+                      placeholder={l({ en: 'e.g. https://example.com/video.mp4', ar: 'مثلاً https://example.com/video.mp4', de: 'z. B. https://example.com/video.mp4' })}
                     />
                   </div>
                 )}
               </section>
 
               <section>
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Layout & Navigation</h2>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'Layout & Navigation', ar: 'التخطيط والتنقل', de: 'Layout & Navigation' })}</h2>
                 <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
                   <div className="p-5 flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Bookmarks Bar</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Show favorite sites below address bar</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Bookmarks Bar', ar: 'شريط الإشارات المرجعية', de: 'Lesezeichenleiste' })}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{l({ en: 'Show favorite sites below address bar', ar: 'عرض المواقع المفضلة أسفل شريط العنوان', de: 'Lieblingsseiten unter der Adressleiste anzeigen' })}</div>
                     </div>
                     <ToggleSwitch
-                      ariaLabel="Toggle bookmarks bar"
+                      ariaLabel={l({ en: 'Toggle bookmarks bar', ar: 'تشغيل أو إيقاف شريط الإشارات المرجعية', de: 'Lesezeichenleiste umschalten' })}
                       checked={settings.showBookmarksBar}
                       onToggle={() => onUpdateSettings({ showBookmarksBar: !settings.showBookmarksBar })}
                     />
@@ -438,15 +441,15 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                   <div className="p-5 flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Vertical Tabs</span>
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Vertical Tabs', ar: 'تبويبات عمودية', de: 'Vertikale Tabs' })}</span>
                         <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full">
-                          Beta
+                          {l({ en: 'Beta', ar: 'تجريبي', de: 'Beta' })}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Display tabs on the left sidebar instead of the top</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{l({ en: 'Display tabs on the left sidebar instead of the top', ar: 'عرض التبويبات في شريط جانبي بدلاً من الأعلى', de: 'Tabs in der Seitenleiste statt oben anzeigen' })}</div>
                     </div>
                     <ToggleSwitch
-                      ariaLabel="Toggle vertical tabs"
+                      ariaLabel={l({ en: 'Toggle vertical tabs', ar: 'تشغيل أو إيقاف التبويبات العمودية', de: 'Vertikale Tabs umschalten' })}
                       checked={settings.useVerticalTabs}
                       onToggle={() => onUpdateSettings({ useVerticalTabs: !settings.useVerticalTabs })}
                     />
@@ -454,11 +457,11 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                   
                   <div className="p-5 flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Tasks Widget</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Show tasks and to-do list on the New Tab Page</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Tasks Widget', ar: 'أداة المهام', de: 'Aufgaben-Widget' })}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{l({ en: 'Show tasks and to-do list on the New Tab Page', ar: 'عرض المهام وقائمة الأعمال في صفحة التبويب الجديد', de: 'Aufgaben und To-do-Liste auf der Seite „Neuer Tab“ anzeigen' })}</div>
                     </div>
                     <ToggleSwitch
-                      ariaLabel="Toggle tasks widget"
+                      ariaLabel={l({ en: 'Toggle tasks widget', ar: 'تشغيل أو إيقاف أداة المهام', de: 'Aufgaben-Widget umschalten' })}
                       checked={settings.showTasksWidget !== false}
                       onToggle={() => onUpdateSettings({ showTasksWidget: settings.showTasksWidget === false ? true : false })}
                     />

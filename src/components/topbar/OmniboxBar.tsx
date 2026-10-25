@@ -18,7 +18,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tab, Bookmark, UserSettings, PermissionRequest } from '../../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../../utils/searchEngine';
-import { getLanguage, getLocale, useTranslation } from '../../services/i18n';
+import { getLanguage, getLocale, useTranslation, displayTabTitle } from '../../services/i18n';
 import { getUrlSecurityInfo, formatDisplayUrl } from '../../utils/securityUtils';
 import { SiteInfoPopover } from '../SiteInfoPopover';
 import { PermissionPromptPopover } from '../PermissionPromptPopover';
@@ -72,7 +72,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
   // Reactive: the placeholder below is localised, so it has to repaint on
   // language change rather than only whenever some other prop changes.
-  const { t } = useTranslation();
+  const { t, l } = useTranslation();
 
   const relevantPermissionRequests = useMemo(() => {
     if (!permissionRequests || permissionRequests.length === 0) return [];
@@ -128,7 +128,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         detail: { tabId: activeTab.id, targetLang: tLang, sourceLang: sLang || 'auto' }
       }));
     } catch (err: any) {
-      setTranslationError(err.message || 'Translation failed');
+      setTranslationError(err.message || l({ en: 'Translation failed', ar: 'فشلت الترجمة', de: 'Übersetzung fehlgeschlagen' }));
       setIsTranslating(false);
     }
   };
@@ -391,7 +391,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               }}              className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg text-xs font-semibold shadow-xs ${
                 isIncognito ? 'left-28' : 'left-10'
               }`}
-              title="Site Permissions (Click to toggle)"
+              title={l({ en: 'Site Permissions (Click to toggle)', ar: 'أذونات الموقع (انقر للتبديل)', de: 'Website-Berechtigungen (zum Umschalten klicken)' })}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />
               <span className="text-[11px] font-semibold whitespace-nowrap">Permissions</span>
@@ -400,7 +400,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
           <input
             type="text"
-            aria-label="Address and search bar"
+            dir="auto"
+            aria-label={l({ en: 'Address and search bar', ar: 'شريط العنوان والبحث', de: 'Adress- und Suchleiste' })}
             // Stable hook for the ⌘L / focus-url shortcut sites in App.tsx and
             // useAppIpc.ts. They must never match on placeholder text again:
             // the placeholder is now localised (and changes with the language
@@ -468,7 +469,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 : isIncognito ? 'pl-28' : 'pl-11'
             }`}>
               <span className="text-[12px] font-semibold truncate text-slate-800 dark:text-slate-200 leading-[14px]">
-                {activeTab?.title || 'New Tab'}
+                {displayTabTitle(activeTab)}
               </span>
               {activeTab?.url && activeTab.url !== 'king://newtab' && (
                 <span className="text-[10px] truncate text-slate-500 dark:text-slate-400 leading-[12px]">
@@ -495,7 +496,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 type="button"
                 onClick={onResetZoom}
                 className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-colors hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-cyan-400' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-cyan-400'}`}
-                title="Zoom Level (Click to reset 100%)"
+                title={l({ en: 'Zoom Level (Click to reset 100%)', ar: 'مستوى التكبير (انقر للعودة إلى 100%)', de: 'Zoomstufe (klicken für 100 %)' })}
               >
                 {Math.round(activeTab.zoomFactor * 100)}%
               </button>
@@ -506,7 +507,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 type="button"
                 onClick={onToggleReaderMode}
                 className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
-                title="Toggle Reader Mode"
+                title={l({ en: 'Toggle Reader Mode', ar: 'تبديل وضع القراءة', de: 'Lesemodus umschalten' })}
               >
                 <BookOpen className="w-4 h-4" />
               </button>
@@ -525,7 +526,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                         ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
                         : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'
                   }`}
-                  title="Translate Page"
+                  title={l({ en: 'Translate Page', ar: 'ترجمة الصفحة', de: 'Seite übersetzen' })}
                 >
                   <Languages className="w-3.5 h-3.5" />
                   {activeTab.isTranslated && (
@@ -551,7 +552,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               type="button"
               onClick={() => onToggleBookmark?.(activeTab)}
               className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
-              title="Bookmark Page"
+              title={l({ en: 'Bookmark Page', ar: 'إضافة الصفحة إلى الإشارات المرجعية', de: 'Seite als Lesezeichen speichern' })}
             >
               <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-cyan-500 text-cyan-500' : ''}`} />
             </button>

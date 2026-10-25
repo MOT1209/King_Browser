@@ -147,6 +147,7 @@ import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, getGoogleSigninCompatUserAgent, isGoogleAccountsUrl, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
+import { acceptLanguagesFor, contextMenuLabels, googleSigninDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
@@ -359,9 +360,12 @@ nativeTheme.on('updated', () => {
 });
 
 
-function getAcceptLanguagesForLocale(_localeOrLang?: string): string {
-  return 'en-US,en;q=0.9';
+function getAcceptLanguagesForLocale(localeOrLang?: string): string {
+  return acceptLanguagesFor(normalizeUiLanguage(localeOrLang));
 }
+
+/** Interface language reported by the renderer; drives the context menu and native dialogs. */
+let currentUiLanguage: UiLanguage = normalizeUiLanguage(app.getLocale());
 
 let currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
 
@@ -3828,6 +3832,7 @@ ipcMain.handle('set-app-language', async (event, lang: unknown) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
   if (typeof lang !== 'string' || !lang.trim()) return { success: false, error: 'Invalid language' };
   const cleanLang = lang.trim().toLowerCase();
+  currentUiLanguage = normalizeUiLanguage(cleanLang);
   currentAcceptLanguages = getAcceptLanguagesForLocale(cleanLang);
 
   try {
@@ -4191,11 +4196,12 @@ function watchGoogleSigninRejection(wc: Electron.WebContents): void {
     if (prompting) return;
     prompting = true;
     const target = pickSystemBrowserUrl(lastNonGoogleUrl);
+    const strings = googleSigninDialogStrings(currentUiLanguage);
     const options: Electron.MessageBoxOptions = {
       type: 'info',
-      message: 'Google blocked sign-in in this browser',
-      detail: `Google does not allow signing in from embedded browsers such as King Browser. You can continue in your default browser:\n${target}\n\nTo sign in inside King Browser instead, turn on Settings → Privacy → Google sign-in compatibility and try again.`,
-      buttons: ['Open in Default Browser', 'Cancel'],
+      message: strings.message,
+      detail: strings.detail(target),
+      buttons: [strings.openInDefaultBrowser, strings.cancel],
       defaultId: 0,
       cancelId: 1
     };
@@ -4242,60 +4248,7 @@ app.on('web-contents-created', (_event, wc) => {
     if (wc.getType() === 'webview') {
       const menu = new Menu();
 
-      const labels = {
-        // Spellcheck
-        noGuesses: 'No guesses found',
-        addToDictionary: 'Add to Dictionary',
-
-        // Links
-        openLinkNewTab: 'Open Link in New Tab',
-        openLinkNewIncognitoTab: 'Open Link in Incognito Window',
-        saveLinkAs: 'Save Link As...',
-        copyLinkAddress: 'Copy Link Address',
-
-        // Images
-        openImageNewTab: 'Open Image in New Tab',
-        saveImageAs: 'Save Image As...',
-        copyImage: 'Copy Image',
-        copyImageAddress: 'Copy Image Address',
-        searchImageLens: 'Search Image with Google Lens',
-
-        // Audio & Video
-        play: 'Play',
-        pause: 'Pause',
-        mute: 'Mute',
-        unmute: 'Unmute',
-        loop: 'Loop',
-        showControls: 'Show Controls',
-        pictureInPicture: 'Picture in Picture',
-        saveVideoAs: 'Save Video As...',
-        copyVideoAddress: 'Copy Video Address',
-        saveAudioAs: 'Save Audio As...',
-        copyAudioAddress: 'Copy Audio Address',
-
-        // Selection
-        copy: 'Copy',
-        cut: 'Cut',
-        paste: 'Paste',
-        pasteAsPlainText: 'Paste as Plain Text',
-        selectAll: 'Select All',
-        undo: 'Undo',
-        redo: 'Redo',
-        delete: 'Delete',
-        searchFor: (query: string) => `Search Google for "${query}"`,
-        aiExplain: 'Explain with King AI',
-
-        // Page Navigation
-        back: 'Back',
-        forward: 'Forward',
-        reload: 'Reload',
-        translatePage: 'Translate Page',
-        openInSystemBrowser: 'Open Page in Default Browser',
-        savePageAs: 'Save As...',
-        print: 'Print...',
-        viewSource: 'View Page Source',
-        inspect: 'Inspect',
-      };
+      const labels = contextMenuLabels(currentUiLanguage);
 
       // 1. Spellcheck Suggestions (if misspelled word)
       if (params.misspelledWord) {

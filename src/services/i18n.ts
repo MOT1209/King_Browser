@@ -1,32 +1,49 @@
-// King has a single, bundled English interface.
+// King's interface ships in English, Arabic and German. All three
+// dictionaries are bundled, so switching never waits on a network or chunk load.
 import en from '../locales/en.json';
+import ar from '../locales/ar.json';
+import de from '../locales/de.json';
 import { useState, useEffect } from 'react';
 
-export type SupportedLanguage = 'en' | 'tr' | 'ar' | 'de';
+export type SupportedLanguage = 'en' | 'ar' | 'de';
+export const SUPPORTED_LANGUAGES: readonly SupportedLanguage[] = ['en', 'ar', 'de'];
 
-// Retain legacy codes at the API boundary so old backups and callers remain
-// readable. They cannot select another interface language.
 type Dictionary = Record<string, any>;
-const dictionaries: Record<string, Dictionary> = { en };
-const activeLanguage: SupportedLanguage = 'en';
+const dictionaries: Record<SupportedLanguage, Dictionary> = { en, ar, de };
+let activeLanguage: SupportedLanguage = 'en';
+
+/**
+ * Maps any stored or OS language code to an interface language. Unknown and
+ * retired codes (old settings and backups may still say 'tr') fall back to English.
+ */
+export function normalizeLanguage(lang: unknown): SupportedLanguage {
+  if (typeof lang !== 'string') return 'en';
+  const code = lang.trim().toLowerCase();
+  if (code === 'ar' || code.startsWith('ar-')) return 'ar';
+  if (code === 'de' || code.startsWith('de-')) return 'de';
+  return 'en';
+}
 
 export function ensureLanguageLoaded(_lang?: SupportedLanguage): Promise<void> {
   return Promise.resolve();
 }
 
-/** Compatibility with older callers; the bundled English dictionary is fixed. */
-export function seedDictionary(_lang: SupportedLanguage, _dict: Dictionary): void {}
+/** Lets tests replace a dictionary. */
+export function seedDictionary(lang: SupportedLanguage, dict: Dictionary): void {
+  const key = normalizeLanguage(lang);
+  dictionaries[key] = dict;
+}
 
 export function isLanguageReady(_lang?: SupportedLanguage): boolean {
   return true;
 }
 
 export const LOCALE_MAP: Record<SupportedLanguage, string> = {
-  en: 'en-US', tr: 'en-US', de: 'en-US', ar: 'en-US'
+  en: 'en-US', ar: 'ar', de: 'de-DE'
 };
 
-export function getLocale(_lang?: SupportedLanguage): string {
-  return 'en-US';
+export function getLocale(lang?: SupportedLanguage): string {
+  return LOCALE_MAP[normalizeLanguage(lang ?? activeLanguage)];
 }
 
 export function formatDate(date: Date | number, lang?: SupportedLanguage, options?: Intl.DateTimeFormatOptions): string {
@@ -41,32 +58,49 @@ export function formatTime(date: Date | number, lang?: SupportedLanguage, option
   return d.toLocaleTimeString(locale, options || { hour: '2-digit', minute: '2-digit' });
 }
 
-if (typeof document !== 'undefined') {
-  document.documentElement.lang = 'en';
-  document.documentElement.dir = 'ltr';
-}
-
 const listeners = new Set<(lang: SupportedLanguage) => void>();
 
-export function isRTL(_lang?: string): boolean {
-  return false;
+export function isRTL(lang?: string): boolean {
+  return normalizeLanguage(lang ?? activeLanguage) === 'ar';
 }
 
-export function getLanguage(): SupportedLanguage {
+function applyDocumentLanguage(lang: SupportedLanguage): void {
+  if (typeof document === 'undefined' || !document.documentElement) return;
+  document.documentElement.lang = lang;
+  document.documentElement.dir = isRTL(lang) ? 'rtl' : 'ltr';
+}
+
+function readStoredLanguage(): SupportedLanguage {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('nova_language');
+      if (stored) return normalizeLanguage(stored);
+    }
+  } catch (_) {}
   return 'en';
 }
 
-export function setLanguage(_lang: SupportedLanguage): void {
+// Apply the last chosen language before the first render, so the UI does not
+// flash English (and left-to-right) for Arabic users.
+activeLanguage = readStoredLanguage();
+applyDocumentLanguage(activeLanguage);
+
+export function getLanguage(): SupportedLanguage {
+  return activeLanguage;
+}
+
+export function setLanguage(lang: SupportedLanguage | string): void {
+  const next = normalizeLanguage(lang);
+  const changed = next !== activeLanguage;
+  activeLanguage = next;
   // Do not rewrite user_settings here: its persistence owner holds live state.
   try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('nova_language', 'en');
+    if (typeof localStorage !== 'undefined') localStorage.setItem('nova_language', next);
   } catch (_) {}
-  if (typeof document !== 'undefined') {
-    document.documentElement.lang = 'en';
-    document.documentElement.dir = 'ltr';
-  }
+  applyDocumentLanguage(next);
+  if (!changed) return;
   listeners.forEach(fn => {
-    try { fn('en'); } catch (_) {}
+    try { fn(next); } catch (_) {}
   });
 }
 
@@ -183,6 +217,47 @@ export function t(path: string, params?: Record<string, string | number>): strin
   return current;
 }
 
+/**
+ * Inline translation for component strings that have no dictionary key:
+ * `l({ en: 'Close', ar: 'إغلاق', de: 'Schließen' })`. The type requires all
+ * three languages, so a string cannot ship untranslated. `{name}` params are
+ * interpolated like t().
+ */
+export type LocalizedText = Record<SupportedLanguage, string>;
+export function l(texts: LocalizedText, params?: Record<string, string | number>): string {
+  let text = texts[activeLanguage] ?? texts.en;
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      text = text.split(`{${k}}`).join(String(v));
+    });
+  }
+  return text;
+}
+
+/**
+ * Title to show for a tab. Built-in pages (king://newtab, settings, ...) store
+ * an English title in tab state, so they are translated at display time; web
+ * pages keep the title the site set.
+ */
+const INTERNAL_PAGE_TITLES: Array<[string, LocalizedText]> = [
+  ['king://newtab', { en: 'New Tab', ar: 'تبويب جديد', de: 'Neuer Tab' }],
+  ['king://settings', { en: 'Settings', ar: 'الإعدادات', de: 'Einstellungen' }],
+  ['king://history', { en: 'History', ar: 'السجل', de: 'Verlauf' }],
+  ['king://downloads', { en: 'Downloads', ar: 'التنزيلات', de: 'Downloads' }],
+  ['king://changelog', { en: "What's New", ar: 'ما الجديد', de: 'Neuigkeiten' }],
+  ['king://whats-new', { en: "What's New", ar: 'ما الجديد', de: 'Neuigkeiten' }],
+];
+export function displayTabTitle(tab: { title?: string; url?: string } | null | undefined): string {
+  const url = tab?.url || '';
+  for (const [prefix, text] of INTERNAL_PAGE_TITLES) {
+    if (url === prefix || url.startsWith(`${prefix}#`) || url.startsWith(`${prefix}/`) || url.startsWith(`${prefix}?`)) return l(text);
+  }
+  if (!url || url === 'about:blank') {
+    if (!tab?.title || tab.title === 'New Tab') return l(INTERNAL_PAGE_TITLES[0][1]);
+  }
+  return tab?.title || url || l(INTERNAL_PAGE_TITLES[0][1]);
+}
+
 export function useTranslation() {
   const [lang, setLangState] = useState<SupportedLanguage>(activeLanguage);
 
@@ -194,6 +269,7 @@ export function useTranslation() {
 
   return {
     t,
+    l,
     language: lang,
     locale: getLocale(lang),
     isRTL: isRTL(lang),

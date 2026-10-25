@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { UserSettings } from '../types/browser';
-import { setLanguage } from '../services/i18n';
+import { normalizeLanguage, setLanguage } from '../services/i18n';
 import { getElectronAPI } from '../utils/electronBridge';
 
 export interface UseThemeLanguageOptions {
@@ -560,13 +560,12 @@ export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
 
   // Apply Language and RTL Mode
   useEffect(() => {
-    if (settings.language) {
-      // setLanguage falls back to 'en' internally for unknown values.
-      setLanguage('en');
-      // Sync with Electron session Accept-Language headers
-      if (typeof window !== 'undefined' && window.electronAPI?.setAppLanguage) {
-        window.electronAPI.setAppLanguage('en').catch(() => {});
-      }
+    // setLanguage maps unknown values to English and sets lang/dir on <html>.
+    const language = normalizeLanguage(settings.language);
+    setLanguage(language);
+    // Main uses it for Accept-Language, the context menu and its dialogs.
+    if (typeof window !== 'undefined' && window.electronAPI?.setAppLanguage) {
+      window.electronAPI.setAppLanguage(language).catch(() => {});
     }
   }, [settings.language]);
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, Search, ShieldCheck, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Key, RefreshCw, ShieldAlert, Keyboard, Puzzle, X, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp, Bookmark, Power, Plus } from 'lucide-react';
 import { UserSettings } from '../types/browser';
+import { useTranslation } from '../services/i18n';
 
 import { GeneralSection } from './settings/GeneralSection';
 import { ShortcutsSection } from './settings/ShortcutsSection';
@@ -34,6 +35,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onPurgeMemory,
   onPerformSync
 }) => {
+  const { l } = useTranslation();
   const [activeTab, setActiveTab] = useState<'general' | 'account' | 'appearance' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
 
   useEffect(() => {
@@ -51,15 +53,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   }, [url]);
 
   const tabs = [
-    { id: 'general', label: 'General', icon: Settings },
+    { id: 'general', label: l({ en: 'General', ar: 'عام', de: 'Allgemein' }), icon: Settings },
     { id: 'account', label: 'King Sync', icon: Cloud },
-    { id: 'appearance', label: 'Appearance', icon: Paintbrush },
-    { id: 'privacy', label: 'Privacy & Security', icon: ShieldCheck },
-    { id: 'passwords', label: 'Passwords', icon: Key },
-    { id: 'extensions', label: 'Extensions', icon: Puzzle, badge: 'Beta' },
-    { id: 'advanced', label: 'Advanced', icon: Bot },
-    { id: 'mcp', label: 'MCP Server', icon: Cpu },
-    { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
+    { id: 'appearance', label: l({ en: 'Appearance', ar: 'المظهر', de: 'Darstellung' }), icon: Paintbrush },
+    { id: 'privacy', label: l({ en: 'Privacy & Security', ar: 'الخصوصية والأمان', de: 'Datenschutz & Sicherheit' }), icon: ShieldCheck },
+    { id: 'passwords', label: l({ en: 'Passwords', ar: 'كلمات المرور', de: 'Passwörter' }), icon: Key },
+    { id: 'extensions', label: l({ en: 'Extensions', ar: 'الإضافات', de: 'Erweiterungen' }), icon: Puzzle, badge: 'Beta' },
+    { id: 'advanced', label: l({ en: 'Advanced', ar: 'متقدم', de: 'Erweitert' }), icon: Bot },
+    { id: 'mcp', label: l({ en: 'MCP Server', ar: 'خادم MCP', de: 'MCP-Server' }), icon: Cpu },
+    { id: 'shortcuts', label: l({ en: 'Shortcuts', ar: 'اختصارات لوحة المفاتيح', de: 'Tastenkürzel' }), icon: Keyboard },
   ];
 
   return (
@@ -71,12 +73,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       {/* Sidebar */}
       <div 
         style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-        className="w-64 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-xl flex flex-col"
+        className="w-64 border-e border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-xl flex flex-col"
       >
         <div className="p-6 pb-2">
           <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Settings className="w-5 h-5 text-blue-500" />
-            Settings
+            {l({ en: 'Settings', ar: 'الإعدادات', de: 'Einstellungen' })}
           </h1>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-1">

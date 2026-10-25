@@ -1,20 +1,23 @@
 import assert from 'node:assert/strict';
 import { getLocale, formatDate, formatTime, setLanguage, getLanguage, onLanguageChange, t, LOCALE_MAP, SupportedLanguage } from '../src/services/i18n';
 import en from '../src/locales/en.json';
-import tr from '../src/locales/tr.json';
 import de from '../src/locales/de.json';
 import ar from '../src/locales/ar.json';
 
 console.log('\n--- i18n & English Date/Time Suite ---');
 
-// Legacy locale arguments all resolve to the single English interface.
-for (const code of ['en', 'tr', 'de', 'ar'] as SupportedLanguage[]) {
-  assert.equal(LOCALE_MAP[code], 'en-US');
-  assert.equal(getLocale(code), 'en-US');
+// Dates follow the interface language's locale.
+assert.equal(LOCALE_MAP.en, 'en-US');
+assert.equal(LOCALE_MAP.de, 'de-DE');
+assert.equal(LOCALE_MAP.ar, 'ar');
+{
   const fixedDate = new Date(2026, 8, 4, 15, 30);
-  const date = formatDate(fixedDate, code);
-  assert.ok(date.includes('September') && date.includes('Friday'));
-  assert.ok(formatTime(fixedDate, code).length > 0);
+  assert.ok(formatDate(fixedDate, 'en').includes('September') && formatDate(fixedDate, 'en').includes('Friday'));
+  assert.ok(formatDate(fixedDate, 'de').includes('September') && formatDate(fixedDate, 'de').includes('Freitag'));
+  for (const code of ['en', 'ar', 'de'] as SupportedLanguage[]) {
+    assert.equal(getLocale(code), LOCALE_MAP[code]);
+    assert.ok(formatTime(fixedDate, code).length > 0);
+  }
 }
 
 // 4. Greetings in All Locales
@@ -29,11 +32,6 @@ assert.equal(t(getGreetingKey(9)), 'Good Morning');
 assert.equal(t(getGreetingKey(14)), 'Good Afternoon');
 assert.equal(t(getGreetingKey(20)), 'Good Evening');
 
-// The tr/de/ar dictionaries are dynamic imports in the app, so they are NOT
-// synchronously available here and this suite does not seed them: i18n is
-// module-level shared state, and seeding from two suites makes them order
-// dependent. The loading policy and the translated strings are asserted in
-// tests/i18n_loading.test.ts, which owns those dictionaries.
 
 // 5. Reactive Listener on Language Change
 let listenerTriggered = false;
@@ -43,14 +41,18 @@ const unsubscribe = onLanguageChange((lang) => {
   observedLang = lang;
 });
 
+// Re-selecting the current language is a no-op; a real change notifies.
 setLanguage('en');
+assert.equal(listenerTriggered, false);
+setLanguage('de');
 assert.equal(listenerTriggered, true);
-assert.equal(observedLang, 'en');
-assert.equal(getLanguage(), 'en');
+assert.equal(observedLang, 'de');
+assert.equal(getLanguage(), 'de');
 unsubscribe();
+setLanguage('en');
 
 // 6. Locale Dictionary Parity for New Sections
-const dictionaries = { en, tr, de, ar };
+const dictionaries = { en, de, ar };
 const requiredNewtabKeys = [
   'goodMorning', 'goodAfternoon', 'goodEvening',
   'incognitoTitle', 'incognitoDesc', 'incognitoPlaceholder',
@@ -90,4 +92,4 @@ for (const [langCode, dict] of Object.entries(dictionaries)) {
 // Reset language to en
 setLanguage('en');
 
-console.log('[PASS] [i18n Localization] English date/time formatting, greetings and legacy language compatibility verified.');
+console.log('[PASS] [i18n Localization] Locale date/time formatting, greetings and dictionary coverage verified.');
