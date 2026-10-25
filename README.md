@@ -544,12 +544,14 @@ npm run benchmark
   sees your normal-browsing cookies, and a popup cannot open further popups of its own.
 - **Google accounts (YouTube, Gmail):** Google refuses sign-in inside embedded browsers such as
   King Browser ("This browser or app may not be secure"). You have two options:
-  - Turn on **Settings → Privacy → Google sign-in compatibility** (off by default). King then
-    identifies as Firefox on `accounts.google.com` only, which is how other Electron browsers get
-    past this check. It is a workaround: Google can stop accepting it at any time. If Google offers
-    a passkey, choose **Try another way** and use your password.
-  - Otherwise, when the rejection page appears, King offers **Open in Default Browser**; you can
-    also right-click any page and choose **Open Page in Default Browser**.
+  - **Reliable:** when the rejection page appears, King offers **Open in Default Browser**; you can
+    also right-click any page and choose **Open Page in Default Browser**. Sites that also offer
+    email or GitHub sign-in (Claude, for example) work inside King.
+  - **Experimental, usually blocked:** **Settings → Privacy → Google sign-in compatibility** (off by
+    default) makes King identify as Firefox on `accounts.google.com` only. In current testing Google
+    still detects King and refuses the sign-in ("This browser or app may not be secure" on YouTube,
+    an error 500 in sign-in popups), so do not rely on it. If Google offers a passkey, choose
+    **Try another way** and use your password.
 
 ---
 

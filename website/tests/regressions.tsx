@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { JSDOM } from 'jsdom'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import App, { platforms, VERSION } from '../src/App'
+import App, { initialLanguage, platforms, VERSION } from '../src/App'
+import { copy, languages } from '../src/content'
 import pkg from '../../package.json'
 
 /** Expand electron-builder's ${version}/${arch}/${ext} for the arch and extension a download link names. */
@@ -29,8 +30,29 @@ function assertDownloadNamesMatchBuildConfig() {
   }
 }
 
+/** Every language must carry the same keys and the same list lengths as English, so no screen falls back to an empty string. */
+function assertCopyParity() {
+  assert.deepEqual(languages.map(l => l.code).sort(), ['ar', 'de', 'en'])
+  assert.deepEqual(Object.keys(copy).sort(), ['ar', 'de', 'en'], 'Site languages are Arabic, English and German')
+  const en = copy.en as Record<string, unknown>
+  for (const code of ['ar', 'de'] as const) {
+    const other = copy[code] as Record<string, unknown>
+    assert.deepEqual(Object.keys(other).sort(), Object.keys(en).sort(), `${code} copy has the same keys as English`)
+    for (const [key, value] of Object.entries(en)) {
+      const translated = other[key]
+      if (Array.isArray(value)) {
+        assert.ok(Array.isArray(translated) && translated.length === value.length, `${code}.${key} has ${value.length} entries`)
+        assert.ok(JSON.stringify(translated).replace(/[\[\]",]/g, '').trim().length > 0, `${code}.${key} is not empty`)
+      } else {
+        assert.ok(typeof translated === 'string' && translated.trim().length > 0, `${code}.${key} is not empty`)
+      }
+    }
+  }
+}
+
 async function run() {
   assertDownloadNamesMatchBuildConfig()
+  assertCopyParity()
   const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost/' })
   const w = dom.window
   Object.assign(globalThis, { window: w, document: w.document, localStorage: w.localStorage, Node: w.Node, IS_REACT_ACT_ENVIRONMENT: true })
@@ -43,6 +65,11 @@ async function run() {
   let loads = 0
   w.HTMLMediaElement.prototype.pause = () => {}
   w.HTMLMediaElement.prototype.load = () => { loads++ }
+  w.localStorage.setItem('king-language', 'tr')
+  assert.equal(initialLanguage(), 'en', 'A saved Turkish choice from the old site falls back to English')
+  w.localStorage.setItem('king-language', 'de')
+  assert.equal(initialLanguage(), 'de', 'A saved language wins')
+  w.localStorage.removeItem('king-language')
   const root = createRoot(document.getElementById('root')!)
   await act(async () => root.render(<App />))
   const click = async (el: Element | null) => { assert.ok(el); await act(async () => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true }))) }
@@ -84,18 +111,30 @@ async function run() {
   const video = document.querySelector('video')!
   assert.equal(document.body.style.overflow, 'hidden')
   const tracks = [...document.querySelectorAll('track')]
-  assert.equal(tracks.length, 2, 'Video must provide both English and Turkish caption tracks')
-  assert.equal(tracks[0].default, true, 'English captions should be enabled by default')
+  assert.deepEqual(tracks.map(t => t.srclang).sort(), ['ar', 'de', 'en'], 'Video must provide Arabic, English and German caption tracks')
+  assert.equal(tracks.find(t => t.srclang === 'en')?.default, true, 'Captions follow the page language')
   await act(async () => video.dispatchEvent(new w.Event('error')))
   assert.ok(document.querySelector('[role="alert"]'), 'Failed media needs a visible recovery state')
   await click(button('Retry video'))
   assert.equal(loads, 1)
   await click(document.querySelector('.video-heading button'))
   assert.equal(document.body.style.overflow, 'clip', 'Closing restores previous overflow')
+  const picker = document.querySelector('.language-button select') as HTMLSelectElement
+  assert.ok(picker, 'Language picker is present')
+  await act(async () => { picker.value = 'ar'; picker.dispatchEvent(new w.Event('change', { bubbles: true })) })
+  assert.equal(document.documentElement.lang, 'ar')
+  assert.equal(document.documentElement.dir, 'rtl', 'Arabic switches the page to right-to-left')
+  assert.equal(document.title, copy.ar.pageTitle)
+  assert.equal(w.localStorage.getItem('king-language'), 'ar', 'The choice is remembered')
+  assert.ok(document.querySelector('#hero-title')?.textContent?.includes(copy.ar.hero[0]), 'Arabic copy is rendered')
+  await act(async () => { picker.value = 'de'; picker.dispatchEvent(new w.Event('change', { bubbles: true })) })
+  assert.equal(document.documentElement.dir, 'ltr', 'German is left-to-right')
+  assert.equal(document.querySelector('.hero-intro')?.textContent, copy.de.intro)
+  await act(async () => { picker.value = 'en'; picker.dispatchEvent(new w.Event('change', { bubbles: true })) })
   await click(button('Take a closer look'))
   await act(async () => root.unmount())
   assert.equal(document.body.style.overflow, 'clip', 'Unmount while open must release scroll lock')
-  console.log('[PASS] Website tab references, keyboard navigation, mobile menu, captions, media recovery and scroll-lock cleanup.')
+  console.log('[PASS] Website languages (ar/en/de, RTL), tab references, keyboard navigation, mobile menu, captions, media recovery and scroll-lock cleanup.')
   dom.window.close()
 }
 run().then(() => process.exit(0)).catch(error => { console.error(error); process.exit(1) })
