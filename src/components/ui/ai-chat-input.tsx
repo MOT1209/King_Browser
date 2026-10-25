@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
 import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check, AlertCircle, X } from "lucide-react";
-import { getLocale, useTranslation } from "../../services/i18n";
+import { getLocale, useTranslation, l } from "../../services/i18n";
 import { transcribeAudio } from "../../services/localSpeechRecognition";
 
 // ----------------------------------------------------------------------
@@ -160,9 +160,9 @@ function AttachmentThumb({
           "relative size-full overflow-hidden rounded-xl border border-border bg-muted outline-none",
           "transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.04] active:scale-[0.96]"
         )}
-        aria-label="Open attachment preview"
+        aria-label={l({ en: 'Open attachment preview', ar: 'فتح معاينة المرفق', de: 'Anhangvorschau öffnen' })}
       >
-        <img src={sanitizeBlobUrl(attachment.url)} alt="Attachment preview" className="size-full object-cover" draggable={false} />
+        <img src={sanitizeBlobUrl(attachment.url)} alt={l({ en: 'Attachment preview', ar: 'معاينة المرفق', de: 'Anhangvorschau' })} className="size-full object-cover" draggable={false} />
         <span
           aria-hidden="true"
           className={cn("pointer-events-none absolute inset-0 flex items-start justify-end bg-black/0 transition-colors duration-200", isHovered && "bg-black/25")}
@@ -268,7 +268,7 @@ function AttachmentGalleryModal({
         onTransitionEnd={() => { if (phase === "closing") onClose(); }}
         onClick={(e) => e.stopPropagation()}
       >
-        <img ref={imgRef} src={sanitizeBlobUrl(attachment.url)} alt="Attachment preview" className="size-full object-cover" draggable={false} />
+        <img ref={imgRef} src={sanitizeBlobUrl(attachment.url)} alt={l({ en: 'Attachment preview', ar: 'معاينة المرفق', de: 'Anhangvorschau' })} className="size-full object-cover" draggable={false} />
       </div>
 
       <button
@@ -1001,14 +1001,14 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                     onClick={() => window.electronAPI?.openSystemSettings?.('microphone')}
                     className="px-1.5 py-0.5 text-[11px] font-medium bg-amber-500/20 hover:bg-amber-500/30 rounded transition-colors text-amber-700 dark:text-amber-300"
                   >
-                    {getLocale().startsWith('tr') ? "Ayarları Aç" : "Open Settings"}
+                    {l({ en: 'Open Settings', ar: 'فتح الإعدادات', de: 'Einstellungen öffnen' })}
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setVoiceError(null)}
                   className="p-0.5 hover:opacity-75 transition-opacity"
-                  aria-label="Kapat"
+                  aria-label={l({ en: 'Close', ar: 'إغلاق', de: 'Schließen' })}
                 >
                   <X className="size-3.5" />
                 </button>
@@ -1107,7 +1107,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                 }
               }}
               placeholder={placeholder}
-              aria-label="Prompt"
+              aria-label={l({ en: 'Prompt', ar: 'الطلب', de: 'Eingabe' })}
               disabled={isRecording}
               style={{
                 outline: 'none',
@@ -1147,7 +1147,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                 "absolute inset-x-0 top-0 z-[1] cursor-text ps-4 pe-12 py-[15px] text-left text-sm font-medium leading-[17px] text-muted-foreground/80 outline-none focus:outline-none focus-visible:outline-none",
                 !expanded ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-105 translate-y-1 pointer-events-none"
               )}
-              aria-label="Open prompt input"
+              aria-label={l({ en: 'Open prompt input', ar: 'فتح حقل الإدخال', de: 'Eingabefeld öffnen' })}
             >
               {placeholder}
             </button>

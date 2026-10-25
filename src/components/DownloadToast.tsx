@@ -17,6 +17,7 @@ import {
   FileAudio
 } from 'lucide-react';
 import { formatBytes } from '../utils/formatBytes';
+import { useTranslation } from '../services/i18n';
 
 interface DownloadToastProps {
   /** Aktif indirme öğesi; App.tsx tarafından seçilip tekil prop olarak geçirilir. */
@@ -44,6 +45,7 @@ function getFileIcon(filename: string) {
 }
 
 export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeDownload }) => {
+  const { l } = useTranslation();
   const [speed, setSpeed] = useState<string>('');
   // Toast gövdesi artık prop'tan doğrudan türetiliyor; lokal state yalnızca
   // gerçekten "türetilemeyen" UI durumunu tutar: kullanıcı tarafından kapatılan
@@ -122,7 +124,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
               <button
                 onClick={(e) => { e.stopPropagation(); dismissToast(); }}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors shrink-0 p-0.5 rounded-md"
-                title="Dismiss"
+                title={l({ en: 'Dismiss', ar: 'إخفاء', de: 'Schließen' })}
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -132,10 +134,10 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
               <div className="mt-1">
                 <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1.5">
                   <span className="font-semibold text-cyan-600 dark:text-cyan-400">
-                    {activeToast.isPaused ? 'Paused' : `${progress}%`}
+                    {activeToast.isPaused ? l({ en: 'Paused', ar: 'متوقف مؤقتاً', de: 'Pausiert' }) : `${progress}%`}
                   </span>
                   <span>
-                    {formatBytes(activeToast.receivedBytes)} / {activeToast.totalBytes ? formatBytes(activeToast.totalBytes) : 'Unknown'}
+                    {formatBytes(activeToast.receivedBytes)} / {activeToast.totalBytes ? formatBytes(activeToast.totalBytes) : l({ en: 'Unknown', ar: 'غير معروف', de: 'Unbekannt' })}
                     {speed && !activeToast.isPaused ? ` (${speed})` : ''}
                   </span>
                 </div>
@@ -157,9 +159,9 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                     Download complete ({formatBytes(activeToast.totalBytes || activeToast.receivedBytes)})
                   </span>
                 ) : isCancelled ? (
-                  <span className="text-red-500 font-medium">Download cancelled</span>
+                  <span className="text-red-500 font-medium">{l({ en: 'Download cancelled', ar: 'أُلغي التنزيل', de: 'Download abgebrochen' })}</span>
                 ) : (
-                  <span className="text-amber-500 font-medium">Download interrupted</span>
+                  <span className="text-amber-500 font-medium">{l({ en: 'Download interrupted', ar: 'توقّف التنزيل', de: 'Download unterbrochen' })}</span>
                 )}
               </div>
             )}
@@ -176,7 +178,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                     className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-white/5 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                   >
                     <FolderIcon className="w-3 h-3" />
-                    Show in Folder
+                    {l({ en: 'Show in Folder', ar: 'إظهار في المجلد', de: 'Im Ordner anzeigen' })}
                   </button>
                   <button
                     onClick={() => {
@@ -186,7 +188,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                     className="flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                   >
                     <FileCheck className="w-3 h-3" />
-                    Open File
+                    {l({ en: 'Open File', ar: 'فتح الملف', de: 'Datei öffnen' })}
                   </button>
                 </>
               )}
@@ -204,7 +206,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                     className="flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
                   >
                     {activeToast.isPaused ? <Play className="w-3 h-3 fill-current" /> : <Pause className="w-3 h-3 fill-current" />}
-                    <span>{activeToast.isPaused ? 'Resume' : 'Pause'}</span>
+                    <span>{activeToast.isPaused ? l({ en: 'Resume', ar: 'استئناف', de: 'Fortsetzen' }) : l({ en: 'Pause', ar: 'إيقاف مؤقت', de: 'Pausieren' })}</span>
                   </button>
                   <button
                     onClick={() => (window as any).electronAPI?.cancelDownload?.(activeToast.id)}

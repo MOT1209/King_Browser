@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, X, Download, Copy, Check, Expand, LayoutTemplate, Loader2, AlertCircle } from 'lucide-react';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { useTranslation } from '../services/i18n';
 
 interface ScreenshotModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
   pageTitle,
   onCaptureFullPage
 }) => {
+  const { l } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [isCapturingFull, setIsCapturingFull] = useState(false);
@@ -135,7 +137,7 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
                 <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                   <Camera className="w-4 h-4" />
                 </div>
-                <h2 className="font-semibold text-sm">Screenshot Preview</h2>
+                <h2 className="font-semibold text-sm">{l({ en: 'Screenshot Preview', ar: 'معاينة لقطة الشاشة', de: 'Screenshot-Vorschau' })}</h2>
               </div>
 
               {/* Mode Toggle */}
@@ -147,7 +149,7 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
                     className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${captureMode === 'visible' ? 'bg-white dark:bg-slate-700 shadow-xs text-slate-800 dark:text-slate-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
                     <LayoutTemplate className="w-3.5 h-3.5" />
-                    Visible Area
+                    {l({ en: 'Visible Area', ar: 'المنطقة الظاهرة', de: 'Sichtbarer Bereich' })}
                   </button>
                   <button
                     onClick={() => handleToggleMode('full')}
@@ -155,7 +157,7 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
                     className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${captureMode === 'full' ? 'bg-white dark:bg-slate-700 shadow-xs text-slate-800 dark:text-slate-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
                     {isCapturingFull ? <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-500" /> : <Expand className="w-3.5 h-3.5" />}
-                    Full Page
+                    {l({ en: 'Full Page', ar: 'الصفحة كاملة', de: 'Ganze Seite' })}
                   </button>
                 </div>
               )}
@@ -167,7 +169,7 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-50"
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
-                  <span>{copied ? 'Copied!' : 'Copy'}</span>
+                  <span>{copied ? l({ en: 'Copied!', ar: 'تم النسخ!', de: 'Kopiert!' }) : l({ en: 'Copy', ar: 'نسخ', de: 'Kopieren' })}</span>
                 </button>
                 <button
                   onClick={handleDownload}
@@ -175,12 +177,12 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-600 text-white transition-colors shadow-xs disabled:opacity-50"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Save PNG</span>
+                  <span>{l({ en: 'Save PNG', ar: 'حفظ PNG', de: 'PNG speichern' })}</span>
                 </button>
                 <button
                   onClick={onClose}
                   className="p-1 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-1"
-                  title="Close"
+                  title={l({ en: 'Close', ar: 'إغلاق', de: 'Schließen' })}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -203,10 +205,10 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
                 {isCapturingFull ? (
                   <div className="h-[50vh] flex flex-col items-center justify-center text-slate-400 gap-3 w-full">
                     <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-                    <span className="text-sm font-medium">Capturing full page...</span>
+                    <span className="text-sm font-medium">{l({ en: 'Capturing full page...', ar: 'جارٍ التقاط الصفحة كاملة...', de: 'Ganze Seite wird aufgenommen...' })}</span>
                   </div>
                 ) : (
-                  currentImage && <img src={currentImage} alt="Screenshot" className="max-w-full object-contain block max-h-[60vh] rounded-lg shadow-sm" />
+                  currentImage && <img src={currentImage} alt={l({ en: 'Screenshot', ar: 'لقطة شاشة', de: 'Screenshot' })} className="max-w-full object-contain block max-h-[60vh] rounded-lg shadow-sm" />
                 )}
               </div>
             </div>

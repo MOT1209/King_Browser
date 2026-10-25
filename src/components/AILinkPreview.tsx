@@ -4,6 +4,7 @@ import { Sparkles, Loader2, Globe, Clock, ExternalLink } from 'lucide-react';
 import { Readability } from '@mozilla/readability';
 import DOMPurify from 'dompurify';
 import { aiAgent } from '../services/aiAgent';
+import { useTranslation } from '../services/i18n';
 
 interface AILinkPreviewProps {
   url: string;
@@ -61,6 +62,7 @@ export function extractPreviewFallbackSummary(cleanText: string, ogDesc?: string
 }
 
 export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x, y, isOpen }) => {
+  const { l } = useTranslation();
   const [data, setData] = useState<PreviewData | null>(null);
   const [loadingText, setLoadingText] = useState<string>('');
   const [displayedSummary, setDisplayedSummary] = useState<string>('');
@@ -285,10 +287,10 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
             <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10.5px] text-slate-400 dark:text-slate-500">
               <span className="flex items-center gap-1 font-medium text-cyan-600 dark:text-cyan-400">
                 <Sparkles className="w-2.5 h-2.5" />
-                {data.isAiGenerated ? 'AI Summary' : 'Smart Page Preview'}
+                {data.isAiGenerated ? l({ en: 'AI Summary', ar: 'ملخص الذكاء الاصطناعي', de: 'KI-Zusammenfassung' }) : l({ en: 'Smart Page Preview', ar: 'معاينة ذكية للصفحة', de: 'Intelligente Seitenvorschau' })}
               </span>
               <span className="flex items-center gap-1 opacity-80">
-                Click to open <ExternalLink className="w-2.5 h-2.5" />
+                {l({ en: 'Click to open', ar: 'انقر للفتح', de: 'Zum Öffnen klicken' })} <ExternalLink className="w-2.5 h-2.5" />
               </span>
             </div>
           )}

@@ -1458,7 +1458,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-400/40'
                 : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 border border-cyan-500/20 hover:border-cyan-400/40 shadow-xs'
             }`}
-            title={isMac ? "King AI Assistant (⌘I)" : "King AI Assistant (Ctrl+I)"}
+            title={l({ en: 'King AI Assistant ({key})', ar: 'مساعد King الذكي ({key})', de: 'King-KI-Assistent ({key})' }, { key: isMac ? '⌘I' : 'Ctrl+I' })}
           >
             <KingAssistantIcon size={15} active={isAIAssistantOpen} />
             <span className="font-medium text-[11px]">
@@ -1610,7 +1610,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   ? 'hover:bg-slate-700 text-slate-300'
                   : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white'
               }`}
-              title={`${ext.name}${ext.popupUrl ? ' (Click to open popup)' : ''}`}
+              title={ext.popupUrl ? l({ en: '{name} (click to open popup)', ar: '{name} (انقر لفتح النافذة)', de: '{name} (zum Öffnen des Popups klicken)' }, { name: ext.name }) : ext.name}
             >
               {ext.iconData ? (
                 <img src={ext.iconData} alt={ext.name} className="w-4 h-4 object-contain rounded-xs" />

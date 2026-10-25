@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Shield, ShieldOff, X } from 'lucide-react';
+import { useTranslation } from '../services/i18n';
 
 interface AdBlockerPopoverProps {
   blockedCount: number;
@@ -19,6 +20,7 @@ export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
   hostname,
   buttonRef
 }) => {
+  const { l } = useTranslation();
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
           <div className="p-1 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
             {isWhitelisted ? <ShieldOff className="w-4 h-4 text-slate-400" /> : <Shield className="w-4 h-4 text-cyan-500" />}
           </div>
-          <span>Privacy & Ad Shield</span>
+          <span>{l({ en: 'Privacy & Ad Shield', ar: 'درع الخصوصية والإعلانات', de: 'Datenschutz- und Werbeschild' })}</span>
         </div>
         <button 
           onClick={onClose} 
@@ -74,22 +76,22 @@ export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
           <span className="text-xl font-bold font-mono">{isWhitelisted ? '0' : blockedCount}</span>
         </div>
         <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-0.5">
-          {isWhitelisted ? 'Ad Shield Paused' : 'Ads & Trackers Neutralized'}
+          {isWhitelisted ? l({ en: 'Ad Shield Paused', ar: 'درع الإعلانات متوقف', de: 'Werbeschild pausiert' }) : l({ en: 'Ads & Trackers Neutralized', ar: 'تم إيقاف الإعلانات وأدوات التتبّع', de: 'Werbung & Tracker blockiert' })}
         </div>
         <div className="text-[11px] text-slate-500 dark:text-slate-400 text-center mb-3.5">
-          {isWhitelisted ? 'Protection disabled for this site' : 'Protection active on this page'}
+          {isWhitelisted ? l({ en: 'Protection disabled for this site', ar: 'الحماية معطّلة لهذا الموقع', de: 'Schutz für diese Website deaktiviert' }) : l({ en: 'Protection active on this page', ar: 'الحماية مفعّلة في هذه الصفحة', de: 'Schutz auf dieser Seite aktiv' })}
         </div>
 
         <div className="w-full flex items-center justify-between p-3 bg-slate-50/80 dark:bg-white/[0.03] rounded-xl border border-slate-100 dark:border-white/5">
           <div className="flex flex-col min-w-0 pr-2">
-            <span className="text-xs font-medium text-slate-800 dark:text-slate-200">Shield Protection</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">{hostname || 'Current Domain'}</span>
+            <span className="text-xs font-medium text-slate-800 dark:text-slate-200">{l({ en: 'Shield Protection', ar: 'حماية الدرع', de: 'Schildschutz' })}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">{hostname || l({ en: 'Current Domain', ar: 'النطاق الحالي', de: 'Aktuelle Domain' })}</span>
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={!isWhitelisted}
-            aria-label={!isWhitelisted ? 'Disable ad blocking on this domain' : 'Enable ad blocking on this domain'}
+            aria-label={!isWhitelisted ? l({ en: 'Disable ad blocking on this domain', ar: 'إيقاف حظر الإعلانات في هذا النطاق', de: 'Werbeblocker für diese Domain deaktivieren' }) : l({ en: 'Enable ad blocking on this domain', ar: 'تفعيل حظر الإعلانات في هذا النطاق', de: 'Werbeblocker für diese Domain aktivieren' })}
             onClick={onToggleWhitelist}
             disabled={!hostname}
             className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none ${!hostname ? 'bg-slate-200 dark:bg-slate-700 opacity-50 cursor-not-allowed' : (!isWhitelisted ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-slate-700')}`}

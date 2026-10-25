@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, RefreshCw, X, ArrowUpCircle, AlertCircle } from 'lucide-react';
+import { useTranslation } from '../services/i18n';
 
 function formatBytes(bytes: number, decimals = 1): string {
   if (!bytes || bytes === 0) return '0 B';
@@ -12,6 +13,7 @@ function formatBytes(bytes: number, decimals = 1): string {
 }
 
 export const UpdateToast: React.FC = React.memo(() => {
+  const { l } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [version, setVersion] = useState('');
   const [releaseName, setReleaseName] = useState('');
@@ -66,7 +68,7 @@ export const UpdateToast: React.FC = React.memo(() => {
         unsubs.push(api.onUpdateError((_: any, err: any) => {
           setIsDownloading(false);
           setIsInstalling(false);
-          setError(typeof err === 'string' ? err : (err?.message || 'Update error encountered'));
+          setError(typeof err === 'string' ? err : (err?.message || l({ en: 'Update error encountered', ar: 'حدث خطأ في التحديث', de: 'Fehler beim Update' })));
           setIsVisible(true);
         }));
       }
@@ -88,7 +90,7 @@ export const UpdateToast: React.FC = React.memo(() => {
         setIsVisible(true);
       }
     } catch (e: any) {
-      setError(e?.message || 'Download failed');
+      setError(e?.message || l({ en: 'Download failed', ar: 'فشل التنزيل', de: 'Download fehlgeschlagen' }));
       setIsDownloading(false);
       setIsVisible(true);
     }
@@ -101,7 +103,7 @@ export const UpdateToast: React.FC = React.memo(() => {
       try {
         await api.installUpdate();
       } catch (e: any) {
-        setError(e?.message || 'Install failed');
+        setError(e?.message || l({ en: 'Install failed', ar: 'فشل التثبيت', de: 'Installation fehlgeschlagen' }));
         setIsInstalling(false);
         setIsVisible(true);
       }
@@ -133,21 +135,21 @@ export const UpdateToast: React.FC = React.memo(() => {
           <div className="flex-1 pt-0.5 min-w-0">
             <h3 className="text-xs font-bold text-slate-900 dark:text-white mb-0.5 truncate">
               {isDownloaded
-                ? 'Update Ready to Install'
+                ? l({ en: 'Update Ready to Install', ar: 'التحديث جاهز للتثبيت', de: 'Update bereit zur Installation' })
                 : isDownloading
-                ? 'Downloading Update...'
+                ? l({ en: 'Downloading Update...', ar: 'جارٍ تنزيل التحديث...', de: 'Update wird heruntergeladen...' })
                 : error
-                ? 'Update Warning'
-                : 'Update Available'}
+                ? l({ en: 'Update Warning', ar: 'تنبيه التحديث', de: 'Update-Hinweis' })
+                : l({ en: 'Update Available', ar: 'تحديث متاح', de: 'Update verfügbar' })}
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5 leading-relaxed">
               {error
                 ? error
                 : isDownloaded
-                ? `Version ${version} has been prepared and is ready to install.`
+                ? l({ en: 'Version {v} has been prepared and is ready to install.', ar: 'الإصدار {v} جاهز للتثبيت.', de: 'Version {v} ist vorbereitet und bereit zur Installation.' }, { v: version })
                 : isDownloading
-                ? `Fetching version ${version} from GitHub Releases...`
-                : `${releaseName || `Version ${version}`} is available.`}
+                ? l({ en: 'Fetching version {v} from GitHub Releases...', ar: 'جارٍ جلب الإصدار {v} من GitHub...', de: 'Version {v} wird von GitHub Releases geladen...' }, { v: version })
+                : l({ en: '{name} is available.', ar: '{name} متاح.', de: '{name} ist verfügbar.' }, { name: releaseName || l({ en: 'Version {v}', ar: 'الإصدار {v}', de: 'Version {v}' }, { v: version }) })}
             </p>
 
             {isDownloading && downloadProgress && (
@@ -182,14 +184,14 @@ export const UpdateToast: React.FC = React.memo(() => {
                   ) : (
                     <Download className="w-3.5 h-3.5" />
                   )}
-                  {isInstalling ? 'Relaunching...' : 'Restart & Update'}
+                  {isInstalling ? l({ en: 'Relaunching...', ar: 'جارٍ إعادة التشغيل...', de: 'Wird neu gestartet...' }) : l({ en: 'Restart & Update', ar: 'إعادة التشغيل والتحديث', de: 'Neu starten und aktualisieren' })}
                 </button>
               ) : !isDownloading ? (
                 <button
                   onClick={handleDownload}
                   className="px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5"
                 >
-                  <Download className="w-3.5 h-3.5" /> Download & Install
+                  <Download className="w-3.5 h-3.5" /> {l({ en: 'Download & Install', ar: 'تنزيل وتثبيت', de: 'Herunterladen und installieren' })}
                 </button>
               ) : null}
 
@@ -197,7 +199,7 @@ export const UpdateToast: React.FC = React.memo(() => {
                 onClick={() => setIsVisible(false)}
                 className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors"
               >
-                Dismiss
+                {l({ en: 'Dismiss', ar: 'إخفاء', de: 'Schließen' })}
               </button>
             </div>
           </div>
@@ -205,7 +207,7 @@ export const UpdateToast: React.FC = React.memo(() => {
           <button
             onClick={() => setIsVisible(false)}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-md transition-colors"
-            title="Dismiss"
+            title={l({ en: 'Dismiss', ar: 'إخفاء', de: 'Schließen' })}
           >
             <X className="w-3.5 h-3.5" />
           </button>

@@ -349,7 +349,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                   className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-2"
                 >
                   <Link2 className="w-4 h-4" />
-                  <span>Connect & Sync</span>
+                  <span>{l({ en: 'Connect & Sync', ar: 'اتصال ومزامنة', de: 'Verbinden & synchronisieren' })}</span>
                 </button>
               </div>
             </div>

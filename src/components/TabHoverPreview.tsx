@@ -15,6 +15,7 @@ import {
   Pin,
   Moon
 } from 'lucide-react';
+import { useTranslation } from '../services/i18n';
 
 export interface TabHoverPreviewProps {
   tab: Tab | null;
@@ -29,6 +30,7 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
   position = 'bottom',
   visible
 }) => {
+  const { l } = useTranslation();
   const [cachedThumbnail, setCachedThumbnail] = useState<string | undefined>(
     tab ? (tabThumbnailCache.get(tab.id) || tab.thumbnail) : undefined
   );
@@ -155,17 +157,17 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
             {/* Badges: Audio, Muted, Pinned, Hibernated */}
             <div className="flex items-center gap-1 shrink-0">
               {tab.isPinned && (
-                <span className="p-1 rounded-md bg-blue-500/10 text-blue-500 dark:text-blue-400" title="Pinned Tab">
+                <span className="p-1 rounded-md bg-blue-500/10 text-blue-500 dark:text-blue-400" title={l({ en: 'Pinned Tab', ar: 'تبويب مثبّت', de: 'Angehefteter Tab' })}>
                   <Pin className="w-3 h-3" />
                 </span>
               )}
               {tab.isPlayingAudio && (
-                <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-500 dark:text-emerald-400" title="Playing Audio">
+                <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-500 dark:text-emerald-400" title={l({ en: 'Playing Audio', ar: 'يشغّل صوتاً', de: 'Gibt Audio wieder' })}>
                   {tab.isMuted ? <VolumeX className="w-3 h-3 text-red-400" /> : <Volume2 className="w-3 h-3 animate-pulse" />}
                 </span>
               )}
               {tab.isSuspended && (
-                <span className="p-1 rounded-md bg-amber-500/10 text-amber-500 dark:text-amber-400" title="Sleeping Tab">
+                <span className="p-1 rounded-md bg-amber-500/10 text-amber-500 dark:text-amber-400" title={l({ en: 'Sleeping Tab', ar: 'تبويب نائم', de: 'Schlafender Tab' })}>
                   <Moon className="w-3 h-3" />
                 </span>
               )}
@@ -177,7 +179,7 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
             {cachedThumbnail ? (
               <img
                 src={cachedThumbnail}
-                alt="Tab preview"
+                alt={l({ en: 'Tab preview', ar: 'معاينة التبويب', de: 'Tab-Vorschau' })}
                 className="w-full h-full object-cover object-top block"
               />
             ) : (
@@ -197,10 +199,10 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
                   )}
                 </div>
                 <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[200px]">
-                  {tab.title || (isNewTab ? 'New Tab Page' : domain)}
+                  {tab.title || (isNewTab ? l({ en: 'New Tab Page', ar: 'صفحة التبويب الجديد', de: 'Neuer Tab' }) : domain)}
                 </span>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  {tab.isLoading ? 'Loading Page...' : (isInternal ? 'King System Page' : domain || 'Web Page')}
+                  {tab.isLoading ? l({ en: 'Loading Page...', ar: 'جارٍ تحميل الصفحة...', de: 'Seite wird geladen...' }) : (isInternal ? l({ en: 'King System Page', ar: 'صفحة من King', de: 'King-Systemseite' }) : domain || l({ en: 'Web Page', ar: 'صفحة ويب', de: 'Webseite' }))}
                 </span>
               </div>
             )}

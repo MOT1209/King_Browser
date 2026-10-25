@@ -960,9 +960,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">{l({ en: 'Theme', ar: 'السمة', de: 'Design' })}</div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleThemeChange('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='light' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Light Theme"><Sun className="w-5 h-5"/></button>
-                      <button onClick={() => handleThemeChange('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20 shadow-sm' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepia Theme">A</button>
-                      <button onClick={() => handleThemeChange('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='dark' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-700'} bg-slate-950 text-white hover:scale-105`} title="Dark OLED Theme"><Moon className="w-5 h-5"/></button>
+                      <button onClick={() => handleThemeChange('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='light' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title={l({ en: 'Light Theme', ar: 'سمة فاتحة', de: 'Helles Design' })}><Sun className="w-5 h-5"/></button>
+                      <button onClick={() => handleThemeChange('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20 shadow-sm' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title={l({ en: 'Sepia Theme', ar: 'سمة بنية', de: 'Sepia-Design' })}>A</button>
+                      <button onClick={() => handleThemeChange('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='dark' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-700'} bg-slate-950 text-white hover:scale-105`} title={l({ en: 'Dark OLED Theme', ar: 'سمة داكنة (OLED)', de: 'Dunkles OLED-Design' })}><Moon className="w-5 h-5"/></button>
                     </div>
                   </div>
 
@@ -1190,7 +1190,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                     <button
                       onClick={toggleSpeech}
                       className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all shadow-md active:scale-95 cursor-pointer"
-                      title={isPlaying ? "Pause" : "Resume"}
+                      title={isPlaying ? l({ en: 'Pause', ar: 'إيقاف مؤقت', de: 'Pause' }) : l({ en: 'Resume', ar: 'استئناف', de: 'Fortsetzen' })}
                     >
                       {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                     </button>
@@ -1316,7 +1316,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                     <button
                       onClick={() => deleteHighlight(viewingNote.id)}
                       className="p-1 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
-                      title="Delete Highlight"
+                      title={l({ en: 'Delete Highlight', ar: 'حذف التظليل', de: 'Markierung löschen' })}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
