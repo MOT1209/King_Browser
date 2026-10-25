@@ -1,8 +1,9 @@
 # Proposal: harden the rolling nightly release flow (post PR #15)
 
-Status: proposal only. Not applied yet. PR #15 ("one rolling nightly pre-release
-rebuilt on every push to main", merged via 671943b) is now on `main`, and the
-change below must be applied there. Nothing here blocks a versioned release.
+Status: applied. The diff below was applied verbatim to
+`.github/workflows/release.yml` on `main` (overwrite-in-place replaced
+delete-before-upload). Kept as the reviewed rationale record. Nothing here
+blocks a versioned release.
 
 ## What PR #15 does and why it is good
 
@@ -128,3 +129,7 @@ UI. Suggested fix as part of the same follow-up PR on main:
 +          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
 +          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 ```
+
+Resolved: this exact env block is present in the merged release workflow on
+`main` (verified against `1c50ddf`), so versioned installers compile King Cloud
+in instead of silently shipping local-vault-only.
