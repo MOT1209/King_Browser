@@ -190,7 +190,10 @@ export default defineConfig({
           'vendor-dompurify': ['dompurify'],
           'vendor-supabase': ['@supabase/supabase-js'],
           'vendor-readability': ['@mozilla/readability'],
-          'web-llm': ['@mlc-ai/web-llm']
+          'web-llm': ['@mlc-ai/web-llm'],
+          // The interface dictionaries are bundled (language switching is
+          // synchronous) but kept out of the startup index chunk.
+          'i18n-locales': ['./src/locales/en.json', './src/locales/ar.json', './src/locales/de.json']
         }
       }
     }
