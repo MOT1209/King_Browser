@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Download, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle, Folder as FolderIcon } from 'lucide-react';
 import { DownloadItem } from '../types/browser';
 import { formatBytes } from '../utils/formatBytes';
+import { useTranslation } from '../services/i18n';
 
 interface DownloadsPopoverProps {
   downloads: DownloadItem[];
@@ -21,6 +22,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
   onOpenDownloadsPage,
   buttonRef
 }) => {
+  const { l } = useTranslation();
   // Hide popover if click outside
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -60,14 +62,14 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                 <div className="p-1 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                   <Download className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Downloads</h3>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Downloads', ar: 'التنزيلات', de: 'Downloads' })}</h3>
               </div>
               {downloads.length > 0 && (
                 <button
                   onClick={onClearDownloads}
                   className="text-xs text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors"
                 >
-                  Clear
+                  {l({ en: 'Clear', ar: 'مسح', de: 'Leeren' })}
                 </button>
               )}
             </div>
@@ -76,7 +78,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
               {downloads.length === 0 ? (
                 <div className="py-8 flex flex-col items-center justify-center text-center px-4">
                   <Download className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
-                  <p className="text-sm text-slate-500 dark:text-slate-400">No downloaded files yet.</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{l({ en: 'No downloaded files yet.', ar: 'لا توجد ملفات منزّلة بعد.', de: 'Noch keine heruntergeladenen Dateien.' })}</p>
                 </div>
               ) : (
                 downloads.map(item => {
@@ -111,8 +113,8 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                         {isProgressing && (
                           <div className="mt-1">
                             <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-1">
-                              <span>{isPaused ? 'Paused' : `${progress}%`}</span>
-                              {item.totalBytes ? <span>{formatBytes(item.totalBytes)}</span> : <span>Downloading...</span>}
+                              <span>{isPaused ? l({ en: 'Paused', ar: 'متوقف مؤقتاً', de: 'Pausiert' }) : `${progress}%`}</span>
+                              {item.totalBytes ? <span>{formatBytes(item.totalBytes)}</span> : <span>{l({ en: 'Downloading...', ar: 'جارٍ التنزيل...', de: 'Wird heruntergeladen...' })}</span>}
                             </div>
                             <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                               <div className={`h-full rounded-full transition-all duration-300 ${isPaused ? 'bg-amber-500' : 'bg-cyan-500'}`} style={{ width: `${progress}%` }} />
@@ -122,7 +124,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                       
                         {!isProgressing && (
                           <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                            {isCompleted ? 'Completed — click to open' : isCancelled ? 'Cancelled' : 'Interrupted'}
+                            {isCompleted ? l({ en: 'Completed — click to open', ar: 'اكتمل — انقر للفتح', de: 'Fertig – zum Öffnen klicken' }) : isCancelled ? l({ en: 'Cancelled', ar: 'أُلغي', de: 'Abgebrochen' }) : l({ en: 'Interrupted', ar: 'توقّف', de: 'Unterbrochen' })}
                           </div>
                         )}
                       </div>
@@ -135,7 +137,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                               (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!);
                             }}
                             className="p-1.5 text-slate-400 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg transition-colors"
-                            title="Show in Folder"
+                            title={l({ en: 'Show in Folder', ar: 'إظهار في المجلد', de: 'Im Ordner anzeigen' })}
                           >
                             <FolderIcon className="w-3.5 h-3.5" />
                           </button>
@@ -150,7 +152,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                                   (window as any).electronAPI?.resumeDownload?.(item.id);
                                 }}
                                 className="p-1.5 text-slate-400 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg transition-colors"
-                                title="Resume"
+                                title={l({ en: 'Resume', ar: 'استئناف', de: 'Fortsetzen' })}
                               >
                                 <Play className="w-3.5 h-3.5 fill-current" />
                               </button>
@@ -161,7 +163,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                                   (window as any).electronAPI?.pauseDownload?.(item.id);
                                 }}
                                 className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-colors"
-                                title="Pause"
+                                title={l({ en: 'Pause', ar: 'إيقاف مؤقت', de: 'Pausieren' })}
                               >
                                 <Pause className="w-3.5 h-3.5 fill-current" />
                               </button>
@@ -172,7 +174,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                                 (window as any).electronAPI?.cancelDownload?.(item.id);
                               }}
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
-                              title="Cancel"
+                              title={l({ en: 'Cancel', ar: 'إلغاء', de: 'Abbrechen' })}
                             >
                               <XCircle className="w-3.5 h-3.5" />
                             </button>
@@ -194,7 +196,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                   }}
                   className="w-full text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:underline py-1"
                 >
-                  Show all downloads (king://downloads)
+                  {l({ en: 'Show all downloads (king://downloads)', ar: 'عرض كل التنزيلات (king://downloads)', de: 'Alle Downloads anzeigen (king://downloads)' })}
                 </button>
               </div>
             )}

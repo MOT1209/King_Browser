@@ -6,14 +6,14 @@ import { useTranslation } from '../../services/i18n';
 type Media = { src: string; kind: 'image' | 'video'; title: string; poster?: string; captions?: string };
 
 export function ReleaseMedia({ release }: { release: ReleaseVersion }) {
-  const { t, language } = useTranslation();
+  const { t } = useTranslation();
   const [index, setIndex] = useState(0);
   const video = useRef<HTMLVideoElement>(null);
   const gallery: Media[] = release.version === '1.5.0' ? [
     { src: './changelog/newtab.jpg', kind: 'image', title: t('releaseJournal.newTab') },
     { src: './changelog/assistant.jpg', kind: 'image', title: t('releaseJournal.assistant') },
-    { src: './changelog/king-tour.mp4', kind: 'video', title: t('releaseJournal.productFilm'), poster: './changelog/king-tour.poster.jpg', captions: `./changelog/king-tour.${language === 'tr' ? 'tr' : 'en'}.vtt` },
-    { src: './changelog/update-guide.mp4', kind: 'video', title: t('releaseJournal.updateFilm'), poster: './changelog/update-guide.poster.jpg', captions: `./changelog/update-guide.${language === 'tr' ? 'tr' : 'en'}.vtt` },
+    { src: './changelog/king-tour.mp4', kind: 'video', title: t('releaseJournal.productFilm'), poster: './changelog/king-tour.poster.jpg', captions: `./changelog/king-tour.en.vtt` },
+    { src: './changelog/update-guide.mp4', kind: 'video', title: t('releaseJournal.updateFilm'), poster: './changelog/update-guide.poster.jpg', captions: `./changelog/update-guide.en.vtt` },
   ] : [release.hero, ...(release.sections ?? []).map(section => section.media)]
     .filter((media): media is NonNullable<typeof media> => Boolean(media))
     .map(media => ({ src: media.src, kind: 'image', title: media.caption || media.alt }));
@@ -27,7 +27,7 @@ export function ReleaseMedia({ release }: { release: ReleaseVersion }) {
       {active.kind === 'image' ? <img key={active.src} src={active.src} alt={active.title} loading="lazy" /> :
         <video key={active.src} ref={video} controls playsInline preload="none" poster={active.poster} aria-label={active.title}>
           <source src={active.src} type="video/mp4" />
-          {active.captions && <track key={active.captions} kind="captions" src={active.captions} srcLang={language === 'tr' ? 'tr' : 'en'} label={language === 'tr' ? 'Türkçe' : 'English'} default />}
+          {active.captions && <track key={active.captions} kind="captions" src={active.captions} srcLang="en" label="English" default />}
         </video>}
     </div>
     <div className="journal-media-footer">

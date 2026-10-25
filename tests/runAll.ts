@@ -13,6 +13,7 @@ import './e2e/tier2_boundary_corner.test';
 import './e2e/tier3_cross_feature.test';
 // Verify the English-only interface policy and legacy setting compatibility.
 import './i18n_loading.test';
+import './i18n_coverage.test';
 import './english_settings_migration.test';
 import './e2e/tier4_real_world.test';
 import './e2e/tier5_adversarial_stress.test';
