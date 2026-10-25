@@ -159,12 +159,6 @@ jobs:
         working-directory: release-files
         run: sha256sum $(ls | grep -v '\.yml$') > SHA256SUMS.txt
 
-      # Replace nightly completely (assets and tag), so no stale files from an
-      # older version number remain in it.
-      - name: Remove the previous nightly
-        if: needs.check.outputs.nightly == 'true'
-        run: gh release delete nightly --cleanup-tag --yes || true
-
       - name: Publish nightly
         if: needs.check.outputs.nightly == 'true'
         uses: softprops/action-gh-release@v2
@@ -175,6 +169,12 @@ jobs:
           prerelease: true
           make_latest: 'false'
           draft: false
+          # Refresh the rolling nightly in place: same-named assets are
+          # replaced, so a failed run can never delete the nightly and the
+          # download link never 404s between pushes. The git tag stays where
+          # the previous successful build put it; the release body names the
+          # exact commit these assets were built from.
+          overwrite_files: true
           body: |
             Rolling build of `main` at commit ${{ github.sha }}. It is replaced on every push to `main`.
             Unsigned. For trying the newest code; use a versioned release for everyday use.
