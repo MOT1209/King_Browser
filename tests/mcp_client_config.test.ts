@@ -6,8 +6,8 @@ console.log('\n--- MCP Client Config Test Suite ---');
 {
   const bridge = 'C:\\Program Files\\King Browser\\resources\\mcp-bridge.cjs';
 
-  // OpenCode: local stdio through the bundled bridge. A `remote` entry is
-  // Streamable HTTP and always fails against King's SSE-only endpoint.
+  // OpenCode: local stdio through the bundled bridge (the verified baseline).
+  // A `remote` entry would have to point at /mcp, so the generator keeps the bridge.
   const open = JSON.parse(buildMcpClientConfig('opencode', 3020, 'tok_123', bridge));
   const server = open.mcp['king-browser'];
   assert.equal(open.$schema, 'https://opencode.ai/config.json');
@@ -18,7 +18,7 @@ console.log('\n--- MCP Client Config Test Suite ---');
   assert.equal(server.timeout, 180000);
   assert.equal(server.environment.MCP_TOKEN, 'tok_123');
   assert.equal(server.environment.MCP_PORT, '3020');
-  assert.equal(server.url, undefined, 'remote transport is not used: the server only serves SSE');
+  assert.equal(server.url, undefined, 'the generator keeps the stdio bridge as the verified default');
   assert.equal(server.headers, undefined);
 
   // Generic (Claude Desktop style): the same bridge in stdio command form.

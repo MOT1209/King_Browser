@@ -22,13 +22,13 @@ npm run build:website        # marketing site in website/
 npm --prefix website test    # website tests
 ```
 
-CI (`.github/workflows/ci.yml`) runs typecheck, lint, `npm test`, website build and tests on Linux, and a blocking Windows job. Run the same locally before pushing: `npx tsc --noEmit && npm run lint && npm test`.
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, `npm test`, website build and tests on Linux, plus Windows and macOS jobs. Run the same locally before pushing: `npx tsc --noEmit && npm run lint && npm test`.
 
 ## Layout
 
 - `electron/main.ts` - app entry, windows, webContents lifecycle, IPC handlers.
 - `electron/main/*.ts` - main-process modules, mostly dependency-free so tests can import them in plain Node (policy engine, approval mode, site rules, injection detector, activity log, SSRF/IP policy, update and CRX handling).
-- `electron/mcpServer.ts` - loopback HTTP/SSE MCP server (port 3020, bearer token). `mcp-bridge.ts` and `mcp-bridge.mjs` are the stdio bridge for clients.
+- `electron/mcpServer.ts` - loopback MCP server (port 3020, bearer token): Streamable HTTP `/mcp` and legacy SSE `/sse` + `/message`, both answered by `electron/main/mcpProtocol.ts`; `mcpStreamableHttp.ts` holds the `/mcp` session and Origin logic. `mcp-bridge.ts` and `mcp-bridge.mjs` are the stdio bridge for clients.
 - `electron/preload.ts`, `guest-preload.ts`, `webstore-preload.ts` - context bridges; `electron/security/trustedSender.ts` validates IPC senders.
 - `src/` - React renderer: `components/`, `hooks/` (state, one concern per hook), `services/` (sync crypto, AI agent, i18n), `utils/`, `locales/{en,ar,de}.json`, `types/`.
 - `tests/` - one file per concern plus `tests/e2e/tier1..5`; every test file must be imported in `tests/runAll.ts` or it does not run.

@@ -44,7 +44,7 @@
 
 Rather than bloated cloud telemetry or generic hype, King focuses on concrete developer and power-user requirements:
 
-- **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server exposing 41 browser automation, inspection, and execution-control tools directly to coding agents (OpenCode, Claude Code, Cursor, Windsurf). Agents authenticate with a bearer token copied from Settings → MCP.
+- **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local MCP server (Streamable HTTP and legacy SSE) exposing 45 browser automation, inspection, and execution-control tools (19 safe ones enabled by default) directly to coding agents (OpenCode, Claude Code, Cursor, Windsurf). Agents authenticate with a bearer token copied from Settings → MCP.
 - **On-Device Whisper Voice & Neural Execution**: Run multilingual speech-to-text locally via Transformers.js (`whisper-tiny`, ~41 MB) and on-device LLMs via WebGPU (Llama 3.2, Phi 3.5 Vision, Qwen 2.5). Exactly 0 KB of voice audio or model prompt data is transmitted to cloud servers.
 - **No Analytics SDK, Network-Level Privacy Shield**: Ships no analytics or crash-reporting SDK (see [Network connections](#network-connections) for the services King does contact). Employs `@ghostery/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
 - **Tab Hibernation & Memory Eviction**: Dormant background tabs automatically suspend active rendering execution via an LRU pool (capping live webviews to 6) while preserving complete navigation state, preventing Chromium process explosion regardless of tab count.
@@ -135,7 +135,7 @@ Current English interface in Clean Minimalist mode with the light theme.
 - **Hands-Free Browser Navigation**: Voice queries automatically translate into direct browser actions (navigation, searching, tab management).
 
 ### AI Agent & Virtual Cursor (MCP Protocol)
-- **Model Context Protocol (MCP)**: Native integration for AI agents (Cursor, Claude Desktop, Windsurf, Antigravity, OpenCode) to navigate, read pages, click elements, fill forms, and take screenshots via 41 built-in tools.
+- **Model Context Protocol (MCP)**: Native integration for AI agents (Cursor, Claude Desktop, Windsurf, Antigravity, OpenCode) to navigate, read pages, click elements, fill forms, and take screenshots via 45 built-in tools.
 - **Glowing AI Cursor Overlay**: Watch autonomous AI subagents interact with live webpages in real-time with an animated glowing cursor overlay.
 - **Built-in Local AI Sidepanel**: Run lightweight local models offline directly on your GPU via WebGPU and WebLLM.
 - **Persistent Info & Memory Vault**: Automatically extracts user preferences and retains task history with category badges (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`).
@@ -221,7 +221,7 @@ Tab-targeted navigation lives on the dedicated tab tools: page tools act on the 
 
 ### Connecting External AI Agents
 
-King Browser exposes its tools through a local MCP server (`127.0.0.1`, bearer-token protected). Every agent connects through the same stdio bridge, shipped as `resources/mcp-bridge.cjs` in the installed app and as `mcp-bridge.mjs` in a source checkout, so only the agent-side config differs.
+King Browser exposes its tools through a local MCP server (`127.0.0.1`, bearer-token protected). Agents connect either through the stdio bridge, shipped as `resources/mcp-bridge.cjs` in the installed app and as `mcp-bridge.mjs` in a source checkout, or directly over [Streamable HTTP](#direct-streamable-http-no-bridge); only the agent-side config differs.
 
 | Agent | Config location | Section |
 |---|---|---|
@@ -248,13 +248,13 @@ King Browser exposes its tools through a local MCP server (`127.0.0.1`, bearer-t
 
 #### OpenCode
 
-OpenCode must use the stdio bridge. Its `type: "remote"` transport speaks Streamable HTTP, while King Browser serves MCP over the older SSE transport (`GET /sse` for the stream, `POST /message?sessionId=...` for requests) and exposes no Streamable HTTP endpoint. A remote entry fails at startup with:
+The stdio bridge is the recommended OpenCode setup and the one this project tests against a real server (see [Compatibility status](#compatibility-status)). King Browser serves two transports: Streamable HTTP at `POST /mcp`, and the older SSE transport (`GET /sse` for the stream, `POST /message?sessionId=...` for requests) that the bridge uses. A `type: "remote"` entry must therefore point at `http://127.0.0.1:3020/mcp` (see [Direct Streamable HTTP](#direct-streamable-http-no-bridge)); pointing it at `/sse` fails at startup with:
 
 ```text
 king-browser  failed: Error POSTing to endpoint: ... Cannot POST /sse (HTTP 404)
 ```
 
-Pointing the Claude Desktop `url`/`headers` shape at `http://localhost:3020/sse` does not work for this reason. The **OpenCode** button in *Settings > MCP* copies a ready `type: "local"` entry with the live port, token and bundled bridge path (the clipboard clears after 15 seconds). Paste it into `opencode.json` and restart OpenCode; Node.js must be on `PATH`.
+The **OpenCode** button in *Settings > MCP* copies a ready `type: "local"` entry with the live port, token and bundled bridge path (the clipboard clears after 15 seconds). Paste it into `opencode.json` and restart OpenCode; Node.js must be on `PATH`.
 
 Manual setup: add to `opencode.json` (project root) or your global OpenCode config. Keys (`type`, `command` as an array, `environment`, `enabled`) follow the [OpenCode MCP docs](https://opencode.ai/docs/mcp-servers/):
 
@@ -349,12 +349,80 @@ Any client that can launch a stdio MCP server works with these four values:
 | Environment | `MCP_TOKEN` (from King settings), optional `MCP_PORT` (default `3020`) |
 | Transport | stdio |
 
+#### Direct Streamable HTTP (no bridge)
+
+Clients that speak Streamable HTTP can connect straight to King Browser, without Node.js or the bridge:
+
+| Setting | Value |
+|---|---|
+| URL | `http://127.0.0.1:3020/mcp` (use the port shown in King settings) |
+| Header | `Authorization: Bearer <MCP token>` (the only accepted credential; tokens in the URL are rejected) |
+| Methods | `POST` (JSON-RPC), `DELETE` (end session). `GET` answers 405: the server never pushes messages on its own |
+| Session | `initialize` returns an `Mcp-Session-Id` header; send it on every later request |
+| Versions | `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`; the client's version is echoed when supported |
+
+The same tools, approval gate, site rules, activity log and tool settings apply as on the other transports; the protocol code is shared between `/mcp` and `/message`. The server accepts at most 32 sessions, expires idle ones after an hour, and drops all of them when the token is rotated. A call that needs your approval keeps its request open for up to 135 seconds, so set the client timeout to at least 180000 ms.
+
+Examples (set `MCP_TOKEN` in your environment first; none of these were run against the real product, see [Compatibility status](#compatibility-status)):
+
+```bash
+# Claude Code
+claude mcp add --transport http king-browser http://127.0.0.1:3020/mcp \
+  --header "Authorization: Bearer $MCP_TOKEN"
+```
+
+```toml
+# Codex: ~/.codex/config.toml
+[mcp_servers.king-browser]
+url = "http://127.0.0.1:3020/mcp"
+bearer_token_env_var = "MCP_TOKEN"
+```
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "king-browser": {
+      "type": "remote",
+      "url": "http://127.0.0.1:3020/mcp",
+      "headers": { "Authorization": "Bearer {env:MCP_TOKEN}" },
+      "oauth": false,
+      "enabled": true,
+      "timeout": 180000
+    }
+  }
+}
+```
+
+Config keys follow the clients' own documentation: [Codex](https://developers.openai.com/codex/mcp) and [OpenCode](https://opencode.ai/docs/mcp-servers/); the Claude Code command follows third-party guides, so confirm it with `claude mcp add --help`. Option names change between client versions; check the one you run.
+
+#### Compatibility status
+
+What has actually been verified. "Automated" means a test in this repository drives the real `BrowserMCPServer` with the official MCP SDK client (`tests/mcp_server_transports.test.ts`, `tests/mcp_streamable_http.test.ts`); it does not mean the product itself was run.
+
+| Client | Connection | Verified | Notes |
+|---|---|---|---|
+| OpenCode (baseline) | stdio bridge `mcp-bridge.mjs` to `/sse` | Automated: the bridge process is spawned and lists tools and receives tool errors. Not run with OpenCode itself in this session | Config generator unchanged (`tests/mcp_client_config.test.ts`) |
+| Any MCP SDK client | Streamable HTTP `/mcp` | Automated: initialize, tool discovery, read tool, failing tool, unknown tool, concurrent calls, session end, server shutdown | |
+| Any MCP SDK client | Legacy SSE `/sse` | Automated: same tool list and error path as `/mcp` | |
+| Claude Code | `/mcp` or bridge | Not tested with the product | Config shape taken from third-party guides |
+| Codex | `/mcp` or bridge | Not tested with the product | Config keys taken from the official Codex docs |
+| OpenCode `remote` | `/mcp` | Not tested with the product | Config keys taken from the official OpenCode docs |
+| Cursor, Windsurf, Gemini CLI, Claude Desktop | bridge, or `/mcp` where supported | Not tested | Cursor forum reports mention custom headers being dropped on some tool calls; use the bridge if `/mcp` answers 401 only on `tools/call` |
+
+Known limits: browser-driving tools (click, type, navigate) were exercised only up to the point where a browser window is required; that part is covered by the renderer tests, not by the transport tests.
+
 #### Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
 | `Set a valid MCP_TOKEN…` | The variable is missing or not in the allowed format. Copy the token from King settings again. |
-| `Cannot POST /sse` (HTTP 404) | A remote MCP entry points at the SSE URL. OpenCode's `remote` transport needs Streamable HTTP and King Browser does not serve it; press the **OpenCode** button or use a `type: "local"` entry. |
+| `Cannot POST /sse` (HTTP 404) | A remote MCP entry points at the SSE URL. Remote (Streamable HTTP) clients must use `http://127.0.0.1:3020/mcp`; stdio clients use the bridge. |
+| HTTP 401 on `/mcp` | Missing or wrong `Authorization: Bearer <token>`; the token also changes when you rotate it in King settings. |
+| HTTP 403 on `/mcp` | The request carried a foreign `Origin` or a `Host` other than `localhost`, `127.0.0.1` or `[::1]` (DNS rebinding protection). Connect through the loopback address. |
+| HTTP 404 "Unknown or expired session" | The session ended (idle for an hour, token rotated, King restarted). The client must send `initialize` again; SDK clients do this themselves. |
+| HTTP 503 "Too many open MCP sessions" | 32 sessions are open. Close unused clients or restart the MCP server. |
+| Only a few tools are listed | Medium and sensitive tools are disabled by default; enable them in *Settings > MCP*. A fresh install lists the 19 safe tools. |
 | `Make sure King Browser is running.` | King Browser is closed, or `MCP_PORT` does not match the port shown in its settings. |
 | Server missing in the agent after editing | Restart the agent (and the desktop app) so it re-reads the config and environment. |
 | Works in the terminal but not in a desktop app | The app did not inherit your shell variables; set `MCP_TOKEN` in the agent's `env` setting instead. |
@@ -463,7 +531,7 @@ King Browser runs fully offline out of the box with zero required configuration.
 | :--- | :--- | :--- | :--- |
 | `VITE_SUPABASE_URL` | Optional | `""` | Supabase project URL for zero-knowledge cloud sync |
 | `VITE_SUPABASE_ANON_KEY` | Optional | `""` | Supabase anonymous public API key |
-| `MCP_PORT` | Optional | `3020` | Local port for the Model Context Protocol HTTP/SSE server |
+| `MCP_PORT` | Optional | `3020` | Local port for the Model Context Protocol server (Streamable HTTP `/mcp` and legacy SSE `/sse`) |
 | `MCP_TOKEN` | Optional | Auto-generated | Bearer token for authenticating external MCP clients |
 
 ---

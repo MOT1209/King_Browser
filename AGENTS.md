@@ -29,6 +29,7 @@ npm --prefix website test                     # when you touched website/
 | Strict/balanced mode | `electron/main/approvalMode.ts` |
 | Per-site ask/block rules | `electron/main/siteRules.ts` |
 | Prompt-injection detection | `electron/main/injectionDetector.ts` |
+| MCP protocol or transport | `electron/main/mcpProtocol.ts` (shared JSON-RPC handling), `electron/main/mcpStreamableHttp.ts` (`/mcp`), routes in `electron/mcpServer.ts`, tests `tests/mcp_streamable_http.test.ts` and `tests/mcp_server_transports.test.ts` |
 | New MCP tool | `electron/mcpServer.ts`, renderer handler in `src/hooks/useBrowserAgentBridge.ts`, a policy classification, tests, README tool count |
 | Element targeting by ref (`e12`) | `electron/main/elementRefs.ts`, `src/utils/elementSnapshot.ts` |
 | Activity log | `electron/main/activityLog.ts`, `activityStore.ts` |
@@ -47,7 +48,7 @@ npm --prefix website test                     # when you touched website/
 
 ## 2. Driver agent (MCP)
 
-King exposes a loopback MCP server on `127.0.0.1:3020` (HTTP/SSE). Clients authenticate with the bearer token from Settings -> MCP. Call `king_browser_info` first to learn the version and capabilities, and `browser_status` to see the current run state.
+King exposes a loopback MCP server on `127.0.0.1:3020` over Streamable HTTP (`POST /mcp`) and legacy SSE (`/sse` + `/message`), plus a stdio bridge (`mcp-bridge.mjs`). Clients authenticate with the bearer token from Settings -> MCP. Medium and sensitive tools are hidden until enabled in Settings, so `tools/list` on a fresh install shows only the safe tools. Call `king_browser_info` first to learn the version and capabilities, and `browser_status` to see the current run state.
 
 ### Tool families
 
