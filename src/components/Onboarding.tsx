@@ -197,7 +197,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all  no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        {l({ en: 'Let&apos;s Get Started', ar: 'لنبدأ', de: 'Los geht’s' })}
+        {l({ en: 'Let’s Get Started', ar: 'لنبدأ', de: 'Los geht’s' })}
       </motion.button>
     </motion.div>,
 

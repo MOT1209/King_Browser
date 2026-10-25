@@ -47,6 +47,23 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.8',
+    date: 'October 2026',
+    title: 'The new tab page is back in shape',
+    badge: 'Pre-release',
+    lede: 'A fix release: the new tab page and the AI chat lost their layout styles during the King rebrand.',
+    highlights: [
+      'The new tab page is centered again, with the tasks card beside the clock and the glass styling on the clock, search box and shortcuts.',
+      'The first-run button reads “Let’s Get Started” instead of showing a stray HTML code.',
+    ],
+    changes: [
+      { category: 'fix', text: 'New tab page: the layout, clock, search box, shortcuts and tasks card use their styles again (they were renamed in the components but not in the stylesheet).' },
+      { category: 'fix', text: 'AI side panel: the chat scroll area uses its styles again.' },
+      { category: 'fix', text: 'First-run screen: the start button no longer shows “&apos;”.' },
+      { category: 'improvement', text: 'Tests now fail when a stylesheet class is no longer used by any component, or when a translated string contains an HTML entity.' },
+    ],
+  },
+  {
     version: '0.0.7',
     date: 'October 2026',
     title: 'The whole interface in Arabic, English and German',
