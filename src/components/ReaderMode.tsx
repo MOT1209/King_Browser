@@ -972,7 +972,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                     <div className="flex gap-1.5">
                       <button onClick={() => handleFontChange('sans')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>{l({ en: 'Modern', ar: 'حديث', de: 'Modern' })}</button>
                       <button onClick={() => handleFontChange('serif')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>{l({ en: 'Classic', ar: 'كلاسيكي', de: 'Klassisch' })}</button>
-                      <button onClick={() => handleFontChange('mono')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-mono transition-all no-drag cursor-pointer ${font==='mono' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Mono</button>
+                      <button onClick={() => handleFontChange('mono')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-mono transition-all no-drag cursor-pointer ${font==='mono' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>{l({ en: 'Mono', ar: 'ثابت العرض', de: 'Monospace' })}</button>
                     </div>
                   </div>
 

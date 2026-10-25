@@ -12,6 +12,7 @@ import {
 } from '../services/translationService';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { AGENT_PARTITION, AGENT_PERSIST_PARTITION } from '../utils/appConstants';
+import { recordConsoleMessage, clearConsoleMessages } from '../utils/consoleBuffer';
 import { useTranslation } from '../services/i18n';
 
 const PasswordPromptModal = lazy(() => import('./PasswordPromptModal').then(m => ({ default: m.PasswordPromptModal })));
@@ -459,6 +460,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     latestTabRef.current = tab;
   }, [tab]);
 
+  // A closed tab's console output is not kept.
+  useEffect(() => {
+    const id = tab?.id;
+    return () => { if (id) clearConsoleMessages(id); };
+  }, [tab?.id]);
+
   // Security: Harden per-tab incognito partition as soon as incognito tab mounts
   useEffect(() => {
     if (isIncognito && tab?.id) {
@@ -866,7 +873,18 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
     };
 
+    // Feeds the agent's browser_console_messages tool; a new document starts
+    // with an empty console, as in DevTools.
+    const handleConsoleMessage = (e: any) => {
+      if (tab?.id) recordConsoleMessage(tab.id, { level: e?.level, message: e?.message, source: e?.sourceId, line: e?.line });
+    };
+    const handleConsoleReset = (e: any) => {
+      if (tab?.id && e?.isMainFrame !== false && !e?.isInPlace) clearConsoleMessages(tab.id);
+    };
+
     webview.addEventListener('dom-ready', handleDomReady);
+    webview.addEventListener('console-message', handleConsoleMessage);
+    webview.addEventListener('did-start-navigation', handleConsoleReset);
     webview.addEventListener('will-navigate', handleWillNavigate);
     webview.addEventListener('did-start-navigation', handleStartNavigation);
     webview.addEventListener('did-redirect-navigation', handleRedirectNavigation);
@@ -914,6 +932,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
       webview.removeEventListener('focus', handleFocus);
       webview.removeEventListener('dom-ready', handleDomReady);
+      webview.removeEventListener('console-message', handleConsoleMessage);
+      webview.removeEventListener('did-start-navigation', handleConsoleReset);
       webview.removeEventListener('will-navigate', handleWillNavigate);
       webview.removeEventListener('did-start-navigation', handleStartNavigation);
       webview.removeEventListener('did-redirect-navigation', handleRedirectNavigation);

@@ -1,6 +1,7 @@
 import * as sensitiveFieldModule from '../src/utils/sensitiveField';
 import * as agentLoginModule from '../src/utils/agentLogin';
 import * as elementSnapshotModule from '../src/utils/elementSnapshot';
+import * as consoleBufferModule from '../src/utils/consoleBuffer';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -51,6 +52,7 @@ async function run() {
     '../utils/searchHistoryBookmarks': { searchHistoryAndBookmarks: () => [] },
     '../utils/sensitiveField': sensitiveFieldModule,
     '../utils/elementSnapshot': elementSnapshotModule,
+    '../utils/consoleBuffer': consoleBufferModule,
     '../utils/agentLogin': agentLoginModule
   };
   const module: any = { exports: {} };

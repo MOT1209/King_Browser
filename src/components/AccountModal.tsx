@@ -231,7 +231,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-xl hover:bg-slate-200/80 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                title="Close"
+                title={l({ en: 'Close', ar: 'إغلاق', de: 'Schließen' })}
               >
                 <X className="w-4 h-4" />
               </button>

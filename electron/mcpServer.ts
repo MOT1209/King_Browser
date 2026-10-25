@@ -13,6 +13,7 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
 import { resolveElementRef } from './main/elementRefs.js';
+import { toMcpContent, formatToolError } from './main/mcpContent.js';
 import { Recorder, RECORDABLE_TOOLS, createRecordingStore, replaySteps, type Recording, type RecordingStore, type ReplayReport } from './main/recordings.js';
 import { createApprovalModeStore, strictModeRequiresApproval, type ApprovalMode, type ApprovalModeStore } from './main/approvalMode.js';
 import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
@@ -72,7 +73,7 @@ const TOOLS: McpTool[] = [
   },
   {
     name: 'browser_screenshot',
-    description: 'Takes a screenshot of the current active page and returns it as a base64-encoded data URL (image/png).',
+    description: 'Takes a screenshot of the visible part of the active page and returns it as a PNG image. Internal King pages (king://) cannot be captured.',
     inputSchema: { type: 'object', properties: {} }
   },
   {
@@ -390,6 +391,64 @@ const TOOLS: McpTool[] = [
     name: 'browser_stop',
     description: '§10/§11 STOP NOW: emergency stop. Cancels every queued action, aborts the in-flight one, and blocks new actions until browser_resume. Always available.',
     inputSchema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'browser_wait_for',
+    description: 'Waits until the active page has finished loading and, optionally, until an element matching a CSS selector or a piece of visible text appears. Prefer this over browser_wait after clicks and navigations.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: { type: 'string', description: 'CSS selector that must match a visible element (optional)' },
+        text: { type: 'string', description: 'Text that must appear on the page (optional)' },
+        timeoutMs: { type: 'number', description: 'Maximum time to wait in milliseconds (default 5000, max 10000)' }
+      }
+    }
+  },
+  {
+    name: 'browser_fill_form',
+    description: 'Types into several fields in one call. Each field is handled exactly like browser_type, including its approval checks; filling stops at the first field that fails.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fields: {
+          type: 'array',
+          description: 'Fields to fill, in order',
+          items: {
+            type: 'object',
+            properties: {
+              ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+              selector: { type: 'string', description: 'CSS selector of the input (alternative to ref)' },
+              text: { type: 'string', description: 'Text to type' }
+            },
+            required: ['text']
+          }
+        },
+        submit: { type: 'boolean', description: 'Press Enter in the last field after filling (default: false)' }
+      },
+      required: ['fields']
+    }
+  },
+  {
+    name: 'browser_console_messages',
+    description: 'Returns the most recent console messages (log, warning, error) logged by the active page, newest last.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        level: { type: 'string', enum: ['all', 'warning', 'error'], description: 'Minimum level to return (default: all)' },
+        limit: { type: 'number', description: 'Maximum number of messages (default 50, max 200)' }
+      }
+    }
+  },
+  {
+    name: 'browser_element_screenshot',
+    description: 'Takes a PNG screenshot of a single element on the active page, scrolling it into view first. Cheaper than a full screenshot when only one part of the page matters.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element (alternative to ref)' }
+      }
+    }
   }
 ];
 
@@ -414,7 +473,7 @@ const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_se
 
 // Tools whose output is page text the agent will read, and the actions that
 // need an approval after that text looked like an injection attempt.
-const INJECTION_SCAN_TOOLS = new Set(['browser_read_page', 'browser_snapshot', 'browser_get_element_text']);
+const INJECTION_SCAN_TOOLS = new Set(['browser_read_page', 'browser_snapshot', 'browser_get_element_text', 'browser_console_messages']);
 const INJECTION_GATED_TOOLS = new Set([
   'browser_navigate', 'browser_new_tab', 'browser_click', 'browser_type', 'browser_select_option', 'browser_press_key'
 ]);
@@ -425,7 +484,8 @@ const SITE_RULE_TOOLS = new Set([
   ...PAGE_CONTEXT_TOOLS,
   'browser_read_page', 'browser_snapshot', 'browser_screenshot', 'browser_full_page_screenshot',
   'browser_get_element_text', 'browser_find_element', 'browser_run_js',
-  'browser_scroll', 'browser_scroll_to_element', 'browser_hover', 'browser_focus'
+  'browser_scroll', 'browser_scroll_to_element', 'browser_hover', 'browser_focus',
+  'browser_wait_for', 'browser_console_messages', 'browser_element_screenshot'
 ]);
 
 // Tool permission levels
@@ -482,6 +542,12 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_get_page_summary: 'medium',
   browser_find_element: 'medium',
   browser_select: 'sensitive',
+  browser_wait_for: 'safe',
+  // Reads page output or pixels, like the other inspection tools.
+  browser_console_messages: 'medium',
+  browser_element_screenshot: 'medium',
+  // Each field is executed as a browser_type call and checked as one.
+  browser_fill_form: 'sensitive',
 };
 
 // Default disabled tools (all medium & sensitive levels; users can re-enable them in settings)
@@ -1217,6 +1283,40 @@ export class BrowserMCPServer {
       return `Waited ${ms}ms`;
     }
 
+    // browser_fill_form is a batch of browser_type calls. Each field goes
+    // through the full path (permission, site rules, classification, approval),
+    // so a batch can never type somewhere a single call would not be allowed.
+    if (toolName === 'browser_fill_form') {
+      const fields = Array.isArray(args.fields) ? args.fields : [];
+      if (fields.length === 0) return "Error: 'fields' must be a non-empty array.";
+      if (fields.length > 30) return 'Error: browser_fill_form accepts at most 30 fields.';
+      if (!this.isToolAllowed('browser_type')) {
+        throw new Error("Permission denied: Tool 'browser_type' (required by 'browser_fill_form') is disabled in MCP security settings.");
+      }
+      const filled: string[] = [];
+      for (let i = 0; i < fields.length; i++) {
+        const field = fields[i] && typeof fields[i] === 'object' ? fields[i] : {};
+        const label = String(field.ref ?? field.selector ?? `#${i + 1}`);
+        const isLast = i === fields.length - 1;
+        let result: string;
+        try {
+          result = await this.executeToolCore('browser_type', {
+            ...(field.ref !== undefined ? { ref: field.ref } : {}),
+            ...(field.selector !== undefined ? { selector: field.selector } : {}),
+            text: typeof field.text === 'string' ? field.text : String(field.text ?? ''),
+            pressEnter: isLast && args.submit === true
+          });
+        } catch (err: any) {
+          result = formatToolError(err);
+        }
+        if (result.startsWith('Error:')) {
+          return `Error: Field ${label} failed after ${filled.length} filled: ${result.replace(/^(Error:\s*)+/, '')}`;
+        }
+        filled.push(label);
+      }
+      return `Filled ${filled.length} field(s)${args.submit === true ? ' and submitted' : ''}.`;
+    }
+
     // Forward the tool call to the renderer via IPC and wait for its response.
     // §11/§12: when enforcement is enabled the action is classified and queued
     // through the execution engine (sensitive decisions get an approval dialog
@@ -1549,7 +1649,7 @@ export class BrowserMCPServer {
               jsonrpc: '2.0',
               id: body.id,
               result: {
-                content: [{ type: 'text', text: result }],
+                content: toMcpContent(result),
                 ...(isError ? { isError: true } : {})
               }
             };
@@ -1559,7 +1659,7 @@ export class BrowserMCPServer {
               jsonrpc: '2.0',
               id: body.id,
               result: {
-                content: [{ type: 'text', text: `Error: ${err.message}` }],
+                content: [{ type: 'text', text: formatToolError(err) }],
                 isError: true
               }
             };

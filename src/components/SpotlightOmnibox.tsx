@@ -312,7 +312,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                             ) : (
                               <Globe className={`w-4 h-4 shrink-0 ${isSelected ? 'text-cyan-500' : 'text-slate-400'}`} />
                             )}
-                            <span className="truncate text-sm font-medium">{item.tab.title || item.tab.url || 'Tab'}</span>
+                            <span dir="auto" className="truncate text-sm font-medium">{item.tab.title || item.tab.url || 'Tab'}</span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0 ml-2">
                             <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">

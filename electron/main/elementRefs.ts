@@ -19,6 +19,7 @@ export const REF_TOOLS: ReadonlySet<string> = new Set([
   'browser_hover',
   'browser_focus',
   'browser_get_element_text',
+  'browser_element_screenshot',
   'browser_scroll_to_element'
 ]);
 

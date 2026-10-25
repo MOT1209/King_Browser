@@ -54,7 +54,7 @@ import {
 } from 'lucide-react';
 import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, DownloadItem } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
-import { getLanguage, getLocale, useTranslation, displayTabTitle } from '../services/i18n';
+import { getLanguage, getLocale, useTranslation, displayTabTitle, displayWorkspaceName } from '../services/i18n';
 import { AdBlockerPopover } from './AdBlockerPopover';
 import { ADBLOCK_WHITELIST_EVENT } from '../utils/adblockWhitelist';
 import { KingAssistantIcon } from './ui/KingAssistantIcon';
@@ -482,7 +482,7 @@ const MemoizedTabItem = React.memo(
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
-            <span className="truncate text-[12px] flex-1">{displayTabTitle(tab)}</span>
+            <span dir="auto" className="truncate text-[12px] flex-1">{displayTabTitle(tab)}</span>
 
             <button
               aria-label={l({ en: 'Close Left Tab', ar: 'إغلاق التبويب الأيسر', de: 'Linken Tab schließen' })}
@@ -554,7 +554,7 @@ const MemoizedTabItem = React.memo(
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
-            <span className="truncate text-[12px] flex-1">{displayTabTitle(splitTab)}</span>
+            <span dir="auto" className="truncate text-[12px] flex-1">{displayTabTitle(splitTab)}</span>
 
             <button
               aria-label={l({ en: 'Close Right Tab', ar: 'إغلاق التبويب الأيمن', de: 'Rechten Tab schließen' })}
@@ -589,7 +589,7 @@ const MemoizedTabItem = React.memo(
             ) : (
               <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             )}
-            <span className="truncate">{displayTabTitle(tab)}</span>
+            <span dir="auto" className="truncate">{displayTabTitle(tab)}</span>
           </div>
 
           <div className="flex items-center gap-1 shrink-0 ml-1">
@@ -1171,7 +1171,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold bg-slate-200/50 hover:bg-slate-300/50 text-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:text-slate-300 transition-colors mr-1"
               >
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: WORKSPACE_COLORS[activeWorkspace.color] || '#64748b' }} />
-                <span>{activeWorkspace.name}</span>
+                <span>{displayWorkspaceName(activeWorkspace)}</span>
               </button>
               <AnimatePresence>
               {isWorkspaceDropdownOpen && (
@@ -1193,7 +1193,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         className="w-full text-start px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700"
                       >
                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }} />
-                        <span className={w.id === activeWorkspaceId ? 'font-medium text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}>{w.name}</span>
+                        <span className={w.id === activeWorkspaceId ? 'font-medium text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}>{displayWorkspaceName(w)}</span>
                       </button>
                     ))}
                     <div className="border-t border-slate-100 dark:border-slate-700 my-1" />
@@ -1414,10 +1414,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         {/* Navigation Buttons */}
         <div className="flex items-center gap-1">
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoBack} disabled={!activeTab?.canGoBack} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title={l({ en: 'Go Back', ar: 'رجوع', de: 'Zurück' })}>
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 rtl:-scale-x-100" />
           </motion.button>
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoForward} disabled={!activeTab?.canGoForward} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title={l({ en: 'Go Forward', ar: 'تقدّم', de: 'Vorwärts' })}>
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4 rtl:-scale-x-100" />
           </motion.button>
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onReload} className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title={l({ en: 'Reload Page', ar: 'إعادة تحميل الصفحة', de: 'Seite neu laden' })}>
             <RotateCw className={`w-4 h-4 transition-transform duration-500 active:rotate-180 ${activeTab?.isLoading ? 'animate-spin' : ''}`} />
@@ -1861,7 +1861,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 ) : (
                   <Globe className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
                 )}
-                <span className="truncate font-medium">{bookmark.title}</span>
+                <span dir="auto" className="truncate font-medium">{bookmark.title}</span>
               </button>
             ))
           ) : (

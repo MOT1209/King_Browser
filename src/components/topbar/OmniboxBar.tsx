@@ -603,7 +603,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
               {/* Search Suggestions (Index 0 to suggestions.length - 1) */}
               {suggestions.length > 0 && (
-                <div className="py-1" role="listbox" aria-label="Search suggestions">
+                <div className="py-1" role="listbox" aria-label={l({ en: 'Search suggestions', ar: 'اقتراحات البحث', de: 'Suchvorschläge' })}>
                   <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                     {l({ en: 'Search Suggestions', ar: 'اقتراحات البحث', de: 'Suchvorschläge' })}
                   </div>
@@ -662,7 +662,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                         >
                           <div className="flex items-center gap-3 overflow-hidden">
                             <Star className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === bookmarkIdx ? 'text-cyan-500 fill-cyan-500' : 'text-amber-400 fill-amber-400'}`} />
-                            <span className="truncate font-medium">{bookmark.title}</span>
+                            <span dir="auto" className="truncate font-medium">{bookmark.title}</span>
                           </div>
                           <span className="text-xs text-slate-400 truncate max-w-[150px]">{bookmark.url}</span>
                         </button>

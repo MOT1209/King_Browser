@@ -63,6 +63,11 @@ const MCP_TOOLS = [
   { name: 'browser_find_element', desc: 'Find elements by CSS selector or visible text', level: 'medium' },
 
   { name: 'browser_select', desc: 'Select a dropdown option (alias)', level: 'sensitive' },
+
+  { name: 'browser_wait_for', desc: 'Wait for the page to load or an element/text to appear', level: 'safe' },
+  { name: 'browser_console_messages', desc: 'Read the page console (logs, warnings, errors)', level: 'medium' },
+  { name: 'browser_element_screenshot', desc: 'Screenshot a single element', level: 'medium' },
+  { name: 'browser_fill_form', desc: 'Fill several fields at once (each checked like browser_type)', level: 'sensitive' },
 ];
 
 export const McpSection: React.FC<McpSectionProps> = ({
@@ -705,7 +710,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
           <select
             value={ruleMode}
             onChange={(event) => setRuleMode(event.target.value === 'block' ? 'block' : 'ask')}
-            aria-label="Rule"
+            aria-label={l({ en: 'Rule', ar: 'القاعدة', de: 'Regel' })}
             className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100"
           >
             <option value="ask">{l({ en: 'Always ask', ar: 'اسأل دائماً', de: 'Immer fragen' })}</option>

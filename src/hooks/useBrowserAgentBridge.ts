@@ -9,6 +9,7 @@ import { orchestrator } from '../services/agentOrchestrator';
 // deliberately permits loopback/private hosts for real user navigation.
 import { isSafeAgentNavigationUrl } from '../utils/safeNavigation';
 import { buildSnapshotScript } from '../utils/elementSnapshot';
+import { getConsoleMessages } from '../utils/consoleBuffer';
 import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS, MCP_POLICY_CONTEXT_ACTION } from '../utils/mcpActionTiming';
 
 /**
@@ -151,6 +152,18 @@ export function useBrowserAgentBridge({
       };
       return new Proxy(target.guest, {
         get(guest, key) {
+          if (key === 'executeAction') {
+            // Page actions (click, type, key, select) run with a user gesture
+            // and skip the post-run check: a navigation they start is their
+            // expected effect, and they return no page content to protect.
+            return async (code: string) => {
+              await authorize();
+              return guest.executeJavaScript(
+                `if (window.location.href !== ${JSON.stringify(target.url)}) { throw new Error('Agent action blocked: target document changed.'); }\n${code}`,
+                true
+              );
+            };
+          }
           const original = guest[key];
           if (typeof original !== 'function') return original;
           if (!['executeJavaScript', 'capturePage', 'sendInputEvent', 'goBack', 'goForward', 'reload', 'setZoomLevel'].includes(String(key))) {
@@ -245,10 +258,23 @@ export function useBrowserAgentBridge({
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
-                let text = (document.body?.innerText || document.documentElement?.innerText || '');
+                const MAX_TEXT = 10000;
+                const MAX_LINKS = 50;
+                const text = (document.body?.innerText || document.documentElement?.innerText || '');
                 const links = Array.from(document.querySelectorAll('a')).map(a => a.href).filter(Boolean);
                 const loginRequired = ${LOGIN_REQUIRED_PROBE};
-                return JSON.stringify({ text: text.substring(0, 10000), links: links.slice(0, 50), loginRequired });
+                // Report the truncation instead of hiding it: an agent that is
+                // told the page ended at 10000 characters will answer from a
+                // half-read document and never know to read further.
+                return JSON.stringify({
+                  text: text.substring(0, MAX_TEXT),
+                  links: links.slice(0, MAX_LINKS),
+                  loginRequired,
+                  textTruncated: text.length > MAX_TEXT,
+                  totalChars: text.length,
+                  linksTruncated: links.length > MAX_LINKS,
+                  totalLinks: links.length
+                });
               })();
             `);
           }
@@ -264,14 +290,28 @@ export function useBrowserAgentBridge({
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
             if (!await previewTarget(safeArgs.selector)) return "Error: MCP action was cancelled or expired.";
-            const result = await activeWebview.executeJavaScript(`
+            // userGesture: Chromium marks the entry of a page that navigates
+            // without user activation as skippable, so Back (and canGoBack)
+            // jumped over it after every agent click, submit or key press.
+            // When nothing covers the element's centre the click is left to a
+            // real mouse event (below), which pages cannot tell from a human
+            // one; a covered or off-screen element falls back to el.click().
+            const result = await activeWebview.executeAction(`
               (() => {
                 try {
                   const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el) {
+                    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center', inline: 'center' });
                     const rect = el.getBoundingClientRect();
+                    const x = rect.left + rect.width / 2;
+                    const y = rect.top + rect.height / 2;
+                    const inView = rect.width > 0 && rect.height > 0 && x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight;
+                    const hit = inView && typeof document.elementFromPoint === 'function' ? document.elementFromPoint(x, y) : null;
+                    if (hit && (hit === el || el.contains(hit))) {
+                      return { success: true, x, y, trusted: true };
+                    }
                     el.click();
-                    return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                    return { success: true, x, y, trusted: false };
                   }
                   return { success: false, error: "Element not found with selector: " + ${JSON.stringify(safeArgs.selector)} };
                 } catch (err) {
@@ -280,22 +320,36 @@ export function useBrowserAgentBridge({
               })();
             `);
             if (result && result.success) {
+              let zoom = 1;
+              try { zoom = Number(activeWebview.getZoomFactor?.()) || 1; } catch (_) {}
+              const x = Math.round(result.x * zoom);
+              const y = Math.round(result.y * zoom);
+              if (result.trusted) {
+                // The proxy re-checks the document before each event, so a page
+                // that changed in between is never clicked blind.
+                await activeWebview.sendInputEvent({ type: 'mouseMove', x, y });
+                await activeWebview.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+                await activeWebview.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+              }
               const bounds = activeWebview.getBoundingClientRect();
               window.dispatchEvent(new CustomEvent('ai-cursor', {
-                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'click' }
+                detail: { x: bounds.left + x, y: bounds.top + y, action: 'click' }
               }));
               return "Successfully clicked element.";
             }
-            return result.error || "Error";
+            // The MCP layer only marks a string that starts with "Error:" as a
+            // tool failure, so a bare message here would be reported to the
+            // agent as a successful click.
+            return `Error: ${result?.error || 'Click failed for an unknown reason.'}`;
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_type': {
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           const textToType = typeof safeArgs.text === 'string' ? safeArgs.text : String(safeArgs.text ?? '');
           if (activeWebview && activeWebview.executeJavaScript) {
             if (!await previewTarget(safeArgs.selector)) return "Error: MCP action was cancelled or expired.";
-            const result = await activeWebview.executeJavaScript(`
+            const result = await activeWebview.executeAction(`
               (() => {
                 try {
                   const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
@@ -305,8 +359,15 @@ export function useBrowserAgentBridge({
                     el.dispatchEvent(new Event('input', { bubbles: true }));
                     el.dispatchEvent(new Event('change', { bubbles: true }));
                     if (${safeArgs.pressEnter === true ? 'true' : 'false'}) {
-                      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
-                      el.dispatchEvent(enterEvent);
+                      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true });
+                      const notHandled = el.dispatchEvent(enterEvent);
+                      // A synthetic keydown is untrusted, so the browser never
+                      // performs implicit form submission for it. Submit the
+                      // form ourselves unless a page script handled the key.
+                      if (notHandled && el.form && el.tagName !== 'TEXTAREA') {
+                        if (typeof el.form.requestSubmit === 'function') el.form.requestSubmit();
+                        else el.form.submit();
+                      }
                     }
                     return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, sensitive: el.type === 'password' };
                   }
@@ -324,9 +385,9 @@ export function useBrowserAgentBridge({
               }));
               return "Successfully typed text.";
             }
-            return result.error || "Error";
+            return `Error: ${result?.error || 'Typing failed for an unknown reason.'}`;
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
         }
 
         case 'browser_run_js':
@@ -351,6 +412,8 @@ export function useBrowserAgentBridge({
 
         case 'browser_close_tab':
           if (!safeArgs.tabId || typeof safeArgs.tabId !== 'string') return "Error: Missing or invalid 'tabId' parameter";
+          // `tabs` is already narrowed to agent-owned tabs in isolated mode.
+          if (!tabs.some(t => t.id === safeArgs.tabId)) return `Error: Tab ${safeArgs.tabId} not found.`;
           mcpHandlersRef.current.handleCloseTab(safeArgs.tabId);
           return `Closed tab ${safeArgs.tabId}`;
 
@@ -359,7 +422,12 @@ export function useBrowserAgentBridge({
             const image = await activeWebview.capturePage();
             return image.toDataURL();
           }
-          return "Error: Could not take screenshot.";
+          // Internal pages render in the app itself, not in a webview, and are
+          // deliberately kept out of the agent's reach.
+          if ((tabs.find(t => t.id === activeTabId)?.url || '').startsWith('king://')) {
+            return "Error: Internal King pages (king://) cannot be captured. Switch to a website tab first.";
+          }
+          return "Error: Could not take screenshot: no web page is open in the active tab.";
 
         case 'browser_scroll': {
           const direction = String(safeArgs.direction || 'down');
@@ -371,7 +439,7 @@ export function useBrowserAgentBridge({
             else if (direction === 'bottom') await activeWebview.executeJavaScript(`window.scrollTo(0, (document.body ? document.body.scrollHeight : (document.documentElement ? document.documentElement.scrollHeight : 0)))`);
             return `Scrolled ${direction}`;
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
         }
 
         case 'browser_new_tab': {
@@ -393,7 +461,7 @@ export function useBrowserAgentBridge({
             await activeWebview.goBack();
             return "Navigated back";
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_go_forward':
           if (activeWebview && activeWebview.goForward) {
@@ -401,14 +469,14 @@ export function useBrowserAgentBridge({
             await activeWebview.goForward();
             return "Navigated forward";
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_reload':
           if (activeWebview && activeWebview.reload) {
             await activeWebview.reload();
             return "Page reloaded";
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_get_url': {
           const activeTab = tabs.find(t => t.id === activeTabId);
@@ -461,7 +529,7 @@ export function useBrowserAgentBridge({
               })()
             `);
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_focus':
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
@@ -478,10 +546,10 @@ export function useBrowserAgentBridge({
               })()
             `);
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_login': {
-          if (!activeWebview || !activeWebview.executeJavaScript) return "Error: No active webview.";
+          if (!activeWebview || !activeWebview.executeJavaScript) return "Error: No active webview available.";
           const api = (window as any).electronAPI;
           if (!api?.secureStoreGet) return "Error: Saved accounts are not available.";
           let records: any[] = [];
@@ -500,7 +568,7 @@ export function useBrowserAgentBridge({
           );
           if (!resolution.ok) return resolution.error;
           if (!canExecute()) return "Error: MCP action was cancelled or expired.";
-          const fillResult = await activeWebview.executeJavaScript(buildLoginFillScript(resolution.username, resolution.password));
+          const fillResult = await activeWebview.executeJavaScript(buildLoginFillScript(resolution.username, resolution.password), true);
           if (fillResult && fillResult.success) {
             const bounds = activeWebview.getBoundingClientRect();
             window.dispatchEvent(new CustomEvent('ai-cursor', { detail: { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, action: 'type', text: '••••••••', masked: true } }));
@@ -511,7 +579,7 @@ export function useBrowserAgentBridge({
         case 'browser_select_option':
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
-            return await activeWebview.executeJavaScript(`
+            return await activeWebview.executeAction(`
               (() => {
                 try {
                   const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
@@ -527,11 +595,11 @@ export function useBrowserAgentBridge({
               })()
             `);
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_press_key':
           if (activeWebview && activeWebview.executeJavaScript) {
-            return await activeWebview.executeJavaScript(`
+            return await activeWebview.executeAction(`
               (() => {
                 try {
                   const selector = ${JSON.stringify(safeArgs.selector || null)};
@@ -546,9 +614,16 @@ export function useBrowserAgentBridge({
                   const key = ${JSON.stringify(safeArgs.key)};
                   const keyMap = { 'Enter': 13, 'Tab': 9, 'Escape': 27, 'Space': 32, 'ArrowUp': 38, 'ArrowDown': 40, 'ArrowLeft': 37, 'ArrowRight': 39, 'Backspace': 8, 'Delete': 46 };
                   const keyCode = keyMap[key] || (key && key.charCodeAt ? key.charCodeAt(0) : 0);
+                  let notHandled = true;
                   ['keydown','keypress','keyup'].forEach(t => {
-                    target.dispatchEvent(new KeyboardEvent(t, { key, keyCode, which: keyCode, bubbles: true }));
+                    const dispatched = target.dispatchEvent(new KeyboardEvent(t, { key, keyCode, which: keyCode, bubbles: true, cancelable: true }));
+                    if (t === 'keydown') notHandled = dispatched;
                   });
+                  // Untrusted key events never trigger implicit form submission.
+                  if (key === 'Enter' && notHandled && target.form && target.tagName !== 'TEXTAREA') {
+                    if (typeof target.form.requestSubmit === 'function') target.form.requestSubmit();
+                    else target.form.submit();
+                  }
                   return "Pressed key: " + key;
                 } catch (err) {
                   return "Error: Failed to press key: " + String(err);
@@ -556,7 +631,7 @@ export function useBrowserAgentBridge({
               })()
             `);
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_get_element_text':
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
@@ -565,15 +640,110 @@ export function useBrowserAgentBridge({
               (() => {
                 try {
                   const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
-                  if (el) return el.innerText || el.textContent || '';
-                  return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
+                  if (!el) return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
+                  const tag = el.tagName.toLowerCase();
+                  // Form controls carry their text in .value, not innerText, so
+                  // the old read returned an empty string and an agent could not
+                  // verify what it had just typed.
+                  if (tag === 'input' || tag === 'textarea') {
+                    if (el.type === 'password') return el.value ? '••••••••' : '';
+                    if (el.type === 'checkbox' || el.type === 'radio') return String(el.checked);
+                    return el.value ?? '';
+                  }
+                  if (tag === 'select') return Array.from(el.selectedOptions || []).map(o => o.value).join(', ');
+                  return el.innerText || el.textContent || '';
                 } catch (err) {
                   return "Error: Invalid selector or DOM error: " + String(err);
                 }
               })()
             `);
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
+
+        case 'browser_wait_for': {
+          // Polls a fresh guest each round: the document is expected to change
+          // while a page loads, so one bound guest would only report "changed".
+          const timeoutMs = Math.min(10000, Math.max(0, Number(safeArgs.timeoutMs) || 5000));
+          const selector = typeof safeArgs.selector === 'string' && safeArgs.selector ? safeArgs.selector : null;
+          const text = typeof safeArgs.text === 'string' && safeArgs.text ? safeArgs.text : null;
+          const deadline = Date.now() + timeoutMs;
+          let lastReason = 'the page is still loading';
+          while (canExecute()) {
+            const guest = guardedGuest(canExecute);
+            if (!guest) return "Error: No active webview available.";
+            let loading = true;
+            try { loading = Boolean(guest.isLoading?.()); } catch (_) {}
+            if (!loading) {
+              try {
+                const found = await guest.executeJavaScript(`
+                  (() => {
+                    const selector = ${JSON.stringify(selector)};
+                    const text = ${JSON.stringify(text)};
+                    if (document.readyState === 'loading') return 'the document is still parsing';
+                    if (selector) {
+                      const el = document.querySelector(selector);
+                      if (!el) return 'no element matches ' + selector;
+                      const r = el.getBoundingClientRect();
+                      if (r.width === 0 && r.height === 0) return 'the element ' + selector + ' is not visible';
+                    }
+                    if (text && !(document.body?.innerText || '').includes(text)) return 'the text is not on the page';
+                    return '';
+                  })()
+                `);
+                if (found === '') {
+                  return `Ready${selector ? `: ${selector} is visible` : ''}${text ? `${selector ? ' and' : ':'} the text is present` : ''}.`;
+                }
+                lastReason = String(found);
+              } catch (err: any) {
+                if (/not a public website|blocked for security/.test(String(err?.message))) return `Error: ${err.message}`;
+                lastReason = 'the page changed while checking';
+              }
+            }
+            if (Date.now() >= deadline) return `Error: Timed out after ${timeoutMs}ms: ${lastReason}.`;
+            await new Promise(r => setTimeout(r, 200));
+          }
+          return "Error: MCP action was cancelled or expired.";
+        }
+
+        case 'browser_console_messages': {
+          if (!activeTabId) return "Error: No active tab.";
+          const level = safeArgs.level === 'error' || safeArgs.level === 'warning' ? safeArgs.level : 'all';
+          const messages = getConsoleMessages(activeTabId, level, Number(safeArgs.limit) || 50);
+          if (messages.length === 0) return 'No console messages recorded for this page.';
+          return JSON.stringify(messages.map(m => ({ level: m.level, message: m.message, source: m.source, line: m.line })));
+        }
+
+        case 'browser_element_screenshot': {
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
+          if (!activeWebview || !activeWebview.capturePage) return "Error: No active webview available.";
+          const rect = await activeWebview.executeJavaScript(`
+            (() => {
+              try {
+                const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+                if (!el) return { error: "Element not found with selector: " + ${JSON.stringify(safeArgs.selector)} };
+                if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center', inline: 'center' });
+                const r = el.getBoundingClientRect();
+                const x = Math.max(0, r.left), y = Math.max(0, r.top);
+                const width = Math.min(window.innerWidth, r.right) - x;
+                const height = Math.min(window.innerHeight, r.bottom) - y;
+                if (width <= 0 || height <= 0) return { error: "The element is not visible." };
+                return { x, y, width, height };
+              } catch (err) {
+                return { error: "Invalid selector or DOM error: " + String(err) };
+              }
+            })()
+          `);
+          if (!rect || rect.error) return `Error: ${rect?.error || 'Could not locate the element.'}`;
+          let zoom = 1;
+          try { zoom = Number(activeWebview.getZoomFactor?.()) || 1; } catch (_) {}
+          const image = await activeWebview.capturePage({
+            x: Math.floor(rect.x * zoom),
+            y: Math.floor(rect.y * zoom),
+            width: Math.max(1, Math.ceil(rect.width * zoom)),
+            height: Math.max(1, Math.ceil(rect.height * zoom))
+          });
+          return image.toDataURL();
+        }
 
         case 'browser_find_element':
           if ((typeof safeArgs.selector !== 'string' || !safeArgs.selector) &&
@@ -613,10 +783,20 @@ export function useBrowserAgentBridge({
                   if (selector) document.querySelectorAll(selector).forEach(push);
                   if (text && out.length < 10) {
                     const needle = text.toLowerCase();
-                    document.querySelectorAll('a,button,input,select,textarea,h1,h2,h3,[role="button"],[role="link"]').forEach(el => {
-                      const hay = ((el.innerText || '') + ' ' + (el.value || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('placeholder') || '')).toLowerCase();
-                      if (hay.includes(needle)) push(el);
-                    });
+                    // Visible text is not limited to links and buttons: a list
+                    // item, table cell, or label carries most page content, and
+                    // the narrow query set made those searches report "no
+                    // matching elements" for text the user could plainly see.
+                    const candidates = Array.from(document.querySelectorAll(
+                      'a,button,input,select,textarea,summary,label,li,td,th,dd,dt,h1,h2,h3,h4,h5,h6,p,span,strong,em,code,option,[role="button"],[role="link"],[role="tab"],[role="menuitem"]'
+                    ));
+                    const haystack = (el) => ((el.innerText || '') + ' ' + (el.value || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('placeholder') || '')).toLowerCase();
+                    const matched = candidates.filter(el => haystack(el).includes(needle));
+                    // Keep the innermost match so a wrapping list item does not
+                    // stand in for the element that actually holds the text.
+                    matched
+                      .filter(el => !matched.some(other => other !== el && el.contains(other)))
+                      .forEach(push);
                   }
                   if (!out.length) return 'No matching elements found.';
                   if (out.length >= 10) out.push({ selector: '', tag: '', text: '... (truncated at 10 matches)' });
@@ -627,7 +807,7 @@ export function useBrowserAgentBridge({
               })()
             `);
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_scroll_to_element':
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
@@ -644,7 +824,7 @@ export function useBrowserAgentBridge({
               })()
             `);
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_zoom':
           if (activeWebview && activeWebview.setZoomLevel) {
@@ -652,7 +832,7 @@ export function useBrowserAgentBridge({
             await activeWebview.setZoomLevel(zoomLevel);
             return `Zoom level set to ${zoomLevel}`;
           }
-          return "Error: No active webview.";
+          return "Error: No active webview available.";
 
         case 'browser_mute_tab': {
           const mute = Boolean(safeArgs.mute);
@@ -701,7 +881,7 @@ export function useBrowserAgentBridge({
           const timeoutPromise = new Promise((_, reject) => {
             timer = setTimeout(() => reject(new Error('Script execution timed out')), timeoutMs);
           });
-          const scriptPromise = webview.executeJavaScript(script);
+          const scriptPromise = webview.executeJavaScript(script, true);
           if (typeof scriptPromise?.catch === 'function') {
             scriptPromise.catch(() => {});
           }
@@ -895,10 +1075,36 @@ export function useBrowserAgentBridge({
           MCP_POLICY_CONTEXT_ACTION
         ]);
 
+        // `canExecute()` folds four unrelated refusals into one boolean. The
+        // caller needs to tell them apart: "retry once the page settles" is a
+        // different instruction from "the user cancelled" or "the tool is
+        // disabled", and a single vague error made agents either give up on a
+        // recoverable race or retry a policy rejection.
+        const describeRefusal = (): string => {
+          if (pending.cancelled) return `MCP action "${toolName}" was cancelled before it ran.`;
+          if (Date.now() >= actionDeadline) return `MCP action "${toolName}" expired before it ran.`;
+          if (!settingsRef.current?.mcpServerEnabled) {
+            return 'MCP tool execution rejected: MCP server is disabled in settings.';
+          }
+          const live = captureTarget();
+          if (live.tabId !== approvedTarget.tabId) {
+            return `MCP action "${toolName}" did not run: the active tab changed from ${approvedTarget.url || '(none)'} to ${live.url || '(none)'} before execution. Re-issue the action for the tab you intend to drive.`;
+          }
+          if (!live.guest) {
+            return `MCP action "${toolName}" did not run: the page went away before execution (the tab was closed, navigated to a browser page, or the webview was destroyed).`;
+          }
+          let loading = false;
+          try { loading = Boolean(live.guest.isLoading?.()); } catch (_) { loading = false; }
+          if (loading) {
+            return `MCP action "${toolName}" did not run: the page is still loading. Wait for it to settle (browser_wait) and retry.`;
+          }
+          return `MCP action "${toolName}" did not run: the page changed between the request and execution. Retry the action on the current page.`;
+        };
+
         const runAction = () => {
           if (!canExecute()) {
             if (pending.approvalId) orchestrator.updateActionState(pending.approvalId, 'denied');
-            electronAPI.respondMcpAction?.(id, { error: 'MCP action was cancelled, expired, or disabled.' });
+            electronAPI.respondMcpAction?.(id, { error: describeRefusal() });
             finish();
             return;
           }

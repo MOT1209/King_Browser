@@ -5,7 +5,7 @@ import { Workspace } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { generateId } from '../utils/idGenerator';
 import { useDialogA11y } from '../hooks/useDialogA11y';
-import { useTranslation } from '../services/i18n';
+import { useTranslation, displayWorkspaceName } from '../services/i18n';
 
 interface WorkspaceManagerProps {
   isOpen: boolean;
@@ -218,7 +218,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                         <IconComp className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <div className="font-medium text-xs text-slate-800 dark:text-slate-200">{workspace.name}</div>
+                        <div className="font-medium text-xs text-slate-800 dark:text-slate-200">{displayWorkspaceName(workspace)}</div>
                         {activeWorkspaceId === workspace.id && <div className="text-[9px] text-cyan-600 dark:text-cyan-400 font-bold uppercase tracking-wider">{l({ en: 'Active', ar: 'نشطة', de: 'Aktiv' })}</div>}
                       </div>
                     </div>

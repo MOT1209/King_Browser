@@ -172,7 +172,7 @@ King Browser natively exposes an MCP endpoint on port `3020`, enabling external 
 
 ### Built-in MCP Tools
 
-King Browser defines 41 tools: 28 page and tab tools (the table below), six aliases and convenience helpers (`browser_open`, `browser_back`, `browser_forward`, `browser_get_page_summary`, `browser_find_element`, `browser_select`), and seven execution-governance tools (`browser_status`, `browser_request_approval`, `browser_next_step`, `browser_next_phase`, `browser_pause`, `browser_resume`, `browser_stop`). `/tools` lists only the tools enabled in *Settings > MCP*: medium and sensitive tools are disabled by default, so a fresh install exposes fewer.
+King Browser defines 45 tools: 32 page and tab tools (the table below), six aliases and convenience helpers (`browser_open`, `browser_back`, `browser_forward`, `browser_get_page_summary`, `browser_find_element`, `browser_select`), and seven execution-governance tools (`browser_status`, `browser_request_approval`, `browser_next_step`, `browser_next_phase`, `browser_pause`, `browser_resume`, `browser_stop`). `/tools` lists only the tools enabled in *Settings > MCP*: medium and sensitive tools are disabled by default, so a fresh install exposes fewer.
 
 To read the exact list from a running instance:
 
@@ -186,9 +186,11 @@ curl -s -H "Authorization: Bearer $MCP_TOKEN" http://127.0.0.1:3020/tools
 | `browser_navigate` | `url` | Navigates the current tab to an absolute URL |
 | `browser_read_page` | - | Returns the visible text, interactive elements, current URL, and title of the active page |
 | `browser_snapshot` | - | Lists interactive elements as `e12 button "Save"`; pass the ref to the element tools instead of guessing a CSS selector. Refs last until the next snapshot or navigation |
-| `browser_screenshot` | - | Returns the active viewport as a base64 PNG data URL |
+| `browser_screenshot` | - | Returns the active viewport as a PNG image (internal `king://` pages cannot be captured) |
+| `browser_element_screenshot` | `ref?`, `selector?` | Returns a PNG image of one element, scrolled into view |
 | `browser_click` | `ref?`, `selector?` | Clicks an element by snapshot ref or CSS selector |
-| `browser_type` | `text`, `ref?`, `selector?`, `pressEnter?` | Types text into an input or textarea |
+| `browser_type` | `text`, `ref?`, `selector?`, `pressEnter?` | Types text into an input or textarea; `pressEnter` submits the surrounding form |
+| `browser_fill_form` | `fields`, `submit?` | Fills several fields in order; each field is checked and approved exactly like `browser_type` |
 | `browser_press_key` | `key`, `selector?` | Dispatches a key event (`Enter`, `Tab`, `Escape`, `ArrowDown`, ...), optionally focusing a selector first |
 | `browser_scroll` | `direction`, `amount?` | Scrolls the page `up`, `down`, `top`, or `bottom` (default 500px) |
 | `browser_scroll_to_element` | `ref?`, `selector?` | Scrolls until the element is in the viewport |
@@ -198,6 +200,8 @@ curl -s -H "Authorization: Bearer $MCP_TOKEN" http://127.0.0.1:3020/tools
 | `browser_login` | `username` | Signs in with an account saved in King Browser; the password is filled by the browser and never returned, and every call needs your approval |
 | `browser_get_element_text` | `ref?`, `selector?` | Returns the inner text of a matched element |
 | `browser_get_url` | - | Returns the URL and title of the active tab |
+| `browser_wait_for` | `selector?`, `text?`, `timeoutMs?` | Waits until the page has loaded and, optionally, an element or text appears (max 10s) |
+| `browser_console_messages` | `level?`, `limit?` | Returns the page's recent console messages, with credential-looking values redacted |
 | `browser_wait` | `ms` | Pauses execution for `ms` milliseconds (max 10000) |
 | `browser_new_tab` | `url?` | Opens a new browser tab with an optional initial URL |
 | `browser_close_tab` | `tabId` | Closes a specific tab by its unique identifier |

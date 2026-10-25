@@ -77,6 +77,7 @@ import './sync_state_remerge.test';
 import './sync_deletion_and_conflict.test';
 import './local_persistence_data_safety.test';
 import './format_bytes.test';
+import './agent_browser_tools.test';
 // Last on purpose: this one renders a component in jsdom and temporarily
 // installs window/document globals while it does.
 import './clipboard_qr_failure.test';

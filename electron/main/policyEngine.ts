@@ -89,13 +89,16 @@ const READ_ONLY_TOOLS = new Set([
   'browser_get_url',
   'browser_get_element_text',
   'browser_list_tabs',
-  'browser_find_element'
+  'browser_find_element',
+  'browser_console_messages',
+  'browser_element_screenshot'
 ]);
 
 const PASSIVE_ACTION_TOOLS = new Set([
   'browser_scroll',
   'browser_scroll_to_element',
   'browser_wait',
+  'browser_wait_for',
   'browser_hover',
   'browser_focus',
   'browser_zoom',

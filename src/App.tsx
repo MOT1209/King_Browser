@@ -108,6 +108,7 @@ const UpdateToast = lazyWithRetry(() => import('./components/UpdateToast').then(
 const VPN_ANCHOR_REF: React.RefObject<HTMLButtonElement> = { current: null };
 
 import { isTombstonedRow } from './services/syncService';
+import { l } from './services/i18n';
 import { logger } from './utils/logger';
 import {
   EMPTY_ARRAY,
@@ -1894,7 +1895,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                           }
                         }}
                         className="p-1 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 rounded text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                        title="Exit Split View"
+                        title={l({ en: 'Exit Split View', ar: 'الخروج من العرض المقسوم', de: 'Geteilte Ansicht beenden' })}
                       >
                         <Columns2 className="w-3.5 h-3.5" />
                       </button>
@@ -1906,7 +1907,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                           handleCloseTab(tab.id);
                         }}
                         className="p-1 hover:bg-red-500/15 rounded text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer"
-                        title="Close Tab"
+                        title={l({ en: 'Close Tab', ar: 'إغلاق التبويب', de: 'Tab schließen' })}
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>

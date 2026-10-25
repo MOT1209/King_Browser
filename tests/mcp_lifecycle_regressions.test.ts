@@ -1,6 +1,7 @@
 import * as sensitiveFieldModule from '../src/utils/sensitiveField';
 import * as agentLoginModule from '../src/utils/agentLogin';
 import * as elementSnapshotModule from '../src/utils/elementSnapshot';
+import * as consoleBufferModule from '../src/utils/consoleBuffer';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -65,6 +66,7 @@ async function run() {
     '../utils/searchHistoryBookmarks': { searchHistoryAndBookmarks: () => [] },
     '../utils/sensitiveField': sensitiveFieldModule,
     '../utils/elementSnapshot': elementSnapshotModule,
+    '../utils/consoleBuffer': consoleBufferModule,
     '../utils/agentLogin': agentLoginModule
   });
   hook.useBrowserAgentBridge({ activeTabId: 'tab', tabs: [], history: [], bookmarks: [], settingsRef,
@@ -100,6 +102,7 @@ async function run() {
   const recordingsModule = loadSource('electron/main/recordings.ts', { Map, Set }, { 'node:fs': fs });
   const approvalModeModule = loadSource('electron/main/approvalMode.ts', {}, { 'node:fs': fs });
   const elementRefsModule = loadSource('electron/main/elementRefs.ts', {}, {});
+  const mcpContentModule = loadSource('electron/main/mcpContent.ts', {}, {});
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
@@ -113,6 +116,7 @@ async function run() {
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
     './main/elementRefs.js': elementRefsModule,
+    './main/mcpContent.js': mcpContentModule,
     './main/approvalMode.js': approvalModeModule,
     './main/recordings.js': recordingsModule,
     './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }

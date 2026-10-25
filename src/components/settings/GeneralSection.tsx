@@ -18,7 +18,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
   onUpdateSettings,
   onClearHistory,
 }) => {
-  const { t } = useTranslation();
+  const { t, l } = useTranslation();
   const [appVersion, setAppVersion] = useState<string>(() => {
     return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.0';
   });
@@ -111,7 +111,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
                 <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.v8}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Architecture</div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">{l({ en: 'Architecture', ar: 'المعمارية', de: 'Architektur' })}</div>
                 <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.platform} ({systemVersions.arch})</div>
               </div>
             </div>

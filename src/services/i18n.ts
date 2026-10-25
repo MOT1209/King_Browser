@@ -304,6 +304,19 @@ export function displayTabTitle(tab: { title?: string; url?: string } | null | u
   return tab?.title || url || l(INTERNAL_PAGE_TITLES[0][1]);
 }
 
+/**
+ * Name to show for a workspace. The built-in default workspace is stored with
+ * the English name "Personal", so it is translated at display time unless the
+ * user renamed it; user-created workspaces keep the name they were given.
+ */
+const DEFAULT_WORKSPACE_NAME: LocalizedText = { en: 'Personal', ar: 'شخصي', de: 'Persönlich' };
+export function displayWorkspaceName(workspace: { id?: string; name?: string } | null | undefined): string {
+  if (!workspace?.name || (workspace.id === 'default' && workspace.name === DEFAULT_WORKSPACE_NAME.en)) {
+    return l(DEFAULT_WORKSPACE_NAME);
+  }
+  return workspace.name;
+}
+
 export function useTranslation() {
   const [lang, setLangState] = useState<SupportedLanguage>(activeLanguage);
 

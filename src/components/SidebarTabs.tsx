@@ -47,7 +47,7 @@ import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
 import { tabThumbnailCache } from '../services/thumbnailCache';
 import { TabHoverPreview } from './TabHoverPreview';
 import { generateId } from '../utils/idGenerator';
-import { getLocale, getLanguage, useTranslation, displayTabTitle } from '../services/i18n';
+import { getLocale, getLanguage, useTranslation, displayTabTitle, displayWorkspaceName } from '../services/i18n';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -320,7 +320,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
-            <span className="truncate text-[12px] flex-1">{displayTabTitle(tab)}</span>
+            <span dir="auto" className="truncate text-[12px] flex-1">{displayTabTitle(tab)}</span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -370,7 +370,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
-            <span className="truncate text-[12px] flex-1">{displayTabTitle(splitTab)}</span>
+            <span dir="auto" className="truncate text-[12px] flex-1">{displayTabTitle(splitTab)}</span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -937,7 +937,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               }`}
               title={l({ en: 'Back', ar: 'رجوع', de: 'Zurück' })}
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
+              <ArrowLeft className="w-3.5 h-3.5 rtl:-scale-x-100" />
             </button>
             <button
               onClick={onGoForward}
@@ -948,7 +948,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               }`}
               title={l({ en: 'Forward', ar: 'تقدّم', de: 'Vorwärts' })}
             >
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" />
             </button>
             <button
               onClick={onReload}
@@ -1197,7 +1197,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           >
             <Orbit className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
             <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate flex-1 tracking-tight">
-              {activeWorkspace?.name || 'Personal'}
+              {displayWorkspaceName(activeWorkspace)}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 opacity-60 group-hover:opacity-100 ${
               isWorkspaceDropdownOpen ? 'rotate-180' : ''
@@ -1226,10 +1226,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     >
                       <div className="w-4 h-4 rounded-md flex items-center justify-center text-[10px] text-white font-bold"
                            style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }}>
-                        {w.name.charAt(0)}
+                        {displayWorkspaceName(w).charAt(0)}
                       </div>
                       <span className={`text-xs flex-1 truncate ${w.id === activeWorkspaceId ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
-                        {w.name}
+                        {displayWorkspaceName(w)}
                       </span>
                       {w.id === activeWorkspaceId && <Check className="w-3 h-3 text-cyan-500 dark:text-cyan-400" />}
                     </button>
