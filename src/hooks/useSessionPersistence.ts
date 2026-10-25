@@ -220,7 +220,17 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
   const scheduledTabsSignature = useRef<string | null>(null);
   const pendingTabsWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (isDemo || !isHydrated) return;
+    // Demo mode and an unhydrated session must not persist tabs. A timer armed
+    // before either flag flipped has to be cancelled here too, or it fires
+    // afterwards and writes a session the user was told is not being kept.
+    if (isDemo || !isHydrated) {
+      if (pendingTabsWrite.current) {
+        clearTimeout(pendingTabsWrite.current);
+        pendingTabsWrite.current = null;
+        scheduledTabsSignature.current = null;
+      }
+      return;
+    }
     const sessionTabs = tabs
       .filter(t => !t.isIncognito && !t.isAgentOwned);
     const signature = buildTabSignature(sessionTabs);
@@ -228,11 +238,19 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
     // Already written, or already covered by a pending write. This is the hot
     // path for the 300ms ad-block churn and must stay allocation-free.
     if (signature === scheduledTabsSignature.current) return;
+
+    // A pending write for a DIFFERENT signature is superseded. It must be
+    // cancelled BEFORE the early return below: leaving it armed let it fire
+    // after the user had moved back to the persisted state (tabs A -> B -> A),
+    // writing B over A so the next launch restored tabs that were closed.
+    if (pendingTabsWrite.current) {
+      clearTimeout(pendingTabsWrite.current);
+      pendingTabsWrite.current = null;
+    }
     scheduledTabsSignature.current = null;
     if (signature === lastPersistedTabsSignature.current) return;
 
-    // Durable state changed: drop the superseded write and debounce a new one.
-    if (pendingTabsWrite.current) clearTimeout(pendingTabsWrite.current);
+    // Durable state changed: debounce a new write.
     scheduledTabsSignature.current = signature;
     pendingTabsWrite.current = setTimeout(() => {
       pendingTabsWrite.current = null;
@@ -247,6 +265,20 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
       }
     }, 500);
   }, [tabs, isDemo, isHydrated]);
+
+  // Never let a debounced tab write outlive the component: without this the
+  // timer above could fire after unmount and persist a snapshot of a session
+  // that no longer exists. A real window close is still covered by the
+  // synchronous beforeunload flush above, so nothing is lost here.
+  useEffect(() => {
+    return () => {
+      if (pendingTabsWrite.current) {
+        clearTimeout(pendingTabsWrite.current);
+        pendingTabsWrite.current = null;
+        scheduledTabsSignature.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isDemo || !isHydrated) return;

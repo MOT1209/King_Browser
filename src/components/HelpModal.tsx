@@ -340,7 +340,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                       placeholder="Search shortcuts (e.g. tab, zoom, reload, find)..."
                       value={shortcutSearch}
                       onChange={(e) => setShortcutSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
+                      className="w-full ps-10 pe-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
 

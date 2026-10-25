@@ -1,11 +1,11 @@
 import React from 'react';
 import { RotateCcw, Shuffle, Check, Images } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
+import { useTranslation } from '../../services/i18n';
 import { useLiveUnsplashPhoto } from '../../utils/unsplash';
 import { TabAnimationPreviewBox } from './TabAnimationPreviewBox';
 import { ToggleSwitch } from './ToggleSwitch';
 import { BackgroundPreviewCard, BACKGROUND_OPTIONS } from './BackgroundPreviewCard';
-import { useTranslation } from '../../services/i18n';
 
 export interface AppearanceSectionProps {
   settings: UserSettings;

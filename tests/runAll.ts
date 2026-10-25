@@ -13,6 +13,7 @@ import './e2e/tier2_boundary_corner.test';
 import './e2e/tier3_cross_feature.test';
 // Verify the English-only interface policy and legacy setting compatibility.
 import './i18n_loading.test';
+import './i18n_coverage.test';
 import './english_settings_migration.test';
 import './e2e/tier4_real_world.test';
 import './e2e/tier5_adversarial_stress.test';
@@ -33,6 +34,7 @@ import './extension_archive_extraction.test';
 import './update_integrity.test';
 import './agent_navigation_guard.test';
 import './sync_pairing_ui.test';
+import './king_cloud_auth.test';
 import './backup_tombstone.test';
 import './dialog_a11y.test';
 import './hover_only_controls.test';
@@ -79,6 +81,12 @@ import './format_bytes.test';
 import './clipboard_qr_failure.test';
 import './download_open_policy.test';
 import './renderer_recovery.test';
+import './trusted_sender_policy.test';
+import './host_policy.test';
+import './window_open_policy.test';
+import './incognito_extensions.test';
+import './crash_log.test';
+import './sync_key_rotation.test';
 
 import './permission_boundary_regressions.test';
 import './mcp_lifecycle_regressions.test';
@@ -114,3 +122,12 @@ import './runtime_error_fixes.test';
 import './website_login_fixes.test';
 // Renders the §10 control panel in jsdom with its own window/document globals.
 import './agent_control_panel.test';
+
+// Very last on purpose. This behaviour-level auth suite (register, login,
+// logout, restore and cross-account isolation driven through the real service
+// paths) is the longest PBKDF2-heavy suite in the tree and installs its own
+// window/localStorage globals. Placed after every other module body, this
+// import gets the final say on the shared globals, and the suite's own
+// reassertGlobals() calls defend each of its phases against suites that still
+// swap globals from running async mains.
+import './king_cloud_auth_behaviour.test';

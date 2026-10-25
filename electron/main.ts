@@ -1,6 +1,12 @@
 import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu, MenuItem, clipboard, systemPreferences } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createTrustedSenderPolicy } from './security/trustedSender';
+import { appendCrashLog as writeCrashLog } from './main/crashLog';
+import { isLocalOrIntranetHost } from './main/hostPolicy';
+import { isExtensionAllowedInIncognito, setExtensionIncognitoAccess, hasExtensionIncognitoAccess } from './main/incognitoExtensions';
+import { openPageSourceViewer as createPageSourceViewer } from './windows/sourceViewer';
+import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import http from 'http';
@@ -12,10 +18,11 @@ import createDOMPurify from 'dompurify';
 import { checkPhishingDomain, matchesExtensionHostPermission } from '../src/utils/securityUtils.js';
 import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity';
 export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt };
+export { isSafeSubframeNavigation } from './main/windowOpenPolicy';
+export { isExtensionAllowedInIncognito } from './main/incognitoExtensions';
 
 console.log('Main process starting...');
 
-const MAX_CRASH_LOG_BYTES = 1024 * 1024; // 1 MB cap to prevent disk exhaustion
 // Registered once at module scope on purpose: createWindow runs again on every
 // macOS activate, so an app-level listener added there would accumulate.
 // NOTE: render-process-gone fires on `app`, not on webContents.
@@ -38,36 +45,19 @@ app.on('render-process-gone', (_event, contents, details) => {
 });
 
 function appendCrashLog(entry: string): void {
+  // Before app startup, userData may not be available yet; use a private app-owned
+  // directory rather than a shared temporary directory.
+  let crashDir: string;
   try {
-    // Avoid shared os.tmpdir() to prevent insecure temporary file / symlink attacks.
-    let crashDir: string;
-    try {
-      crashDir = app.isReady() ? app.getPath('userData') : path.join(require('os').homedir(), '.king-browser');
-    } catch {
-      crashDir = path.join(require('os').homedir(), '.king-browser');
-    }
-    try {
-      fs.mkdirSync(crashDir, { recursive: true, mode: 0o700 });
-    } catch {}
-    const logPath = path.join(crashDir, 'crash.log');
-    let fd: number | null = null;
-    try {
-      fd = fs.openSync(logPath, 'a+', 0o600);
-      const stats = fs.fstatSync(fd);
-      if (stats.size > MAX_CRASH_LOG_BYTES) {
-        const readLen = Math.min(100 * 1024, stats.size);
-        const buf = Buffer.alloc(readLen);
-        fs.readSync(fd, buf, 0, readLen, stats.size - readLen);
-        fs.ftruncateSync(fd, 0);
-        fs.writeSync(fd, buf, 0, readLen, 0);
-      }
-      fs.writeSync(fd, Buffer.from(entry, 'utf8'));
-    } finally {
-      if (fd !== null) {
-        try { fs.closeSync(fd); } catch {}
-      }
-    }
-  } catch {}
+    crashDir = app.isReady() ? app.getPath('userData') : path.join(os.homedir(), '.king-browser');
+  } catch {
+    crashDir = path.join(os.homedir(), '.king-browser');
+  }
+  try {
+    writeCrashLog(path.join(crashDir, 'crash.log'), entry);
+  } catch (error) {
+    console.error('[CrashLog] Unable to append local crash log:', error);
+  }
 }
 
 // Process-level crash guards: log errors safely to prevent full browser shutdown DoS
@@ -147,12 +137,13 @@ import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, getGoogleSigninCompatUserAgent, isGoogleAccountsUrl, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
-import { acceptLanguagesFor, contextMenuLabels, googleSigninDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
+import { contextMenuLabels, googleSigninDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
 import { isPrivateIP } from './main/ipAddress.js';
+export { isLocalOrIntranetHost } from './main/hostPolicy';
 import { enforceModelCacheBudget, MAX_MODEL_CACHE_FILE_BYTES } from './main/modelCacheQuota.js';
 import { isAgentNavigationHostPublic } from './main/agentNavigationGuard.js';
 import { shouldReloadAfterRendererGone, markQuitting } from './main/rendererRecovery.js';
@@ -188,24 +179,7 @@ function isSafeMediaDownloadUrl(urlStr: string, allowedTypes: ('image' | 'video'
   }
 }
 
-// Reusable helper: check if hostname belongs to localhost, intranet, or private networks
-export function isLocalOrIntranetHost(hostname: string): boolean {
-  if (!hostname) return false;
-  const host = hostname.toLowerCase().replace(/\.+$/, '');
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan')) {
-    return true;
-  }
-  if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1' || host === '[::1]') {
-    return true;
-  }
-  // K-1: isPrivateIP fails closed for unknown values (isIP === 0). If host is a domain
-  // (e.g. google.com), isIP is 0, so calling isPrivateIP returned true, breaking HTTPS upgrade!
-  const bareV6 = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
-  if (isIP(bareV6) !== 0) {
-    return isPrivateIP(bareV6);
-  }
-  return false;
-}
+
 
 
 
@@ -360,8 +334,16 @@ nativeTheme.on('updated', () => {
 });
 
 
+/**
+ * Maps an interface language (or a system locale) to an Accept-Language
+ * header. English stays the fallback so sites without Arabic or German
+ * translations still resolve predictably.
+ */
 function getAcceptLanguagesForLocale(localeOrLang?: string): string {
-  return acceptLanguagesFor(normalizeUiLanguage(localeOrLang));
+  const base = String(localeOrLang || 'en').trim().toLowerCase().split(/[-_]/)[0];
+  if (base === 'ar') return 'ar,ar-SA;q=0.9,en-US;q=0.8,en;q=0.7';
+  if (base === 'de') return 'de,de-DE;q=0.9,en-US;q=0.8,en;q=0.7';
+  return 'en-US,en;q=0.9';
 }
 
 /** Interface language reported by the renderer; drives the context menu and native dialogs. */
@@ -369,70 +351,12 @@ let currentUiLanguage: UiLanguage = normalizeUiLanguage(app.getLocale());
 
 let currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
 
-// Safely send IPC to the main window; accessing .webContents on a destroyed window throws.
-function sendToMainWindow(channel: string, payload?: unknown) {
-  try {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
-  } catch (e) { /* window gone */ }
-}
-
-// Security: Validate that IPC messages originate strictly from our trusted main UI window and main frame
-function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): boolean {
-  if (!mainWindow || mainWindow.isDestroyed()) return false;
-  if (event.sender.id !== mainWindow.webContents.id) return false;
-  // Electron supplies senderFrame for renderer IPC. Treat a missing frame as
-  // untrusted instead of accepting an ambiguous sender context.
-  if (!event.senderFrame || !mainWindow.webContents.mainFrame || event.senderFrame !== mainWindow.webContents.mainFrame) {
-    return false;
-  }
-  const frameUrl = event.senderFrame.url;
-  if (!frameUrl || !isTrustedAppOrigin(frameUrl)) {
-    return false;
-  }
-  return true;
-}
+const { sendToMainWindow, isTrustedSender, isTrustedAppOrigin } = createTrustedSenderPolicy(() => mainWindow);
 
 // Security: MCP browser_* tools are forwarded to the renderer over an
 // 'mcp-action-request' IPC and awaited on a channel gated by isTrustedSender()
 // below — never executed as injected JS in the privileged UI context.
 initMcpBridge(isTrustedSender);
-
-// Security: Validate dev server and app internal page origins strictly
-function isTrustedAppOrigin(urlStr: string): boolean {
-  if (!urlStr || typeof urlStr !== 'string') return false;
-  try {
-    const parsed = new URL(urlStr);
-    // Internal tab URLs are rendered by the trusted React shell, not loaded by
-    // the privileged main window. Never treat arbitrary king:/devtools: URLs as
-    // an app origin; doing so would let a crafted URL inherit app privileges.
-    if (parsed.protocol === 'king:') {
-      const allowedHost = ['newtab', 'settings', 'history', 'downloads', 'changelog', 'whats-new'].includes(parsed.hostname);
-      const allowedSettingsHash = parsed.hostname === 'settings' &&
-        (!parsed.hash || ['#extensions', '#mcp'].includes(parsed.hash));
-      return allowedHost && !parsed.pathname && !parsed.search &&
-        !parsed.username && !parsed.password &&
-        (parsed.hostname !== 'settings' ? !parsed.hash : allowedSettingsHash);
-    }
-    if (parsed.protocol === 'devtools:') return false;
-    // Security: The Vite dev server is only trusted in unpackaged dev builds.
-    if (!app.isPackaged && parsed.origin === 'http://localhost:5173') return true;
-    if (parsed.protocol === 'file:') {
-      const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
-      try {
-        const navPath = fileURLToPath(urlStr);
-        const resolvedNav = path.resolve(navPath);
-        return process.platform === 'win32'
-          ? resolvedNav.toLowerCase() === allowedPath.toLowerCase()
-          : resolvedNav === allowedPath;
-      } catch {
-        return false;
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
 
 
 let isPrivacyShieldEnabled = true;
@@ -1801,6 +1725,17 @@ app.whenReady().then(async () => {
       const keys = permissionKeys(permission, (details as any)?.mediaTypes);
       if (!keys) return callback(false);
 
+      // Embedded sign-in frames also *request* storage access, not just check
+      // it. This browser already sends third-party cookies (there is no
+      // blocking policy to uphold), so the grant adds no capability the frame
+      // did not have; only the prompt did harm. Answering the prompt instead
+      // blocked the widget, so grant silently and let Chromium enforce the
+      // rest of its rules. An allowlist here bought no privacy and broke every
+      // identity provider it did not name.
+      if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(url)) {
+        return callback(true);
+      }
+
       // Internal app pages: Allow microphone (audio) only with explicit user confirmation/remember.
       // Other permissions (camera, location, clipboard, openExternal, etc.) remain strictly denied.
       if (isTrustedAppOrigin(url)) {
@@ -1896,7 +1831,9 @@ app.whenReady().then(async () => {
         'clipboard-read': 'Read Clipboard',
         'clipboard-sanitized-write': 'Write Clipboard',
         'display-capture': 'Screen Sharing',
-        'window-management': 'Window Management'
+        'window-management': 'Window Management',
+        'storage-access': 'Storage Access (embedded sign-in)',
+        'top-level-storage-access': 'Storage Access (top-level)'
       };
 
       let permissionName = permissionNames[permission] || permission;
@@ -1959,8 +1896,8 @@ app.whenReady().then(async () => {
       if (!keys) return false;
 
       // Embedded sign-in frames call document.hasStorageAccess(). Third-party
-      // cookies already work in this browser, so answering "no" here only broke
-      // those widgets; Chromium still enforces its own rules for the request.
+      // cookies are already enabled, so reporting "no" only pushed those
+      // widgets into a permission prompt that could not be answered usefully.
       if (isStorageAccessPermission(permission) && !isTrustedAppOrigin(requestingOrigin)) return true;
 
       // Fail-closed permission checking:
@@ -3410,21 +3347,6 @@ fi
   // Cmd+F is covered by the Edit menu accelerator ("Find in Page...").
 });
 
-/**
- * Restricts subframe navigation strictly to safe schemes: http:, https:, and about:blank.
- */
-export function isSafeSubframeNavigation(url: string): boolean {
-  if (!url || typeof url !== 'string') return false;
-  try {
-    const parsed = new URL(url);
-    const isSafeHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
-    const isSafeAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
-    return isSafeHttp || isSafeAboutBlank;
-  } catch {
-    return false;
-  }
-}
-
 app.on('web-contents-created', (_event, contents) => {
   // Security: Force secure webPreferences for any <webview> tags
   contents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -3529,7 +3451,12 @@ app.on('web-contents-created', (_event, contents) => {
               nodeIntegration: false,
               contextIsolation: true,
               sandbox: true,
-              webSecurity: true
+              webSecurity: true,
+              // An override REPLACES the inherited webPreferences, so without
+              // this the popup is built on the default session. An incognito
+              // page's OAuth popup then ran with the normal profile's cookies.
+              // Electron treats `session` as authoritative over `partition`.
+              session: contents.session
             }
           }
         };
@@ -3542,6 +3469,24 @@ app.on('web-contents-created', (_event, contents) => {
       }
     } catch {}
     return { action: 'deny' };
+  });
+
+  // Security: the popup that was just allowed must stay in the same session as
+  // the page that opened it (defence in depth for the `session` above) and must
+  // not open further windows of its own — popup chains are a phishing and
+  // flood vector, and a sign-in popup has no legitimate reason to spawn one.
+  contents.on('did-create-window', (child) => {
+    try {
+      if (child.isDestroyed()) return;
+      if (child.webContents.session !== contents.session) {
+        console.error('[Security] Closing a sign-in popup that did not inherit its opener session');
+        child.destroy();
+        return;
+      }
+      child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    } catch (err) {
+      console.error('[Security] Failed to harden a sign-in popup:', err);
+    }
   });
 
   if (contents.getType() === 'webview') {
@@ -4092,93 +4037,14 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
   }
 });
 
-/**
- * Opens a dedicated sandboxed window to safely view page source without
- * routing dangerous view-source: schemes through renderer navigation.
- */
 export async function openPageSourceViewer(currentUrl: string, wc?: any): Promise<BrowserWindow | null> {
-  if (!currentUrl || typeof currentUrl !== 'string') return null;
-
-  let isInternalPage = false;
-  let isViewSource = false;
-  try {
-    const parsed = new URL(currentUrl);
-    isInternalPage = parsed.protocol.startsWith('king');
-    isViewSource = parsed.protocol === 'view-source:';
-  } catch {
-    isInternalPage = currentUrl.toLowerCase().startsWith('king');
-    isViewSource = currentUrl.toLowerCase().startsWith('view-source:');
-  }
-
-  if (isInternalPage || isViewSource) return null;
-
-  let htmlSource = '';
-  if (wc && !wc.isDestroyed() && typeof wc.executeJavaScript === 'function') {
-    try {
-      htmlSource = await wc.executeJavaScript('document.documentElement.outerHTML');
-    } catch {}
-  }
-
-  if (!htmlSource && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
-    try {
-      const validated = await validatePreviewUrl(currentUrl);
-      if (!('error' in validated)) {
-        const { url: parsedUrl, pinnedIp } = validated;
-        const isHttps = parsedUrl.protocol === 'https:';
-        const agentOptions = {
-          lookup: (_hostname: string, _opts: any, cb: any) => {
-            cb(null, pinnedIp, pinnedIp.includes(':') ? 6 : 4);
-          }
-        };
-        const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
-        const resp = await fetch(currentUrl, {
-          agent,
-          signal: AbortSignal.timeout(8000),
-          headers: {
-            'User-Agent': getStandardUserAgent()
-          }
-        } as any);
-        // Bounded like every sibling fetch path: an adversarially large or
-        // never-ending body would otherwise be buffered into the main process and
-        // then serialised a second time into the viewer, twice over.
-        htmlSource = await readResponseTextWithLimit(resp, 8 * 1024 * 1024);
-      }
-    } catch {}
-  }
-
-  const sourceWin = new BrowserWindow({
-    title: `Source: ${currentUrl}`,
-    width: 1000,
-    height: 700,
-    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
-    autoHideMenuBar: true,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-    }
+  return createPageSourceViewer(currentUrl, wc, {
+    getMainWindow: () => mainWindow,
+    validatePreviewUrl,
+    fetch: fetch as any,
+    getStandardUserAgent,
+    readResponseTextWithLimit,
   });
-
-  sourceWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  sourceWin.webContents.on('will-navigate', (navEvt) => navEvt.preventDefault());
-
-  try {
-    if (!sourceWin.isDestroyed()) {
-      await sourceWin.loadURL('about:blank');
-      if (!sourceWin.isDestroyed()) {
-        await sourceWin.webContents.executeJavaScript(`
-          document.title = ${JSON.stringify(`Source: ${currentUrl}`)};
-          document.body.style.cssText = 'margin:0;padding:16px;background:#0f172a;color:#e2e8f0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;overflow-x:auto;';
-          const pre = document.createElement('pre');
-          pre.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-all;';
-          pre.textContent = ${JSON.stringify(htmlSource || '<!-- No source available -->')};
-          document.body.appendChild(pre);
-        `);
-      }
-    }
-  } catch {}
-
-  return sourceWin;
 }
 
 // Google rejects sign-in inside embedded browsers. Offer the user's default
@@ -4186,7 +4052,9 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
 function watchGoogleSigninRejection(wc: Electron.WebContents): void {
   let lastNonGoogleUrl: string | null = null;
   let prompting = false;
-  wc.on('did-navigate', (_e, url) => {
+
+  const onNavigate = (url: string): void => {
+    if (!url) return;
     if (!isGoogleEmbeddedSigninRejection(url)) {
       try {
         if (new URL(url).hostname !== 'accounts.google.com') lastNonGoogleUrl = url;
@@ -4212,7 +4080,15 @@ function watchGoogleSigninRejection(wc: Electron.WebContents): void {
       if (response === 0) return shell.openExternal(target);
     }).catch((err) => console.error('[Google Sign-in] Fallback failed:', err))
       .finally(() => { prompting = false; });
-  });
+  };
+
+  wc.on('did-navigate', (_e, url) => onNavigate(url));
+  // The rejection usually lands inside an iframe (the Google widget is
+  // embedded), and `did-navigate` only reports the top frame, so the escape
+  // hatch never appeared for the most common failure. `did-frame-navigate`
+  // reports every frame; the `prompting` guard keeps the two events from
+  // showing the dialog twice for a top-level navigation.
+  wc.on('did-frame-navigate', (_e, url) => onNavigate(url));
 }
 
 // With the opt-in setting on, documents on accounts.google.com also see the
@@ -4237,8 +4113,11 @@ function applyGoogleSigninCompat(wc: Electron.WebContents): void {
 
 // Auto-capture thumbnails and Native Chrome-Parity Context Menu for WebViews
 app.on('web-contents-created', (_event, wc) => {
-  // Tabs, and the popup windows that "Sign in with Google" buttons open.
-  if (wc.getType() === 'webview' || wc.getType() === 'window') {
+  // Sign-in popups are type 'window', not 'webview'. Attaching the fallback to
+  // webviews only meant a Google rejection inside an OAuth popup was a dead end,
+  // which is the opposite of what the README promises.
+  const wcType = wc.getType();
+  if (wcType === 'webview' || wcType === 'window') {
     watchGoogleSigninRejection(wc);
     applyGoogleSigninCompat(wc);
   }
@@ -5210,6 +5089,30 @@ ipcMain.handle('store-set', async (event, key: string, value: string) => {
   }
 });
 
+ipcMain.handle('open-crash-logs-folder', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  // Crashes that happen before app startup are appended under the private
+  // fallback directory (see appendCrashLog), not under userData. Reveal the
+  // file that actually exists so the earliest crash is reachable too.
+  const userDataLog = path.join(app.getPath('userData'), 'crash.log');
+  const earlyLog = path.join(os.homedir(), '.king-browser', 'crash.log');
+  try {
+    if (fs.existsSync(userDataLog) || fs.existsSync(earlyLog)) {
+      shell.showItemInFolder(fs.existsSync(userDataLog) ? userDataLog : earlyLog);
+      return true;
+    }
+    // No crash has been recorded yet. Open the private directory that will hold
+    // the log instead of creating an empty file only to reveal it.
+    const logDir = path.dirname(userDataLog);
+    await fs.promises.mkdir(logDir, { recursive: true, mode: 0o700 });
+    const openError = await shell.openPath(logDir);
+    return openError === '';
+  } catch (error) {
+    console.error('[CrashLog] Unable to reveal crash log:', error);
+    return false;
+  }
+});
+
 ipcMain.handle('store-get', async (event, key: string) => {
   if (!isTrustedSender(event)) return null;
   try {
@@ -6029,13 +5932,6 @@ ipcMain.handle('list-extensions', async (event) => {
   }));
 });
 
-const incognitoAllowedExtensions = new Set<string>();
-
-export function isExtensionAllowedInIncognito(extensionId: string, manifest: any): boolean {
-  if (!extensionId) return false;
-  if (manifest?.incognito === 'not_allowed') return false;
-  return incognitoAllowedExtensions.has(extensionId);
-}
 
 // Open Extension Popup Window
 ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?: number; y?: number; width?: number; height?: number } | null, activeTabInfo?: Record<string, unknown> | null) => {
@@ -6617,18 +6513,14 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
 ipcMain.handle('set-extension-incognito-access', async (event, extensionId: unknown, allowed: unknown) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
   if (typeof extensionId !== 'string' || !extensionId) return { error: 'Invalid extension ID' };
-  if (allowed === true) {
-    incognitoAllowedExtensions.add(extensionId);
-  } else {
-    incognitoAllowedExtensions.delete(extensionId);
-  }
+  setExtensionIncognitoAccess(extensionId, allowed === true);
   return { success: true };
 });
 
 ipcMain.handle('get-extension-incognito-access', async (event, extensionId: unknown) => {
   if (!isTrustedSender(event)) return false;
   if (typeof extensionId !== 'string' || !extensionId) return false;
-  return incognitoAllowedExtensions.has(extensionId);
+  return hasExtensionIncognitoAccess(extensionId);
 });
 
 // Install from Chrome Web Store (CRX download + zip-slip guards live in main/crxInstaller.ts)

@@ -35,7 +35,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onPurgeMemory,
   onPerformSync
 }) => {
-  const { l } = useTranslation();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'general' | 'account' | 'appearance' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
 
   useEffect(() => {
@@ -53,15 +53,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   }, [url]);
 
   const tabs = [
-    { id: 'general', label: l({ en: 'General', ar: 'عام', de: 'Allgemein' }), icon: Settings },
-    { id: 'account', label: 'King Sync', icon: Cloud },
-    { id: 'appearance', label: l({ en: 'Appearance', ar: 'المظهر', de: 'Darstellung' }), icon: Paintbrush },
-    { id: 'privacy', label: l({ en: 'Privacy & Security', ar: 'الخصوصية والأمان', de: 'Datenschutz & Sicherheit' }), icon: ShieldCheck },
-    { id: 'passwords', label: l({ en: 'Passwords', ar: 'كلمات المرور', de: 'Passwörter' }), icon: Key },
-    { id: 'extensions', label: l({ en: 'Extensions', ar: 'الإضافات', de: 'Erweiterungen' }), icon: Puzzle, badge: 'Beta' },
-    { id: 'advanced', label: l({ en: 'Advanced', ar: 'متقدم', de: 'Erweitert' }), icon: Bot },
-    { id: 'mcp', label: l({ en: 'MCP Server', ar: 'خادم MCP', de: 'MCP-Server' }), icon: Cpu },
-    { id: 'shortcuts', label: l({ en: 'Shortcuts', ar: 'اختصارات لوحة المفاتيح', de: 'Tastenkürzel' }), icon: Keyboard },
+    { id: 'general', label: t('settings.general'), icon: Settings },
+    { id: 'account', label: t('settings.account'), icon: Cloud },
+    { id: 'appearance', label: t('settings.appearance'), icon: Paintbrush },
+    { id: 'privacy', label: t('settings.privacy'), icon: ShieldCheck },
+    { id: 'passwords', label: t('settings.passwords'), icon: Key },
+    { id: 'extensions', label: t('settings.extensions'), icon: Puzzle, badge: t('settings.beta') },
+    { id: 'advanced', label: t('settings.advanced'), icon: Bot },
+    { id: 'mcp', label: t('settings.mcpServer'), icon: Cpu },
+    { id: 'shortcuts', label: t('settings.shortcuts'), icon: Keyboard },
   ];
 
   return (
@@ -73,12 +73,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       {/* Sidebar */}
       <div 
         style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-        className="w-64 border-e border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-xl flex flex-col"
+        className="w-64 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-xl flex flex-col"
       >
         <div className="p-6 pb-2">
           <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Settings className="w-5 h-5 text-blue-500" />
-            {l({ en: 'Settings', ar: 'الإعدادات', de: 'Einstellungen' })}
+            {t('settings.title')}
           </h1>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-1">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { defaultSettings, type UserSettings } from '../types/browser';
+import { normalizeLanguage } from '../services/language';
 import { safeParseObjectWithBackup } from '../utils/safeStorage';
-import { normalizeLanguage } from '../services/i18n';
 
 export interface UseSettingsOptions {
   isDemo?: boolean;
@@ -40,10 +40,11 @@ export function useSettings(options: UseSettingsOptions = {}) {
 
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('user_settings') : null;
     const parsed = safeParseObjectWithBackup<Partial<UserSettings>>('user_settings', saved, {});
+    const bootLanguage = typeof localStorage !== 'undefined' ? localStorage.getItem('nova_language') : null;
     const merged: UserSettings = {
       ...initialSettings,
       ...parsed,
-      language: normalizeLanguage(parsed.language ?? initialSettings.language),
+      language: normalizeLanguage(parsed.language ?? bootLanguage ?? initialSettings.language),
       shortcuts: {
         ...initialSettings.shortcuts,
         ...(parsed.shortcuts || {})
@@ -67,13 +68,13 @@ export function useSettings(options: UseSettingsOptions = {}) {
     return merged;
   });
 
-  // All restore/import/sync paths share this setter. Retired or unknown
-  // interface languages (e.g. 'tr' from an old backup) become English.
+  // All restore/import/sync paths share this setter. Only the three shipped
+  // interface languages survive; legacy codes resolve to English.
   const setSettings: Dispatch<SetStateAction<UserSettings>> = useCallback(update => {
     setSettingsState(prev => {
       const next = typeof update === 'function' ? update(prev) : update;
-      const language = normalizeLanguage(next.language);
-      return next.language === language ? next : { ...next, language };
+      const language = normalizeLanguage(next.language ?? 'en');
+      return language === next.language ? next : { ...next, language };
     });
   }, []);
 

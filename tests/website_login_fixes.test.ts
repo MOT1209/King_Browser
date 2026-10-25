@@ -41,7 +41,57 @@ assert.match(main, /setWindowOpenHandler\(\(\{ url, disposition \}\) => \{[\s\S]
 assert.match(main, /isStorageAccessPermission\(permission\)/, 'the permission check answers storage access');
 console.log('[PASS] [LoginFix] webview src, popups, preload and permission wiring');
 
-// 4. Opt-in Google sign-in compatibility (Firefox user agent on accounts.google.com only).
+// 4. A sign-in popup must stay in the session that opened it. Returning a
+//    `webPreferences` override REPLACES the inherited one, and a popup without
+//    an explicit session lands on the default session - so an incognito tab's
+//    OAuth popup could read the normal profile's cookies.
+assert.match(main, /session: contents\.session/,
+  'the popup override pins the opener session');
+assert.match(main, /did-create-window'[\s\S]{0,700}?child\.webContents\.session !== contents\.session/,
+  'a popup that did not inherit the opener session is closed instead of used');
+assert.match(main, /did-create-window'[\s\S]{0,900}?child\.webContents\.setWindowOpenHandler\(\(\) => \(\{ action: 'deny' \}\)\)/,
+  'a sign-in popup cannot open further windows');
+assert.doesNotMatch(main, /nativeWindowOpen/,
+  'native window open is never disabled: window.opener and postMessage depend on it');
+console.log('[PASS] [LoginFix] popup session inheritance, no popup chains, window.opener preserved');
+
+// 5. The Google rejection escape hatch must reach popups and iframes. Popups are
+//    type 'window', and the rejection usually arrives in a subframe, which
+//    'did-navigate' never reports.
+assert.match(main, /wcType === 'webview' \|\| wcType === 'window'/,
+  'OAuth popup windows are watched for a Google rejection');
+assert.match(main, /on\('did-frame-navigate'[\s\S]{0,120}?onNavigate\(/,
+  'iframe-based rejections reach the fallback');
+assert.match(main, /if \(isStorageAccessPermission\(permission\) && !isTrustedAppOrigin\(url\)\) \{\s*return callback\(true\);/,
+  'a storage-access REQUEST from an embedded sign-in frame is answered silently');
+assert.match(main, /isStorageAccessPermission\(permission\) && !isTrustedAppOrigin\(requestingOrigin\)\) return true;/,
+  'the storage-access CHECK reports the access third-party cookies already give');
+assert.match(main, /'storage-access': 'Storage Access/,
+  'storage access has a human-readable permission label');
+console.log('[PASS] [LoginFix] Google fallback covers popups and iframes; storage access is labelled');
+
+// 6. Auth failures that need a different action than "try again" carry their
+//    own copy: an address that already has an account points at sign-in, and an
+//    unconfirmed address points at the confirmation link instead of blaming the
+//    password.
+const sync = fs.readFileSync('src/services/syncService.ts', 'utf8');
+assert.match(sync, /if \(isExistingAccountError\(err\)\) \{\s*throw new Error\('An account with this email already exists\. Sign in instead\.'\);/,
+  'registering an existing account points at sign-in instead of a retry');
+assert.match(sync, /if \(isUnconfirmedEmailError\(err\)\) throw new EmailVerificationRequiredError\(normalizedEmail\);/,
+  'an unconfirmed login asks for the confirmation link instead of blaming the password');
+// 7. Password recovery is wired to Supabase's resetPasswordForEmail, and the
+//    AccountModal disconnect now performs a real logout instead of only
+//    clearing local UI state.
+assert.match(sync, /public async requestPasswordReset\(email: string\): Promise<void>/,
+  'syncService exposes requestPasswordReset');
+assert.match(sync, /supabase\.auth\.resetPasswordForEmail\(normalizedEmail\)/,
+  'password recovery uses Supabase resetPasswordForEmail');
+const accountModal = fs.readFileSync('src/components/AccountModal.tsx', 'utf8');
+assert.match(accountModal, /await syncService\.logout\(\);/,
+  'AccountModal disconnect performs a real logout');
+console.log('[PASS] [LoginFix] password recovery and real logout are wired');
+
+// 8. Opt-in Google sign-in compatibility (Firefox user agent on accounts.google.com only).
 assert.equal(isGoogleAccountsUrl('https://accounts.google.com/v3/signin/identifier?continue=x'), true);
 for (const url of ['http://accounts.google.com/', 'https://accounts.google.com.evil.com/', 'https://www.youtube.com/', 'https://myaccount.google.com/', 'not a url']) {
   assert.equal(isGoogleAccountsUrl(url), false, `${url} is not Google's account host`);

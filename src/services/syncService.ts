@@ -1267,6 +1267,22 @@ const isDedicatedSyncKey = (value: string | null | undefined): value is string =
   typeof value === 'string' && value.startsWith(SYNC_KEY_FORMAT_PREFIX);
 
 /**
+ * A published salt must decode to at least the KDF's own salt size. Anything
+ * shorter is corrupt or hostile: deriving from it would weaken the key, and a
+ * malformed value would make every sign-in publish a fresh salt instead of
+ * converging on one. Both cases are treated as "no usable salt", which the
+ * callers resolve by deriving from a full-size random salt and re-publishing it.
+ */
+const isUsableSyncSalt = (value: string | null | undefined): value is string => {
+  if (typeof value !== 'string' || !value) return false;
+  try {
+    return base64ToBytes(value).length >= PBKDF2_SALT_BYTES;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Derive the dedicated sync key: PBKDF2-SHA256 @ 600k over the account
  * password with a per-account random salt, returned as a storable
  * "nk2$<saltB64>$<keyB64>" string. syncCrypto.deriveKey() cannot be reused
@@ -1274,14 +1290,13 @@ const isDedicatedSyncKey = (value: string | null | undefined): value is string =
  * bits to persist the key in the OS secure store.
  */
 async function deriveDedicatedSyncKey(password: string, preferredSaltB64?: string): Promise<{ key: string; saltB64: string }> {
-  let salt = crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES));
-  if (preferredSaltB64) {
-    try {
-      salt = base64ToBytes(preferredSaltB64);
-    } catch {
-      // Malformed salt — fall back to a fresh random one.
-    }
-  }
+  // An unusable published salt is ignored rather than used: deriving from a
+  // short or malformed value would weaken the key. The random replacement is
+  // returned as saltB64, so the caller re-publishes it and the account
+  // converges instead of repeating the same bad derivation.
+  const salt = isUsableSyncSalt(preferredSaltB64)
+    ? base64ToBytes(preferredSaltB64)
+    : crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES));
   const bits = await pbkdf2Bits(password, salt, PBKDF2_ITERATIONS, PBKDF2_HASH_BYTES);
   const saltB64 = bytesToBase64(salt);
   return { key: `${SYNC_KEY_FORMAT_PREFIX}${saltB64}$${bytesToBase64(bits)}`, saltB64 };
@@ -1305,6 +1320,44 @@ export const SYNC_VAULT_TABLE = 'nova_sync_vaults';
  * the backend forever.
  */
 export const SYNC_WRITE_ATTEMPTS = 3;
+
+/**
+ * Raised when Supabase created (or accepted) the account but withheld the
+ * session because email confirmation is still pending.
+ *
+ * This must stay distinguishable from an ordinary provider failure: the caller
+ * has to tell the user to open the confirmation link, and — critically — must
+ * NOT mark the user as signed in or derive an E2EE key from a salt that was
+ * never persisted.
+ */
+export class EmailVerificationRequiredError extends Error {
+  constructor(email: string) {
+    super(`Account created. Check ${email} for a confirmation link, then sign in.`);
+    this.name = 'EmailVerificationRequiredError';
+  }
+}
+
+/**
+ * Provider failures that need different copy than "try again".
+ *
+ * Supabase reports both of these as ordinary auth errors, so without the
+ * checks the user is told to retry a request that can never succeed: signing
+ * up again for an address that already has an account, or signing in before
+ * opening the confirmation link.
+ */
+function isExistingAccountError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  return message.includes('already registered') ||
+    message.includes('already exists') ||
+    message.includes('user already');
+}
+
+function isUnconfirmedEmailError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  return message.includes('email not confirmed') ||
+    message.includes('email_not_confirmed') ||
+    message.includes('not confirmed');
+}
 
 /**
  * A vault write that was rejected because the row changed under it. Only this
@@ -1513,9 +1566,23 @@ export class KingSyncService {
   // next successful sync re-encrypts them under the dedicated key.
   private legacyMasterKey: string | null = null;
   private legacyMasterKeyLoaded = false;
-  // Set during a sync when the legacy fallback had to be used, so the
-  // post-push cleanup can wipe the legacy material.
-  private usedLegacyKeyThisSync = false;
+  // Previous dedicated key, retained for decryption after the account's
+  // published salt changed under this device. Without it, the vault written
+  // under the old key would fail to decrypt and sync would abort even though
+  // the data is intact.
+  private previousMasterKey: string | null = null;
+  // Which account the in-memory key material belongs to. A second sign-in can
+  // run in the same process without an intervening logout; keeping the old
+  // account's keys around would let a sync attempt try them for this one.
+  private masterKeyOwnerId: string | null = null;
+  // Set when a restored key was derived from a salt the account no longer
+  // publishes. Re-deriving needs the account password, which the restore path
+  // does not have, so sync stays disabled with an explicit message until the
+  // user signs in again.
+  private keyRotationRequired = false;
+  // Set during a sync when a retained fallback key had to be used, so the
+  // post-push cleanup can wipe material the vault no longer needs.
+  private usedFallbackKeyThisSync = false;
   private realtimeChannel: RealtimeChannel | null = null;
   // Coalesce realtime bursts: rapid postgres_changes events schedule a single
   // notify 1000ms after the last event instead of one full sync per event.
@@ -1839,6 +1906,16 @@ export class KingSyncService {
   }
 
   /**
+   * Secure-store key for the pre-rotation dedicated key. Kept separate from
+   * the legacy raw-password slot because both can be needed at once: a device
+   * can hold a pre-migration password entry AND a key derived from a salt the
+   * account has since replaced.
+   */
+  private previousMasterKeyStoreName(userId?: string): string {
+    return `${this.masterKeyStoreName(userId)}_previous`;
+  }
+
+  /**
    * Fire-and-forget persistence of the E2EE sync key into the OS-level
    * encrypted secure store (safeStorage in the main process) so sync keeps
    * working after an app restart. Best-effort: never throws, never blocks
@@ -1863,21 +1940,51 @@ export class KingSyncService {
    * migrated format — stages the retained legacy raw-password entry so
    * envelopes still encrypted under the password remain decryptable.
    */
-  private restoreMasterKeysForUser(userId?: string): void {
+  private restoreMasterKeysForUser(userId?: string, publishedSaltB64?: string): void {
     if (!userId) return;
     if (!this.electronAPI?.secureStoreGet) return;
     void (async () => {
       try {
         const storeName = this.masterKeyStoreName(userId);
         const stored = await this.readSecureStore(storeName);
+
+        // A restored key has to be derived from the salt the account publishes
+        // now. When it is not, this device holds exactly the stale key the
+        // rotation in acquireSyncKey exists to replace: the vault it would
+        // write could not be read by any other device. Re-deriving needs the
+        // account password, which the restore path does not have, so refuse the
+        // stale key and ask for a fresh sign-in instead of failing later with a
+        // generic vault error.
+        if (isDedicatedSyncKey(stored) && publishedSaltB64) {
+          const storedSaltB64 = stored.slice(SYNC_KEY_FORMAT_PREFIX.length).split('$')[0] || '';
+          if (storedSaltB64 !== publishedSaltB64) {
+            logger.warn(
+              'SyncService:restoreMasterKeysForUser',
+              'Stored sync key was derived from a salt the account no longer publishes — sign-in required to re-derive'
+            );
+            if (this.currentUser?.id === userId) {
+              this.masterKey = null;
+              this.masterKeyOwnerId = null;
+              this.keyRotationRequired = true;
+            }
+            return;
+          }
+        }
+
         if (stored && !this.masterKey && this.currentUser?.id === userId) {
           this.masterKey = stored;
+          this.masterKeyOwnerId = userId;
+          this.keyRotationRequired = false;
         }
         if (isDedicatedSyncKey(stored)) {
           const legacy = await this.readSecureStore(this.legacyMasterKeyStoreName(userId));
           if (legacy && !isDedicatedSyncKey(legacy) && !this.legacyMasterKey && this.currentUser?.id === userId) {
             this.legacyMasterKey = legacy;
             this.legacyMasterKeyLoaded = true;
+          }
+          const previous = await this.readSecureStore(this.previousMasterKeyStoreName(userId));
+          if (isDedicatedSyncKey(previous) && !this.previousMasterKey && this.currentUser?.id === userId) {
+            this.previousMasterKey = previous;
           }
         }
       } catch (e) {
@@ -1902,33 +2009,107 @@ export class KingSyncService {
     return this.legacyMasterKey;
   }
 
+  /** Pre-rotation dedicated key, restored lazily from the secure store. */
+  private async getPreviousMasterKey(): Promise<string | null> {
+    if (this.previousMasterKey) return this.previousMasterKey;
+    const stored = await this.readSecureStore(this.previousMasterKeyStoreName());
+    if (isDedicatedSyncKey(stored)) {
+      this.previousMasterKey = stored;
+      return stored;
+    }
+    return null;
+  }
+
+  /**
+   * Every key the vault may still have been written under, in the order worth
+   * trying: the pre-rotation key (same scheme, nearest generation) before the
+   * raw-password legacy entry (oldest scheme). Deduplicated so a key that is
+   * both does not cost a second PBKDF2-backed decrypt attempt.
+   */
+  private async getDecryptionFallbackKeys(): Promise<string[]> {
+    const keys = new Set<string>();
+    const previous = await this.getPreviousMasterKey();
+    if (previous) keys.add(previous);
+    const legacy = await this.getLegacyFallbackKey();
+    if (legacy) keys.add(legacy);
+    return [...keys];
+  }
+
   /**
    * Establish the long-lived E2EE secret WITHOUT persisting the raw
-   * password. Reuses an existing dedicated key from the secure store when
-   * present; otherwise derives one via PBKDF2-SHA256 @ 600k with a per-account
-   * salt (`preferredSaltB64`, e.g. mirrored from Supabase user_metadata so all
-   * devices derive the same key) and stores it. A pre-existing legacy
+   * password. Reuses an existing dedicated key from the secure store when it
+   * was derived from the account's published salt; otherwise derives one via
+   * PBKDF2-SHA256 @ 600k with that salt and stores it. A pre-existing legacy
    * raw-password entry is preserved under the legacy name for fallback
-   * decryption of old envelopes. Returns the salt that was used.
+   * decryption of old envelopes.
+   *
+   * Returns the salt that is now authoritative for the account plus whether
+   * the stored key had to be replaced. A mismatch means two devices had been
+   * deriving DIFFERENT keys from a salt that was never mirrored, which made
+   * each one unable to read what the other wrote — silently. Re-deriving is
+   * the only way to converge; the previous key is retained so the vault
+   * written under it is still decryptable until the next push re-encrypts it.
    */
-  private async acquireSyncKey(password: string, preferredSaltB64?: string): Promise<string> {
+  private async acquireSyncKey(
+    password: string,
+    preferredSaltB64?: string
+  ): Promise<{ saltB64: string; rotated: boolean }> {
+    // A second account can sign in on this process without a logout. Drop every
+    // in-memory key from the previous identity before deriving, so a later
+    // decrypt cannot try another account's key material. The secure-store
+    // entries are already scoped by user id.
+    const ownerId = this.currentUser?.id ?? null;
+    if (this.masterKeyOwnerId && this.masterKeyOwnerId !== ownerId) {
+      this.masterKey = null;
+      this.previousMasterKey = null;
+      this.legacyMasterKey = null;
+      this.legacyMasterKeyLoaded = false;
+    }
+    this.masterKeyOwnerId = ownerId;
+    // A successful sign-in is the path that re-derives the canonical key.
+    this.keyRotationRequired = false;
+
     const storeName = this.masterKeyStoreName();
     const stored = await this.readSecureStore(storeName);
 
     if (isDedicatedSyncKey(stored)) {
-      this.masterKey = stored;
+      // Salt is embedded in the stored key string.
+      const storedSaltB64 = stored.slice(SYNC_KEY_FORMAT_PREFIX.length).split('$')[0] || '';
+
+      // Fast path: nothing canonical to compare against (pre-migration
+      // account) or the local key already matches it. A stored salt that could
+      // not have produced this key safely is never reused: it falls through to
+      // the rotation branch, which re-derives from a full-size salt.
+      if ((!preferredSaltB64 || preferredSaltB64 === storedSaltB64) && isUsableSyncSalt(storedSaltB64)) {
+        this.masterKey = stored;
+        if (!this.legacyMasterKey && !this.legacyMasterKeyLoaded) {
+          await this.getLegacyFallbackKey();
+        }
+        return { saltB64: storedSaltB64, rotated: false };
+      }
+
+      // The account's published salt changed under this device. Keep the old
+      // key for decryption, then converge on the published one.
+      await this.writeSecureStore(this.previousMasterKeyStoreName(), stored);
+      this.previousMasterKey = stored;
       if (!this.legacyMasterKey && !this.legacyMasterKeyLoaded) {
         await this.getLegacyFallbackKey();
       }
-      // Salt is embedded in the stored key string.
-      return stored.slice(SYNC_KEY_FORMAT_PREFIX.length).split('$')[0] || preferredSaltB64 || '';
+      const derived = await deriveDedicatedSyncKey(password, preferredSaltB64);
+      this.masterKey = derived.key;
+      await this.writeSecureStore(storeName, derived.key);
+      logger.warn(
+        'SyncService:acquireSyncKey',
+        'Stored sync key was derived from a salt the account no longer publishes — re-derived the key from the published salt and retained the previous one for decryption'
+      );
+      return { saltB64: derived.saltB64, rotated: true };
     }
 
     let saltB64 = preferredSaltB64;
     if (!saltB64) {
       saltB64 = bytesToBase64(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
     }
-    const { key } = await deriveDedicatedSyncKey(password, saltB64);
+    const derived = await deriveDedicatedSyncKey(password, saltB64);
 
     if (stored && !isDedicatedSyncKey(stored)) {
       // Preserve the legacy raw-password entry for decryption of envelopes
@@ -1937,9 +2118,12 @@ export class KingSyncService {
       if (!this.legacyMasterKey) this.legacyMasterKey = stored;
     }
 
-    this.masterKey = key;
-    await this.writeSecureStore(storeName, key);
-    return saltB64;
+    this.masterKey = derived.key;
+    await this.writeSecureStore(storeName, derived.key);
+    // A published salt that had to be replaced (unusable value) has to travel
+    // back to the caller so it re-publishes the salt this key was derived from.
+    const saltReplaced = Boolean(preferredSaltB64) && derived.saltB64 !== preferredSaltB64;
+    return { saltB64: derived.saltB64, rotated: saltReplaced };
   }
 
   private loadSession() {
@@ -1996,6 +2180,22 @@ export class KingSyncService {
         // restored by supabase-js from its storage adapter re-hydrate this
         // service after a restart.
         if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+          // A restored JWT arrives stale: INITIAL_SESSION replays whatever the
+          // storage adapter last persisted, and a second account can sign in on
+          // this process without an intervening logout. Adopting a session for
+          // a different user than the active one would clobber in-memory
+          // identity mid-login (the key re-derivation yield lets the event slip
+          // in) and — through fire-and-forget key persistence — write this
+          // identity's sync key into the other account's slot. Cross-account
+          // events are ignored; a deliberate account switch always goes
+          // through login()/register().
+          if (this.currentUser && this.currentUser.id !== session.user.id) {
+            logger.warn(
+              'SyncService:initSupabaseListener',
+              `Ignoring ${event} for user ${session.user.id}; ${this.currentUser.id} is the active account.`
+            );
+            return;
+          }
           const userMeta = session.user.user_metadata || {};
           this.currentUser = {
             id: session.user.id,
@@ -2011,7 +2211,8 @@ export class KingSyncService {
           });
           // The JWT is persisted by supabase-js through the secure storage
           // adapter — deliberately no localStorage token mirror here.
-          this.restoreMasterKeysForUser(session.user.id);
+          const publishedSalt = typeof userMeta.sync_key_salt === 'string' ? userMeta.sync_key_salt : undefined;
+          this.restoreMasterKeysForUser(session.user.id, publishedSalt);
           void this.subscribeToRealtime();
           this.notify();
         } else if (event === 'SIGNED_OUT') {
@@ -2200,16 +2401,36 @@ export class KingSyncService {
         // First actual auth use: make sure the deferred auth listener is up.
         void this.ensureSupabaseListener();
         const supabase = await getSupabaseClient();
+
+        // Mint the E2EE salt BEFORE signUp and hand it to Supabase inside
+        // options.data. Supabase writes options.data into user_metadata at
+        // account-creation time, so the salt survives email confirmation even
+        // though the signUp response carries no session.
+        //
+        // Generating it afterwards (via updateUser) silently lost it whenever
+        // confirmation was pending: updateUser failed without a session, no
+        // salt reached the server, the second device minted a DIFFERENT salt,
+        // derived a DIFFERENT key, and could never decrypt this vault — with no
+        // error shown. That is unrecoverable data loss, not a UX bug.
+        const saltB64 = bytesToBase64(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
+
         const { data, error } = await supabase.auth.signUp({
           email: normalizedEmail,
           password,
           options: {
-            data: { display_name: finalName }
+            data: { display_name: finalName, sync_key_salt: saltB64 }
           }
         });
 
         if (error) throw error;
         if (!data.user) throw new Error('Registration failed');
+        if (!data.session?.access_token) {
+          // Email confirmation is enabled: the account exists server-side but
+          // there is no session yet. Return control to the user BEFORE touching
+          // currentUser/token — declaring a signed-in state that does not exist
+          // is what let the key drift go unnoticed.
+          throw new EmailVerificationRequiredError(normalizedEmail);
+        }
 
         const newUser: KingUser = {
           id: data.user.id,
@@ -2221,18 +2442,10 @@ export class KingSyncService {
         };
 
         this.currentUser = newUser;
-        this.token = data.session?.access_token || generateId('sb_token');
+        this.token = data.session.access_token;
 
-        // Derive a dedicated sync key instead of using the raw password as
-        // the long-lived E2EE secret. The per-account salt is mirrored
-        // into user_metadata (best-effort) so every device derives the SAME
-        // key for this account.
-        const saltB64 = bytesToBase64(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
-        try {
-          await supabase.auth.updateUser({ data: { sync_key_salt: saltB64 } });
-        } catch (metaErr) {
-          logger.warn('SyncService:register', 'Could not persist sync key salt to user metadata', metaErr);
-        }
+        // Derive the dedicated sync key from the salt already persisted above
+        // so every device converges on the same key for this account.
         await this.acquireSyncKey(password, saltB64);
         this.persistMasterKeyBestEffort();
 
@@ -2244,12 +2457,18 @@ export class KingSyncService {
         this.notify();
         return newUser;
       } catch (err: unknown) {
+        // Pending email confirmation is an expected, actionable outcome — not
+        // a generic provider failure. Let the specific message through.
+        if (err instanceof EmailVerificationRequiredError) throw err;
         logger.warn('SyncService:register', 'Supabase registration failed', err);
         // Never silently downgrade to a local account when Supabase IS
         // configured: syncData() rejects non-UUID ids, so the user would
         // believe cloud sync works and then hit errors on first sync.
         // Raw provider error is logged above; keep the user-facing copy stable
         // instead of interpolating internal error text.
+        if (isExistingAccountError(err)) {
+          throw new Error('An account with this email already exists. Sign in instead.');
+        }
         throw new Error('Could not create your cloud account — please try again.');
       }
     }
@@ -2329,6 +2548,13 @@ export class KingSyncService {
           syncPreferences: userMeta.sync_preferences || { ...DEFAULT_PREFERENCES }
         };
 
+        if (!data.session?.access_token) {
+          // Defensive: signInWithPassword can return a user with no session
+          // when the account is not confirmed. Never dereference a missing
+          // session, and never present a signed-in state without a token.
+          throw new EmailVerificationRequiredError(normalizedEmail);
+        }
+
         this.currentUser = loggedUser;
         this.token = data.session.access_token;
 
@@ -2340,9 +2566,13 @@ export class KingSyncService {
         const metaSalt = typeof userMeta.sync_key_salt === 'string' && userMeta.sync_key_salt
           ? userMeta.sync_key_salt
           : undefined;
-        const saltB64 = await this.acquireSyncKey(password, metaSalt);
-        if (!metaSalt) {
+        const { saltB64, rotated } = await this.acquireSyncKey(password, metaSalt);
+        if (!metaSalt || rotated) {
           try {
+            // A rotation means this device had been writing under a key no
+            // other device could derive. Re-publishing the now-authoritative
+            // salt is what makes the next device converge instead of repeating
+            // the split.
             await supabase.auth.updateUser({ data: { sync_key_salt: saltB64 } });
           } catch (metaErr) {
             logger.warn('SyncService:login', 'Could not persist sync key salt to user metadata', metaErr);
@@ -2362,11 +2592,15 @@ export class KingSyncService {
         this.notify();
         return loggedUser;
       } catch (err: unknown) {
+        if (err instanceof EmailVerificationRequiredError) throw err;
         logger.warn('SyncService:login', 'Supabase login failed', err);
         // Symmetric with register(): do not fall through to the local
         // zero-config registry when Supabase IS configured — that would
         // silently sign the user into a non-syncing local account.
         // Raw provider error is logged above; keep user-facing copy stable.
+        // An unconfirmed address is not a wrong password: point at the
+        // confirmation link the provider already sent.
+        if (isUnconfirmedEmailError(err)) throw new EmailVerificationRequiredError(normalizedEmail);
         throw new Error('Could not sign in to your cloud account — please check your credentials and try again.');
       }
     }
@@ -2413,6 +2647,32 @@ export class KingSyncService {
     return account.user;
   }
 
+  /**
+   * Ask Supabase to email a password-reset link. Only meaningful for King
+   * Cloud accounts; local-vault accounts have no recovery path by design.
+   */
+  public async requestPasswordReset(email: string): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) throw new Error('Email is required');
+
+    if (!isSupabaseConfigured()) {
+      throw new Error('Password reset requires a King Cloud account');
+    }
+
+    try {
+      void this.ensureSupabaseListener();
+      const supabase = await getSupabaseClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+      if (error) throw error;
+    } catch (err) {
+      logger.warn('SyncService:requestPasswordReset', 'Password reset request failed', err);
+      if (err instanceof Error && err.message) {
+        throw new Error(err.message);
+      }
+      throw new Error('Could not send the password reset email — please try again.');
+    }
+  }
+
   public async logout() {
     void this.unsubscribeFromRealtime();
     if (isSupabaseConfigured()) {
@@ -2427,7 +2687,12 @@ export class KingSyncService {
       }
     }
 
-    // Secure wipe of persisted sync keys and tokens via OS secureStore delete
+    // Secure wipe of persisted sync keys and tokens via OS secureStore delete.
+    // The pre-rotation key is deliberately kept: it exists only while a rotation
+    // has not yet been confirmed by a successful push, the old salt is no longer
+    // published (so no device can re-derive it), and deleting it here would make
+    // a vault still sealed under it unreadable for good. It is scoped to this
+    // user id and is wiped by the first sync that re-encrypts the vault.
     const masterKeyStore = this.masterKeyStoreName();
     const legacyKeyStore = this.legacyMasterKeyStoreName();
     await Promise.allSettled([
@@ -2441,9 +2706,13 @@ export class KingSyncService {
     this.currentUser = null;
     this.token = null;
     this.masterKey = null;
+    this.masterKeyOwnerId = null;
+    this.keyRotationRequired = false;
     this.legacyMasterKey = null;
     this.legacyMasterKeyLoaded = false;
-    this.usedLegacyKeyThisSync = false;
+    // In-memory only: the secure-store entry above stays for the next sign-in.
+    this.previousMasterKey = null;
+    this.usedFallbackKeyThisSync = false;
     this.lastSyncedAt = null;
 
     // Web Storage access can throw on its own (partitioned storage, ITP,
@@ -2516,8 +2785,11 @@ export class KingSyncService {
     }
     if (!this.masterKey) {
       // Logged in but the E2EE key never got restored (e.g. secure store
-      // unavailable after restart) — a clear message beats a crypto failure.
-      throw new Error('Sync session expired — please sign in again.');
+      // unavailable after restart), or it was derived from a salt the account
+      // replaced — a clear message beats a crypto failure.
+      throw new Error(this.keyRotationRequired
+        ? 'Your sync key changed on another device — sign in again to update this device.'
+        : 'Sync session expired — please sign in again.');
     }
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!UUID_RE.test(this.currentUser.id)) {
@@ -2532,7 +2804,7 @@ export class KingSyncService {
 
     this.isSyncing = true;
     this.lastError = null;
-    this.usedLegacyKeyThisSync = false;
+    this.usedFallbackKeyThisSync = false;
     this.notify();
 
     // The settings merge compares per-field write clocks, so every attempt has to
@@ -2637,22 +2909,27 @@ export class KingSyncService {
           remoteBundle = migrateSyncBundle(await decryptSyncPayload<SyncDataBundle>(snapshot.row.envelope, session.masterKey));
         } catch (decErr) {
           // Compat: the vault may predate the dedicated sync key and be
-          // encrypted under the raw account password. Fall back to the
-          // retained legacy key for decryption; the push below re-encrypts
-          // everything under the dedicated key, completing the migration.
-          const legacyKey = await this.getLegacyFallbackKey();
-          if (legacyKey) {
+          // encrypted under the raw account password, or under a dedicated key
+          // from a salt the account has since replaced. Try every retained
+          // fallback; the push below re-encrypts everything under the current
+          // key, completing the migration.
+          const fallbackKeys = await this.getDecryptionFallbackKeys();
+          let decrypted: SyncDataBundle | null = null;
+          for (const fallbackKey of fallbackKeys) {
             try {
-              remoteBundle = migrateSyncBundle(await decryptSyncPayload<SyncDataBundle>(snapshot.row.envelope, legacyKey));
-              this.usedLegacyKeyThisSync = true;
-              logger.info('SyncService:syncData', 'Vault decrypted with legacy key; re-encrypting under dedicated sync key');
+              decrypted = migrateSyncBundle(await decryptSyncPayload<SyncDataBundle>(snapshot.row.envelope, fallbackKey));
+              this.usedFallbackKeyThisSync = true;
+              logger.info('SyncService:syncData', 'Vault decrypted with a retained fallback key; re-encrypting under the current sync key');
+              break;
             } catch {
-              remoteUnusable = true;
-              logger.warn('SyncService:syncData', 'Failed to decrypt remote vault with current and legacy keys — aborting push');
+              // Try the next retained key.
             }
+          }
+          if (decrypted) {
+            remoteBundle = decrypted;
           } else {
             remoteUnusable = true;
-            logger.warn('SyncService:syncData', 'Failed to decrypt remote vault — aborting push to prevent data loss', decErr);
+            logger.warn('SyncService:syncData', 'Failed to decrypt remote vault with current and retained keys — aborting push to prevent data loss', decErr);
           }
         }
       }
@@ -2668,13 +2945,21 @@ export class KingSyncService {
     // 2. Decrypt the remote password blob, which lives in its own envelope and
     // therefore cannot travel through the row merge.
     let remotePasswords: TombstoneRow<SavedPassword>[] | undefined;
-    if (remoteBundle && prefs.syncPasswords && remoteBundle.encryptedPasswords && remoteBundle.passwordsSalt && remoteBundle.passwordsIv) {
-      remotePasswords = await this.decryptRemotePasswords(
-        remoteBundle.encryptedPasswords,
-        remoteBundle.passwordsSalt,
-        remoteBundle.passwordsIv,
-        session.masterKey
-      );
+    let remotePasswordsUnreadable = false;
+    if (remoteBundle && prefs.syncPasswords && remoteBundle.encryptedPasswords) {
+      if (remoteBundle.passwordsSalt && remoteBundle.passwordsIv) {
+        remotePasswords = await this.decryptRemotePasswords(
+          remoteBundle.encryptedPasswords,
+          remoteBundle.passwordsSalt,
+          remoteBundle.passwordsIv,
+          session.masterKey
+        );
+      }
+      // The blob is present but no key this device holds can open it. Pushing
+      // the local set now would replace another device's credentials, and a
+      // local set with no rows would drop the blob outright. Carry the original
+      // envelope forward untouched instead, and do not claim its rows.
+      remotePasswordsUnreadable = remotePasswords === undefined;
     }
 
     // 3. Reconstruct the deletions this device made since its last push, for
@@ -2758,7 +3043,7 @@ export class KingSyncService {
     }
 
     let encryptedPassPayload: { ciphertext: string; salt: string; iv: string } | undefined;
-    if (prefs.syncPasswords && pushedPasswords.length > 0) {
+    if (prefs.syncPasswords && pushedPasswords.length > 0 && !remotePasswordsUnreadable) {
       encryptedPassPayload = await this.encryptPasswords(pushedPasswords, session.masterKey);
     }
 
@@ -2775,9 +3060,9 @@ export class KingSyncService {
       bookmarks: prefs.syncBookmarks ? capSyncedCollection(mergedBookmarks, MAX_SYNCED_BOOKMARKS) : undefined,
       folders: prefs.syncBookmarks ? capSyncedCollection(mergedFolders, MAX_SYNCED_FOLDERS) : undefined,
       history: prefs.syncHistory ? pushedHistory : undefined,
-      encryptedPasswords: encryptedPassPayload?.ciphertext,
-      passwordsSalt: encryptedPassPayload?.salt,
-      passwordsIv: encryptedPassPayload?.iv,
+      encryptedPasswords: remotePasswordsUnreadable ? remoteBundle?.encryptedPasswords : encryptedPassPayload?.ciphertext,
+      passwordsSalt: remotePasswordsUnreadable ? remoteBundle?.passwordsSalt : encryptedPassPayload?.salt,
+      passwordsIv: remotePasswordsUnreadable ? remoteBundle?.passwordsIv : encryptedPassPayload?.iv,
       settings: prefs.syncSettings ? mergedSettings : undefined,
       settingsTimestamps: prefs.syncSettings ? this.getSettingsTimestamps() : undefined,
       workspaces: prefs.syncWorkspaces ? capSyncedCollection(mergedWorkspaces, MAX_SYNCED_WORSPACES) : undefined
@@ -2786,6 +3071,13 @@ export class KingSyncService {
     // 5. Conditional write. The vault is only overwritten if it still holds the
     // revision this attempt read; otherwise the attempt lost the race and the
     // whole cycle has to run again from a fresh read.
+    // A sign-in can land while this attempt is in flight: login()/logout() are
+    // not serialized behind syncQueue. Sealing the vault now would put it under
+    // a key the published salt no longer derives, so abandon the attempt
+    // instead of writing. The next sync starts from the new key.
+    if (this.masterKey !== session.masterKey) {
+      throw new Error('Sync key changed during sync — the next sync will use the new key.');
+    }
     const envelope = await encryptSyncPayload(newBundle, session.masterKey);
     this.lastPushedCiphertext = envelope.ciphertext;
     const write = await writeVaultIfUnchanged(table, {
@@ -2802,16 +3094,29 @@ export class KingSyncService {
     // a row it never had.
     this.recordPushedIndex(session.userId, prefs, {
       history: mergedHistory,
-      passwords: liveRowsOnly(pushedPasswords) as SavedPassword[]
+      // A preserved blob means this attempt contributed no credential rows.
+      passwords: remotePasswordsUnreadable ? [] : liveRowsOnly(pushedPasswords) as SavedPassword[]
     });
+
+    // Both cleanups are only valid while the key this attempt encrypted under
+    // is STILL the current one. A sign-in that lands after the write keeps the
+    // old key precisely so the vault just written stays readable; wiping it
+    // here would leave data nobody can decrypt.
+    const keyIsCurrent = this.masterKey === session.masterKey && this.currentUser?.id === session.userId;
 
     // The remote vault is now encrypted under the dedicated sync key, so
     // the retained legacy raw-password material is no longer needed — wipe
     // it from memory and the secure store.
-    if (this.usedLegacyKeyThisSync) {
-      this.usedLegacyKeyThisSync = false;
+    if (keyIsCurrent && this.usedFallbackKeyThisSync) {
+      this.usedFallbackKeyThisSync = false;
       this.legacyMasterKey = null;
       void this.writeSecureStore(this.legacyMasterKeyStoreName(), '');
+    }
+    // The vault now holds this bundle encrypted under the current key, so a
+    // key retained from before a salt rotation can no longer be needed.
+    if (keyIsCurrent && this.previousMasterKey) {
+      this.previousMasterKey = null;
+      void this.writeSecureStore(this.previousMasterKeyStoreName(), '');
     }
 
     // Bookkeeping only — the vault upsert above has already succeeded, so
@@ -2857,9 +3162,10 @@ export class KingSyncService {
    * Decrypt the vault's inner password blob, retrying with the retained legacy
    * key for blobs written before the parameter unification.
    *
-   * Returns undefined — leaving the local passwords untouched — when the blob
-   * cannot be read at all: guessing then would mean either dropping the user's
-   * credentials or overwriting the vault's ones with an empty list.
+   * Returns undefined when the blob cannot be read at all. The caller then
+   * carries the original envelope forward instead of guessing: pushing the
+   * local set would replace another device's credentials, and a local set with
+   * no rows would drop the blob outright.
    */
   private async decryptRemotePasswords(
     ciphertext: string,
@@ -2870,19 +3176,20 @@ export class KingSyncService {
     try {
       return await this.decryptPasswords(ciphertext, salt, iv, masterKey);
     } catch (e) {
-      const legacyKey = await this.getLegacyFallbackKey();
-      if (!legacyKey) {
-        logger.warn('SyncService:syncData', 'Skipping password decrypt', e);
-        return undefined;
+      const fallbackKeys = await this.getDecryptionFallbackKeys();
+      for (const fallbackKey of fallbackKeys) {
+        try {
+          const passwords = await this.decryptPasswords(ciphertext, salt, iv, fallbackKey);
+          this.usedFallbackKeyThisSync = true;
+          return passwords;
+        } catch {
+          // Try the next retained key.
+        }
       }
-      try {
-        const passwords = await this.decryptPasswords(ciphertext, salt, iv, legacyKey);
-        this.usedLegacyKeyThisSync = true;
-        return passwords;
-      } catch (legacyErr) {
-        logger.warn('SyncService:syncData', 'Skipping password decrypt (current and legacy keys failed)', legacyErr);
-        return undefined;
-      }
+      // A blob that cannot be read at all must not be guessed at: the caller
+      // preserves the remote envelope instead of replacing it with local rows.
+      logger.warn('SyncService:syncData', 'Skipping password decrypt (current and retained keys failed)', e);
+      return undefined;
     }
   }
 

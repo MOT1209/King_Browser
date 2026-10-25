@@ -64,7 +64,39 @@
     "light": "Light",
     "system": "System",
     "clearData": "Clear Browsing Data",
-    "clearDataDesc": "Clear browsing history, cache, cookies, and local database."
+    "clearDataDesc": "Clear browsing history, cache, cookies, and local database.",
+    "account": "King Sync",
+    "passwords": "Passwords",
+    "advanced": "Advanced",
+    "mcpServer": "MCP Server",
+    "beta": "Beta",
+    "aboutKing": "About King",
+    "versionLine": "Version {version} (Open Source Edition)",
+    "engineTransparency": "Engine & Security Patch Transparency",
+    "patchTracking": "Patch gap tracking active: Automated CI/CD builds release Chromium security patches with verified platform binaries.",
+    "onStartup": "On Startup",
+    "startupNewTab": "Open New Tab Page",
+    "startupContinue": "Continue where you left off",
+    "startupSpecific": "Open a specific page",
+    "searchEngineHeading": "Search Engine",
+    "searchEngineFast": "Fast & Accurate",
+    "searchEnginePrivacy": "Privacy focused",
+    "searchEngineIndependent": "Independent index",
+    "searchEngineAI": "AI powered",
+    "searchEngineTrees": "Plant trees",
+    "searchEngineClassic": "Classic search",
+    "pageTranslation": "Page Translation",
+    "targetLanguage": "Default Target Language",
+    "targetLanguageDesc": "Foreign web pages will be translated to this language in 1-click.",
+    "fontSize": "Font Size",
+    "sizeSmall": "Small",
+    "sizeMedium": "Medium",
+    "sizeLarge": "Large",
+    "clearDataTitle": "Clear History & Cache",
+    "clearDataButton": "Clear Data",
+    "clearHistoryTitle": "Clear Browsing History",
+    "clearHistoryMessage": "Are you sure you want to clear your browsing history?",
+    "clearHistoryConfirm": "Clear History"
   },
   "ai": {
     "title": "King AI",
@@ -310,5 +342,128 @@
     "statusRejected": "rejected",
     "statusRunning": "running",
     "statusRequested": "queued"
+  },
+  "appearance": {
+    "wallpaper": {
+      "title": "Daily 4K Wallpaper (Ultra HD)",
+      "customChoice": "Custom Choice",
+      "desc": "Automatically updates daily with curated 4K photography. Synchronized across all tabs.",
+      "resetTitle": "Reset to today's official wallpaper",
+      "reset": "Reset to Today",
+      "shuffle": "Shuffle Next",
+      "activeOnNewTab": "Active on New Tab",
+      "gallery": "4K Wallpaper Gallery",
+      "galleryHint": "Click any photo to set it immediately across all tabs",
+      "active": "Active"
+    },
+    "themeMode": "Theme Mode",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System Default",
+    "tabStyle": "Tab Style",
+    "tabStyleFloating": "Floating",
+    "tabStyleFloatingDesc": "Modern & Detached",
+    "tabStyleRounded": "Rounded",
+    "tabStyleRoundedDesc": "Classic Chrome Style",
+    "tabStyleSquare": "Square",
+    "tabStyleSquareDesc": "Compact & Sharp",
+    "tabAnimation": "Tab Animation",
+    "tabAnimationDesc": "Select a tab opening physics preset and preview its motion",
+    "animationChrome": "Chrome (Native)",
+    "animationChromeDesc": "Smooth horizontal width expansion & collapse",
+    "animationSmooth": "Fluid Spring",
+    "animationSmoothDesc": "Soft floating lift with cushioned spring physics",
+    "animationSnappy": "Snappy",
+    "animationSnappyDesc": "Crisp, high-velocity responsive motion",
+    "animationNone": "Instant (No Motion)",
+    "animationNoneDesc": "Immediate tab opening for maximum speed",
+    "defaultBadge": "Default",
+    "browserColor": "Browser Color (Full UI Theme)",
+    "browserColorDesc": "Customize the entire browser chrome, frame, navigation bar, and tab surfaces",
+    "colorDefault": "Classic Slate",
+    "colorDefaultDesc": "Default King aesthetic",
+    "colorMidnight": "Midnight Navy",
+    "colorMidnightDesc": "Deep galactic space blue",
+    "colorCyberpunk": "Cyberpunk Violet",
+    "colorCyberpunkDesc": "Futuristic neon purple tone",
+    "colorForest": "Emerald Forest",
+    "colorForestDesc": "Rich organic botanical green",
+    "colorCrimson": "Crimson Ruby",
+    "colorCrimsonDesc": "Velvet burgundy wine red",
+    "colorWarm": "Warm Mocha",
+    "colorWarmDesc": "Cozy espresso coffee tone",
+    "colorOcean": "Deep Ocean",
+    "colorOceanDesc": "Calm abyssal teal & cyan",
+    "colorSunset": "Sunset Amber",
+    "colorSunsetDesc": "Warm dusk twilight glow",
+    "colorCustom": "Custom Color",
+    "colorCustomDesc": "Choose your own hex color",
+    "customBrowserColor": "Custom Browser Color Picker:",
+    "contrastNote": "The browser automatically calculates frame, toolbar, and tab surfaces with optimal contrast.",
+    "accentColor": "Accent Color",
+    "customColorPicker": "Custom Color Picker:",
+    "newTabBackground": "New Tab Background",
+    "videoImageUrl": "Video / Image URL:",
+    "placeholderUrl": "e.g. https://example.com/video.mp4",
+    "layoutNavigation": "Layout & Navigation",
+    "bookmarksBar": "Bookmarks Bar",
+    "bookmarksBarDesc": "Show favorite sites below address bar",
+    "verticalTabs": "Vertical Tabs",
+    "verticalTabsDesc": "Display tabs on the left sidebar instead of the top",
+    "tasksWidget": "Tasks Widget",
+    "tasksWidgetDesc": "Show tasks and to-do list on the New Tab Page",
+    "toggleBookmarksBar": "Toggle bookmarks bar",
+    "toggleVerticalTabs": "Toggle vertical tabs",
+    "toggleTasksWidget": "Toggle tasks widget",
+    "backgrounds": {
+      "default": {
+        "name": "Clean Minimalist",
+        "badge": "Default"
+      },
+      "aurora_waves": {
+        "name": "Aurora Waves",
+        "badge": "3D Wave"
+      },
+      "cyber_grid": {
+        "name": "Cyber Grid 3D",
+        "badge": "3D Neon"
+      },
+      "hyper_space": {
+        "name": "Hyper Space Stars",
+        "badge": "Particles"
+      },
+      "fireflies": {
+        "name": "Bioluminescent Fireflies",
+        "badge": "Ambient"
+      },
+      "nebula": {
+        "name": "Cosmic Nebula Flow",
+        "badge": "Galaxy"
+      },
+      "matrix": {
+        "name": "Digital Matrix Rain",
+        "badge": "Code Rain"
+      },
+      "gradient": {
+        "name": "Dynamic Gradient",
+        "badge": "Fluid"
+      },
+      "mesh": {
+        "name": "Mesh Aurora",
+        "badge": "Mesh Glow"
+      },
+      "glass": {
+        "name": "Dark Glass & Prism",
+        "badge": "Prism Glass"
+      },
+      "unsplash": {
+        "name": "Daily 4K Wallpaper (Ultra HD)",
+        "badge": "Ultra HD"
+      },
+      "custom_url": {
+        "name": "Video / Image URL",
+        "badge": "Custom"
+      }
+    }
   }
 }

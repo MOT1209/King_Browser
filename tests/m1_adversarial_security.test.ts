@@ -293,6 +293,10 @@ const mainSource = fs.readFileSync(
   path.resolve(process.cwd(), 'electron/main.ts'),
   'utf-8'
 ).replace(/\r\n/g, '\n');
+const trustedSenderSource = fs.readFileSync(
+  path.resolve(process.cwd(), 'electron/security/trustedSender.ts'),
+  'utf-8'
+).replace(/\r\n/g, '\n');
 
 const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
   // Section 1: isTrustedAppOrigin (electron/main.ts:347). The old copy trusted
@@ -356,11 +360,14 @@ const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
 ];
 
 for (const guard of MAIN_SOURCE_GUARDS) {
+  const source = guard.desc.startsWith('isTrustedAppOrigin') || guard.desc.startsWith('isTrustedSender')
+    ? trustedSenderSource
+    : mainSource;
   assert(
-    mainSource.includes(guard.needle),
+    source.includes(guard.needle),
     'Shipped Guard Present',
     guard.desc,
-    `electron/main.ts no longer contains: ${guard.needle.slice(0, 90)}`
+    `production source no longer contains: ${guard.needle.slice(0, 90)}`
   );
 }
 

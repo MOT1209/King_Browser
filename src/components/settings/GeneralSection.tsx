@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
+import { useTranslation } from '../../services/i18n';
+import { normalizeLanguage } from '../../services/language';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
 import { UpdateWidget } from './UpdateWidget';
-import { useTranslation, normalizeLanguage } from '../../services/i18n';
 
 export interface GeneralSectionProps {
   settings: UserSettings;
@@ -17,7 +18,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
   onUpdateSettings,
   onClearHistory,
 }) => {
-  const { l } = useTranslation();
+  const { t } = useTranslation();
   const [appVersion, setAppVersion] = useState<string>(() => {
     return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.0';
   });
@@ -48,33 +49,44 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'Language', ar: 'اللغة', de: 'Sprache' })}</h2>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{t('settings.selectLanguage')}</h2>
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p id="setting-interface-language" className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{l({ en: 'Interface language', ar: 'لغة الواجهة', de: 'Sprache der Oberfläche' })}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{l({ en: 'Menus, settings and messages. Applies immediately.', ar: 'القوائم والإعدادات والرسائل. يُطبَّق فوراً.', de: 'Menüs, Einstellungen und Meldungen. Gilt sofort.' })}</p>
-            </div>
-            <select
-              aria-labelledby="setting-interface-language"
-              value={normalizeLanguage(settings.language)}
-              onChange={(e) => onUpdateSettings({ language: normalizeLanguage(e.target.value) })}
-              className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-sm font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="ar" lang="ar" dir="rtl">العربية</option>
-              <option value="en" lang="en">English</option>
-              <option value="de" lang="de">Deutsch</option>
-            </select>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('settings.languageDesc')}</p>
+          <div role="radiogroup" aria-label={t('settings.selectLanguage')} className="flex flex-col sm:flex-row gap-2">
+            {([
+              { id: 'en', label: 'English' },
+              { id: 'ar', label: 'العربية' },
+              { id: 'de', label: 'Deutsch' }
+            ] as const).map(option => {
+              const active = normalizeLanguage(settings.language) === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  dir={option.id === 'ar' ? 'rtl' : 'ltr'}
+                  onClick={() => onUpdateSettings({ language: option.id })}
+                  className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
+                    active
+                      ? 'bg-slate-900 text-white shadow-md dark:bg-blue-600 dark:text-white'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'About King', ar: 'حول King', de: 'Über King' })}</h2>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{t('settings.aboutKing')}</h2>
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">King Browser</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">{l({ en: 'Version {v} (Open Source Edition)', ar: 'الإصدار {v} (الإصدار مفتوح المصدر)', de: 'Version {v} (Open-Source-Edition)' }, { v: appVersion })}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">{t('settings.versionLine', { version: appVersion })}</p>
           </div>
           <UpdateWidget />
         </div>
@@ -83,7 +95,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
           <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
             <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-              <span>{l({ en: 'Engine & Security Patch Transparency', ar: 'شفافية المحرك والتحديثات الأمنية', de: 'Transparenz zu Engine und Sicherheitspatches' })}</span>
+              <span>{t('settings.engineTransparency')}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
@@ -95,28 +107,28 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
                 <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.electron}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">{l({ en: 'V8 Engine', ar: 'محرك V8', de: 'V8-Engine' })}</div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">V8 Engine</div>
                 <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.v8}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">{l({ en: 'Architecture', ar: 'المعمارية', de: 'Architektur' })}</div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">Architecture</div>
                 <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.platform} ({systemVersions.arch})</div>
               </div>
             </div>
             <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 leading-relaxed">
-              {l({ en: 'Patch gap tracking active: Automated CI/CD builds release Chromium security patches with verified platform binaries.', ar: 'تتبّع فجوة التحديثات مفعّل: تُصدر عمليات البناء الآلية (CI/CD) تحديثات Chromium الأمنية مع ملفات تشغيل موثّقة لكل نظام.', de: 'Patch-Lücken-Überwachung aktiv: Automatisierte CI/CD-Builds liefern Chromium-Sicherheitspatches mit verifizierten Binärdateien für jede Plattform.' })}
+              {t('settings.patchTracking')}
             </p>
           </div>
         )}
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'On Startup', ar: 'عند بدء التشغيل', de: 'Beim Start' })}</h2>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{t('settings.onStartup')}</h2>
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex flex-col sm:flex-row gap-2">
           {[
-            { id: 'newTab', label: l({ en: 'Open New Tab Page', ar: 'فتح صفحة تبويب جديد', de: 'Neuen Tab öffnen' }) },
-            { id: 'continue', label: l({ en: 'Continue where you left off', ar: 'المتابعة من حيث توقفت', de: 'Dort weitermachen, wo Sie aufgehört haben' }) },
-            { id: 'specificPages', label: l({ en: 'Open a specific page', ar: 'فتح صفحة معيّنة', de: 'Bestimmte Seite öffnen' }) }
+            { id: 'newTab', label: t('settings.startupNewTab') },
+            { id: 'continue', label: t('settings.startupContinue') },
+            { id: 'specificPages', label: t('settings.startupSpecific') }
           ].map(opt => (
             <button
               key={opt.id}
@@ -134,21 +146,21 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'Search Engine', ar: 'محرك البحث', de: 'Suchmaschine' })}</h2>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{t('settings.searchEngineHeading')}</h2>
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1">
             {[
-              { id: 'google', name: 'Google', desc: l({ en: 'Fast & Accurate', ar: 'سريع ودقيق', de: 'Schnell und genau' }) },
-              { id: 'duckduckgo', name: 'DuckDuckGo', desc: l({ en: 'Privacy focused', ar: 'يركّز على الخصوصية', de: 'Datenschutzorientiert' }) },
-              { id: 'brave', name: 'Brave Search', desc: l({ en: 'Independent index', ar: 'فهرس مستقل', de: 'Unabhängiger Index' }) },
-              { id: 'bing', name: 'Bing', desc: l({ en: 'AI powered', ar: 'مدعوم بالذكاء الاصطناعي', de: 'KI-gestützt' }) },
-              { id: 'ecosia', name: 'Ecosia', desc: l({ en: 'Plant trees', ar: 'يزرع الأشجار', de: 'Pflanzt Bäume' }) },
-              { id: 'yahoo', name: 'Yahoo', desc: l({ en: 'Classic search', ar: 'بحث تقليدي', de: 'Klassische Suche' }) }
+              { id: 'google', name: 'Google', desc: t('settings.searchEngineFast') },
+              { id: 'duckduckgo', name: 'DuckDuckGo', desc: t('settings.searchEnginePrivacy') },
+              { id: 'brave', name: 'Brave Search', desc: t('settings.searchEngineIndependent') },
+              { id: 'bing', name: 'Bing', desc: t('settings.searchEngineAI') },
+              { id: 'ecosia', name: 'Ecosia', desc: t('settings.searchEngineTrees') },
+              { id: 'yahoo', name: 'Yahoo', desc: t('settings.searchEngineClassic') }
             ].map(engine => (
               <button
                 key={engine.id}
                 onClick={() => onUpdateSettings({ searchEngine: engine.id as any })}
-                className={`p-4 rounded-xl text-start transition-all ${
+                className={`p-4 rounded-xl text-left transition-all ${
                   settings.searchEngine === engine.id
                     ? 'bg-blue-50 dark:bg-blue-500/10 ring-1 ring-blue-500 text-blue-900 dark:text-blue-100'
                     : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
@@ -163,12 +175,12 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'Page Translation', ar: 'ترجمة الصفحات', de: 'Seitenübersetzung' })}</h2>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{t('settings.pageTranslation')}</h2>
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p id="setting-target-language" className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{l({ en: 'Default Target Language', ar: 'اللغة الافتراضية للترجمة', de: 'Standard-Zielsprache' })}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{l({ en: 'Foreign web pages will be translated to this language in 1-click.', ar: 'تُترجَم صفحات الويب الأجنبية إلى هذه اللغة بنقرة واحدة.', de: 'Fremdsprachige Webseiten werden mit einem Klick in diese Sprache übersetzt.' })}</p>
+              <p id="setting-target-language" className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{t('settings.targetLanguage')}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('settings.targetLanguageDesc')}</p>
             </div>
             <select
               aria-labelledby="setting-target-language"
@@ -193,38 +205,38 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'Font Size', ar: 'حجم الخط', de: 'Schriftgröße' })}</h2>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{t('settings.fontSize')}</h2>
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex gap-2">
           {(['small', 'medium', 'large'] as const).map(size => (
             <button
               key={size}
               onClick={() => onUpdateSettings({ fontSize: size })}
-              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium capitalize transition-all ${
+              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
                 settings.fontSize === size
                   ? 'bg-slate-900 text-white shadow-md dark:bg-blue-600 dark:text-white'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              {size === 'small' ? l({ en: 'Small', ar: 'صغير', de: 'Klein' }) : size === 'medium' ? l({ en: 'Medium', ar: 'متوسط', de: 'Mittel' }) : l({ en: 'Large', ar: 'كبير', de: 'Groß' })}
+              {t(size === 'small' ? 'settings.sizeSmall' : size === 'medium' ? 'settings.sizeMedium' : 'settings.sizeLarge')}
             </button>
           ))}
         </div>
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{l({ en: 'Clear Browsing Data', ar: 'محو بيانات التصفح', de: 'Browserdaten löschen' })}</h2>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{t('settings.clearData')}</h2>
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Clear History & Cache', ar: 'محو السجل وذاكرة التخزين المؤقت', de: 'Verlauf und Cache löschen' })}</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">{l({ en: 'Clear your browsing history, cookies, cache, and more.', ar: 'امسح سجل التصفح وملفات تعريف الارتباط وذاكرة التخزين المؤقت وغيرها.', de: 'Löschen Sie Browserverlauf, Cookies, Cache und mehr.' })}</p>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('settings.clearDataTitle')}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">{t('settings.clearDataDesc')}</p>
           </div>
           <button
             onClick={async () => {
               const confirmed = await showConfirm({
-                title: l({ en: 'Clear Browsing History', ar: 'محو سجل التصفح', de: 'Browserverlauf löschen' }),
-                message: l({ en: 'Are you sure you want to clear your browsing history?', ar: 'هل أنت متأكد أنك تريد محو سجل التصفح؟', de: 'Möchten Sie Ihren Browserverlauf wirklich löschen?' }),
-                confirmLabel: l({ en: 'Clear History', ar: 'محو السجل', de: 'Verlauf löschen' }),
-                cancelLabel: l({ en: 'Cancel', ar: 'إلغاء', de: 'Abbrechen' })
+                title: t('settings.clearHistoryTitle'),
+                message: t('settings.clearHistoryMessage'),
+                confirmLabel: t('settings.clearHistoryConfirm'),
+                cancelLabel: t('common.cancel')
               });
               if (confirmed) {
                 if (onClearHistory) {
@@ -236,7 +248,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
             }}
             className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 rounded-xl font-medium transition-colors text-sm"
           >
-            {l({ en: 'Clear Data', ar: 'محو البيانات', de: 'Daten löschen' })}
+            {t('settings.clearDataButton')}
           </button>
         </div>
       </section>

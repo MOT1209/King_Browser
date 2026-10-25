@@ -14,13 +14,6 @@ export function normalizeUiLanguage(lang: unknown): UiLanguage {
   return 'en';
 }
 
-/** Accept-Language sent to websites: the interface language first, English as fallback. */
-export function acceptLanguagesFor(lang: UiLanguage): string {
-  if (lang === 'ar') return 'ar,en-US;q=0.9,en;q=0.8';
-  if (lang === 'de') return 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7';
-  return 'en-US,en;q=0.9';
-}
-
 export interface ContextMenuLabels {
   noGuesses: string;
   addToDictionary: string;

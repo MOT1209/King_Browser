@@ -1,95 +1,95 @@
 import assert from 'node:assert/strict';
-import { getLocale, formatDate, formatTime, setLanguage, getLanguage, onLanguageChange, t, LOCALE_MAP, SupportedLanguage } from '../src/services/i18n';
+import { getLocale, formatDate, formatTime, setLanguage, getLanguage, onLanguageChange, t, LOCALE_MAP, isRTL, SupportedLanguage } from '../src/services/i18n';
 import en from '../src/locales/en.json';
 import de from '../src/locales/de.json';
 import ar from '../src/locales/ar.json';
 
-console.log('\n--- i18n & English Date/Time Suite ---');
+console.log('\n--- i18n: English, Arabic and German ---');
 
-// Dates follow the interface language's locale.
+// Locale map: two LTR languages and one RTL language.
 assert.equal(LOCALE_MAP.en, 'en-US');
 assert.equal(LOCALE_MAP.de, 'de-DE');
-assert.equal(LOCALE_MAP.ar, 'ar');
-{
-  const fixedDate = new Date(2026, 8, 4, 15, 30);
-  assert.ok(formatDate(fixedDate, 'en').includes('September') && formatDate(fixedDate, 'en').includes('Friday'));
-  assert.ok(formatDate(fixedDate, 'de').includes('September') && formatDate(fixedDate, 'de').includes('Freitag'));
-  for (const code of ['en', 'ar', 'de'] as SupportedLanguage[]) {
-    assert.equal(getLocale(code), LOCALE_MAP[code]);
-    assert.ok(formatTime(fixedDate, code).length > 0);
-  }
-}
+assert.equal(LOCALE_MAP.ar, 'ar-SA');
+// Legacy Turkish code resolves to the English locale.
+assert.equal(LOCALE_MAP.tr, 'en-US');
+assert.equal(getLocale('tr'), 'en-US');
 
-// 4. Greetings in All Locales
-const getGreetingKey = (hour: number): string => {
-  if (hour < 12) return 'newtab.goodMorning';
-  if (hour < 18) return 'newtab.goodAfternoon';
-  return 'newtab.goodEvening';
-};
+const fixedDate = new Date(2026, 8, 4, 15, 30);
+assert.ok(formatDate(fixedDate, 'en').includes('Friday'));
+assert.ok(formatDate(fixedDate, 'de').includes('Freitag'));
+assert.ok(formatDate(fixedDate, 'ar').includes('الجمعة'));
+assert.ok(formatTime(fixedDate, 'en').length > 0);
+assert.ok(formatTime(fixedDate, 'de').length > 0);
+assert.ok(formatTime(fixedDate, 'ar').length > 0);
 
+// Greetings come from the active dictionary, not from English.
 setLanguage('en');
-assert.equal(t(getGreetingKey(9)), 'Good Morning');
-assert.equal(t(getGreetingKey(14)), 'Good Afternoon');
-assert.equal(t(getGreetingKey(20)), 'Good Evening');
+assert.equal(t('newtab.goodMorning'), en.newtab.goodMorning);
+setLanguage('de');
+assert.equal(t('newtab.goodMorning'), de.newtab.goodMorning);
+setLanguage('ar');
+assert.equal(t('newtab.goodMorning'), ar.newtab.goodMorning);
+assert.equal(getLanguage(), 'ar');
+assert.equal(isRTL(), true);
 
-
-// 5. Reactive Listener on Language Change
-let listenerTriggered = false;
-let observedLang: SupportedLanguage | null = null;
+// Reactive listener fires on every switch and stops after unsubscribe.
+let observed: SupportedLanguage | null = null;
+let notifications = 0;
 const unsubscribe = onLanguageChange((lang) => {
-  listenerTriggered = true;
-  observedLang = lang;
+  notifications++;
+  observed = lang;
 });
 
-// Re-selecting the current language is a no-op; a real change notifies.
-setLanguage('en');
-assert.equal(listenerTriggered, false);
 setLanguage('de');
-assert.equal(listenerTriggered, true);
-assert.equal(observedLang, 'de');
-assert.equal(getLanguage(), 'de');
+assert.equal(observed, 'de');
+assert.equal(notifications, 1);
+
+setLanguage('ar');
+assert.equal(observed, 'ar');
+assert.equal(notifications, 2);
+
 unsubscribe();
 setLanguage('en');
+assert.equal(observed, 'ar');
+assert.equal(notifications, 2);
 
-// 6. Locale Dictionary Parity for New Sections
-const dictionaries = { en, de, ar };
-const requiredNewtabKeys = [
-  'goodMorning', 'goodAfternoon', 'goodEvening',
-  'incognitoTitle', 'incognitoDesc', 'incognitoPlaceholder',
-  'shieldActive', 'shieldDisabled', 'searchEngine',
-  'tasks', 'tasksLeft', 'clearCompletedTasks', 'noTasks',
-  'addTaskPlaceholder', 'deleteTask', 'clearTasksTitle',
-  'addShortcutTitle', 'editShortcutTitle', 'shortcutName', 'shortcutUrl',
-  'shuffleWallpaper'
-];
+// The three dictionaries stay in exact parity. Arabic may add the extra CLDR
+// plural forms its grammar needs; every other key must exist in all three.
+function flattenKeys(value: Record<string, any>, prefix = ''): string[] {
+  return Object.entries(value).flatMap(([key, child]) =>
+    child && typeof child === 'object'
+      ? flattenKeys(child as Record<string, any>, `${prefix}${key}.`)
+      : [`${prefix}${key}`]
+  );
+}
 
-const requiredHistoryKeys = [
-  'title', 'pagesRecorded', 'clearBrowsingData', 'searchPlaceholder',
-  'noHistory', 'today', 'yesterday', 'last7Days', 'older',
-  'clearModalTitle', 'clearModalDesc', 'lastHour', 'last24Hours',
-  'last7DaysOption', 'allTime'
-];
+const pluralSuffix = /_(zero|one|two|few|many|other)$/;
+const englishKeys = new Set(flattenKeys(en));
+assert.ok(englishKeys.size > 0);
 
-const requiredDownloadsKeys = [
-  'title', 'clearList', 'searchPlaceholder', 'noDownloads',
-  'noDownloadsDesc', 'openFolder', 'cancel', 'pause', 'resume',
-  'retry', 'completed', 'cancelled', 'interrupted', 'progressing'
-];
+for (const [code, dictionary] of Object.entries({ en, de, ar })) {
+  const keys = new Set(flattenKeys(dictionary));
+  const missing = [...englishKeys].filter((key) => !keys.has(key));
+  assert.deepEqual(missing, [], `Missing keys in ${code}`);
 
-for (const [langCode, dict] of Object.entries(dictionaries)) {
-  const d = dict as Record<string, any>;
-  for (const key of requiredNewtabKeys) {
-    assert.ok(d.newtab && typeof d.newtab[key] === 'string' && d.newtab[key].length > 0, `Missing newtab.${key} in ${langCode}`);
-  }
-  for (const key of requiredHistoryKeys) {
-    assert.ok(d.history && typeof d.history[key] === 'string' && d.history[key].length > 0, `Missing history.${key} in ${langCode}`);
-  }
-  for (const key of requiredDownloadsKeys) {
-    assert.ok(d.downloads && typeof d.downloads[key] === 'string' && d.downloads[key].length > 0, `Missing downloads.${key} in ${langCode}`);
+  const unexpected = [...keys].filter((key) => {
+    if (englishKeys.has(key)) return false;
+    const base = key.replace(pluralSuffix, '');
+    return !(pluralSuffix.test(key) && englishKeys.has(base));
+  });
+  assert.deepEqual(unexpected, [], `Unexpected keys in ${code}`);
+
+  for (const key of keys) {
+    const value = key.split('.').reduce<any>((node, part) => node?.[part], dictionary);
+    assert.equal(typeof value, 'string', `${code}.${key} must be a string`);
+    assert.ok(String(value).trim().length > 0, `${code}.${key} must not be empty`);
   }
 }
 
-// Reset language to en
-setLanguage('en');
+// Arabic plural categories actually resolve for counted strings.
+setLanguage('ar');
+assert.equal(t('newtab.tasksLeft', { count: 0 }), 'لا مهام متبقية');
+assert.equal(t('newtab.tasksLeft', { count: 2 }), 'متبقي مهمتين');
 
-console.log('[PASS] [i18n Localization] Locale date/time formatting, greetings and dictionary coverage verified.');
+setLanguage('en');
+console.log('[PASS] [i18n Localization] Three locales format dates, translate greetings, and keep exact dictionary parity.');

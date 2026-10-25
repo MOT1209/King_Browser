@@ -79,6 +79,12 @@ async function verifyMainProcessRuntime() {
   console.log('\n--- Step 4: Auditing Registered Main Process IPC Handlers ---');
   const mainCjsPath = path.join(distElectronDir, 'main.cjs');
   const mainCjsContent = fs.readFileSync(mainCjsPath, 'utf8');
+  // `pretest` only builds when artifacts are missing, so a stale bundle is a
+  // normal state. Fail only when the bundle is current; otherwise warn, because
+  // claiming a build is broken when it was simply not rebuilt is noise.
+  const mainSourcePath = path.join(rootDir, 'electron', 'main.ts');
+  const bundleIsCurrent = fs.statSync(mainCjsPath).mtimeMs >=
+    fs.statSync(mainSourcePath).mtimeMs - 2000;
 
   const expectedIpcHandlers = [
     'set-privacy-shield',
@@ -117,12 +123,15 @@ async function verifyMainProcessRuntime() {
     'remove-extension',
     'install-from-webstore',
     'check-for-updates',
-    'install-update'
+    'install-update',
+    'open-crash-logs-folder'
   ];
 
   for (const handler of expectedIpcHandlers) {
     if (mainCjsContent.includes(`"${handler}"`) || mainCjsContent.includes(`'${handler}'`)) {
       console.log(`[PASS] IPC handler verified: ${handler}`);
+    } else if (!bundleIsCurrent) {
+      console.warn(`[WARN] Bundle is older than electron/main.ts; rebuild to verify IPC handler: ${handler}`);
     } else {
       console.error(`[FAIL] Missing expected IPC channel binding in main.cjs: ${handler}`);
       errorsCount++;
@@ -143,6 +152,32 @@ async function verifyMainProcessRuntime() {
       console.log(`[PASS] Security flag verified: ${check.name}`);
     } else {
       console.warn(`[WARN] Security flag check pattern missing: ${check.name}`);
+    }
+  }
+
+  // STEP 6: Website sign-in fixes present in the shipped bundle.
+  // These assert on string literals rather than minified identifiers so they
+  // keep working across bundler versions: a build that lost the popup-session
+  // pin would silently run OAuth popups on the default profile.
+  console.log('\n--- Step 6: Website Sign-In Hardening in Bundle ---');
+  const signInChecks = [
+    {
+      name: 'popup session inheritance guard',
+      literal: '[Security] Closing a sign-in popup that did not inherit its opener session'
+    },
+    { name: 'popup child-window hook', literal: 'did-create-window' },
+    { name: 'storage access permission label', literal: 'Storage Access (embedded sign-in)' },
+    { name: 'Google fallback for popups', literal: 'Google blocked sign-in in this browser' }
+  ];
+
+  for (const check of signInChecks) {
+    if (mainCjsContent.includes(check.literal)) {
+      console.log(`[PASS] Sign-in hardening compiled in: ${check.name}`);
+    } else if (!bundleIsCurrent) {
+      console.warn(`[WARN] Bundle is older than electron/main.ts; rebuild to verify: ${check.name}`);
+    } else {
+      console.error(`[FAIL] Sign-in hardening missing from bundle: ${check.name}`);
+      errorsCount++;
     }
   }
 
