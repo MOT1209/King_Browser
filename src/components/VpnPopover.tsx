@@ -4,7 +4,7 @@ import { Shield, ShieldAlert, Globe, MapPin, Plus, Trash2, Check, X } from 'luci
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { generateId } from '../utils/idGenerator';
 import { isValidProxyUrl, SECURE_PROXY_ERROR } from '../utils/proxyValidation';
-import { useTranslation } from '../services/i18n';
+import { useTranslation, l } from '../services/i18n';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 
 export interface VpnLocation {
@@ -69,12 +69,12 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
   const handleAddCustom = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customName.trim()) {
-      setError('Please provide a name');
+      setError(l({ en: 'Please provide a name', ar: 'يرجى إدخال اسم', de: 'Bitte geben Sie einen Namen ein' }));
       return;
     }
     const url = customUrl.trim();
     if (!url) {
-      setError('Please provide a proxy URL');
+      setError(l({ en: 'Please provide a proxy URL', ar: 'يرجى إدخال رابط الوكيل', de: 'Bitte geben Sie eine Proxy-URL ein' }));
       return;
     }
     if (!isValidProxyUrl(url)) {

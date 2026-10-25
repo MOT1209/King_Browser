@@ -332,9 +332,9 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer h-7 px-1 rounded-md"
           >
             {isIncognito ? (
-              <div className="flex items-center gap-1.5 text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-lg shadow-xs hover:bg-cyan-500/25 transition-colors" title="Private & Incognito Mode (Click for Site Info)">
+              <div className="flex items-center gap-1.5 text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-lg shadow-xs hover:bg-cyan-500/25 transition-colors" title={l({ en: 'Private & Incognito Mode (Click for Site Info)', ar: 'وضع التصفح الخفي (انقر لمعلومات الموقع)', de: 'Privater Inkognito-Modus (für Website-Infos klicken)' })}>
                 <VenetianMask className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Incognito</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">{l({ en: 'Incognito', ar: 'تصفح خفي', de: 'Inkognito' })}</span>
               </div>
             ) : (
               (() => {
@@ -394,7 +394,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               title={l({ en: 'Site Permissions (Click to toggle)', ar: 'أذونات الموقع (انقر للتبديل)', de: 'Website-Berechtigungen (zum Umschalten klicken)' })}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />
-              <span className="text-[11px] font-semibold whitespace-nowrap">Permissions</span>
+              <span className="text-[11px] font-semibold whitespace-nowrap">{l({ en: 'Permissions', ar: 'الأذونات', de: 'Berechtigungen' })}</span>
             </div>
           )}
 
@@ -591,7 +591,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 {isValidUrlOrDomain(searchValue) ? (
                   <>
                     <Globe className="w-4 h-4 shrink-0 text-cyan-500" />
-                    <span className="truncate font-medium text-cyan-600 dark:text-cyan-400">Go to: <span className="underline">{searchValue}</span></span>
+                    <span className="truncate font-medium text-cyan-600 dark:text-cyan-400">{l({ en: 'Go to:', ar: 'الانتقال إلى:', de: 'Gehe zu:' })} <span className="underline" dir="auto">{searchValue}</span></span>
                   </>
                 ) : (
                   <>
@@ -605,7 +605,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               {suggestions.length > 0 && (
                 <div className="py-1" role="listbox" aria-label="Search suggestions">
                   <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Search Suggestions
+                    {l({ en: 'Search Suggestions', ar: 'اقتراحات البحث', de: 'Suchvorschläge' })}
                   </div>
 
                   {suggestions.map((suggestion, idx) => (

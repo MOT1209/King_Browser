@@ -12,6 +12,7 @@ import { safeBase64 as safeBase64Util } from '../utils/securityUtils';
 import { generateId } from '../utils/idGenerator';
 import { getLocale } from '../services/i18n';
 import { useTitlebarInsets } from '../hooks/useTitlebarInsets';
+import { useTranslation } from '../services/i18n';
 
 const safeBase64 = (str: string): string => {
   return safeBase64Util(str);
@@ -129,6 +130,7 @@ interface ReaderModeProps {
 }
 
 export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, isActive, onClose }) => {
+  const { l } = useTranslation();
   const [content, setContent] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
@@ -454,7 +456,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
             span.parentNode.removeChild(span);
           }
         }
-        setHighlightError('This selection could not be highlighted. Try a shorter, continuous passage.');
+        setHighlightError(l({ en: 'This selection could not be highlighted. Try a shorter, continuous passage.', ar: 'تعذّر تظليل هذا التحديد. جرّب مقطعاً أقصر ومتصلاً.', de: 'Diese Auswahl konnte nicht markiert werden. Versuchen Sie einen kürzeren, zusammenhängenden Abschnitt.' }));
         return;
       }
     }
@@ -721,7 +723,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
       setContent(null);
 
       if (!url || url.startsWith('king://') || url.startsWith('about:')) {
-        setError('Reader mode is not available on this special page.');
+        setError(l({ en: 'Reader mode is not available on this special page.', ar: 'وضع القراءة غير متاح في هذه الصفحة الخاصة.', de: 'Der Lesemodus ist auf dieser Spezialseite nicht verfügbar.' }));
         setIsLoading(false);
         return;
       }
@@ -808,11 +810,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           });
           setContent(linkHost.innerHTML);
         } else {
-          setError('The text content on this page is not suitable for reader mode.');
+          setError(l({ en: 'The text content on this page is not suitable for reader mode.', ar: 'محتوى هذه الصفحة غير مناسب لوضع القراءة.', de: 'Der Text dieser Seite eignet sich nicht für den Lesemodus.' }));
         }
       } catch (err: any) {
         if (cancelled) return;
-        setError(err.message || 'Page content could not be read.');
+        setError(err.message || l({ en: 'Page content could not be read.', ar: 'تعذّرت قراءة محتوى الصفحة.', de: 'Der Seiteninhalt konnte nicht gelesen werden.' }));
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -867,7 +869,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           transition={{ duration: 0.18 }}
           role="dialog"
           aria-modal="true"
-          aria-label="Reader Mode"
+          aria-label={l({ en: 'Reader Mode', ar: 'وضع القراءة', de: 'Lesemodus' })}
           className={`fixed inset-0 z-50 overflow-y-auto ${bgColors[theme]} ${fonts[font]}`}
         >
           {/* Custom style overrides to guarantee dark mode clean contrast without white background bleeding */}
@@ -911,7 +913,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 onClick={onClose}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full transition-colors text-sm font-medium no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
               >
-                <ArrowLeft className="w-4 h-4" /> Close
+                <ArrowLeft className="w-4 h-4" /> {l({ en: 'Close', ar: 'إغلاق', de: 'Schließen' })}
               </button>
             </div>
 
@@ -921,7 +923,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 <button
                   onClick={toggleSpeech}
                   className={`p-1.5 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
-                  title={isPlaying ? "Pause" : "Read Aloud with Natural Voice"}
+                  title={isPlaying ? l({ en: 'Pause', ar: 'إيقاف مؤقت', de: 'Pause' }) : l({ en: 'Read Aloud with Natural Voice', ar: 'القراءة بصوت طبيعي', de: 'Mit natürlicher Stimme vorlesen' })}
                 >
                   {isPlaying ? <Pause className="w-4 h-4 text-cyan-400" /> : <Play className="w-4 h-4 ml-0.5 text-cyan-400" />}
                 </button>
@@ -929,7 +931,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   <button
                     onClick={stopSpeech}
                     className={`p-1.5 rounded-full transition-colors text-red-400 no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
-                    title="Stop"
+                    title={l({ en: 'Stop', ar: 'إيقاف', de: 'Stopp' })}
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
                   </button>
@@ -938,7 +940,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 <button
                   onClick={changeSpeechRate}
                   className={`flex items-center gap-1 p-1 rounded-full transition-colors text-xs font-bold w-10 justify-center no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20 text-cyan-400' : 'hover:bg-black/10 text-cyan-600'}`}
-                  title="Reading Speed"
+                  title={l({ en: 'Reading Speed', ar: 'سرعة القراءة', de: 'Lesegeschwindigkeit' })}
                 >
                   {speechRate}x
                 </button>
@@ -947,7 +949,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
               <button
                 onClick={() => setShowControls(!showControls)}
                 className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${showControls ? 'bg-cyan-500 text-slate-950' : theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
-                title="Appearance & Voice Settings"
+                title={l({ en: 'Appearance & Voice Settings', ar: 'إعدادات المظهر والصوت', de: 'Darstellung & Stimme' })}
               >
                 <Type className="w-4 h-4" />
               </button>
@@ -956,27 +958,27 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[320px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-900 border-white/10 shadow-black/50 text-slate-100' : theme === 'sepia' ? 'bg-[#fdf8ee] border-amber-800/20 text-[#4a3928]' : 'bg-white border-slate-200 text-slate-800'}`}>
                   {/* Theme */}
                   <div>
-                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Theme</div>
+                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">{l({ en: 'Theme', ar: 'السمة', de: 'Design' })}</div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleThemeChange('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='light' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Light Theme"><Sun className="w-5 h-5"/></button>
-                      <button onClick={() => handleThemeChange('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20 shadow-sm' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepia Theme">A</button>
-                      <button onClick={() => handleThemeChange('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='dark' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-700'} bg-slate-950 text-white hover:scale-105`} title="Dark OLED Theme"><Moon className="w-5 h-5"/></button>
+                      <button onClick={() => handleThemeChange('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='light' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title={l({ en: 'Light Theme', ar: 'سمة فاتحة', de: 'Helles Design' })}><Sun className="w-5 h-5"/></button>
+                      <button onClick={() => handleThemeChange('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20 shadow-sm' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title={l({ en: 'Sepia Theme', ar: 'سمة بنية', de: 'Sepia-Design' })}>A</button>
+                      <button onClick={() => handleThemeChange('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='dark' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-700'} bg-slate-950 text-white hover:scale-105`} title={l({ en: 'Dark OLED Theme', ar: 'سمة داكنة (OLED)', de: 'Dunkles OLED-Design' })}><Moon className="w-5 h-5"/></button>
                     </div>
                   </div>
 
                   {/* Font */}
                   <div>
-                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Typeface</div>
+                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">{l({ en: 'Typeface', ar: 'الخط', de: 'Schriftart' })}</div>
                     <div className="flex gap-1.5">
-                      <button onClick={() => handleFontChange('sans')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
-                      <button onClick={() => handleFontChange('serif')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Classic</button>
+                      <button onClick={() => handleFontChange('sans')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>{l({ en: 'Modern', ar: 'حديث', de: 'Modern' })}</button>
+                      <button onClick={() => handleFontChange('serif')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>{l({ en: 'Classic', ar: 'كلاسيكي', de: 'Klassisch' })}</button>
                       <button onClick={() => handleFontChange('mono')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-mono transition-all no-drag cursor-pointer ${font==='mono' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Mono</button>
                     </div>
                   </div>
 
                   {/* Font Size */}
                   <div>
-                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Text Size</div>
+                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">{l({ en: 'Text Size', ar: 'حجم النص', de: 'Textgröße' })}</div>
                     <div className="flex gap-2 items-center">
                       <button onClick={() => handleFontSizeChange('sm')} className={`flex-1 py-1.5 rounded-lg border text-xs transition-all no-drag cursor-pointer ${fontSize==='sm' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
                       <button onClick={() => handleFontSizeChange('md')} className={`flex-1 py-1.5 rounded-lg border text-sm font-medium transition-all no-drag cursor-pointer ${fontSize==='md' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
@@ -986,25 +988,25 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
                   {/* Column Width */}
                   <div>
-                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Column Width</div>
+                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">{l({ en: 'Column Width', ar: 'عرض العمود', de: 'Spaltenbreite' })}</div>
                     <div className="flex gap-1.5">
-                      <button onClick={() => handleColumnWidthChange('narrow')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='narrow' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Narrow</button>
-                      <button onClick={() => handleColumnWidthChange('normal')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='normal' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Normal</button>
-                      <button onClick={() => handleColumnWidthChange('wide')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='wide' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Wide</button>
+                      <button onClick={() => handleColumnWidthChange('narrow')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='narrow' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>{l({ en: 'Narrow', ar: 'ضيق', de: 'Schmal' })}</button>
+                      <button onClick={() => handleColumnWidthChange('normal')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='normal' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>{l({ en: 'Normal', ar: 'عادي', de: 'Normal' })}</button>
+                      <button onClick={() => handleColumnWidthChange('wide')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='wide' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>{l({ en: 'Wide', ar: 'عريض', de: 'Breit' })}</button>
                     </div>
                   </div>
 
                   {/* Natural Voice & Language Settings */}
                   <div className="border-t pt-4 border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">
-                      <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> Natural Voice & Audio Settings
+                      <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> {l({ en: 'Natural Voice & Audio Settings', ar: 'إعدادات الصوت والقراءة', de: 'Stimme & Audio' })}
                     </div>
 
                     <div className="space-y-2.5">
                       {/* Language Selection */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Globe className="w-3 h-3" /> Language
+                          <Globe className="w-3 h-3" /> {l({ en: 'Language', ar: 'اللغة', de: 'Sprache' })}
                         </span>
                         <select
                           value={selectedLanguage}
@@ -1016,19 +1018,19 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                             theme === 'dark' ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
                           }`}
                         >
-                          <option value="auto">Auto ({detectedLang.startsWith('tr') ? 'Turkish' : detectedLang.startsWith('de') ? 'German' : detectedLang.startsWith('fr') ? 'French' : detectedLang.startsWith('es') ? 'Spanish' : 'English'})</option>
-                          <option value="tr-TR">Turkish (Yelda / Natural)</option>
-                          <option value="en-US">English (Samantha / Natural)</option>
-                          <option value="de-DE">German (Anna)</option>
-                          <option value="fr-FR">French (Thomas)</option>
-                          <option value="es-ES">Spanish (Mónica)</option>
+                          <option value="auto">{l({ en: 'Auto ({lang})', ar: 'تلقائي ({lang})', de: 'Automatisch ({lang})' }, { lang: detectedLang.startsWith('tr') ? l({ en: 'Turkish', ar: 'التركية', de: 'Türkisch' }) : detectedLang.startsWith('de') ? l({ en: 'German', ar: 'الألمانية', de: 'Deutsch' }) : detectedLang.startsWith('fr') ? l({ en: 'French', ar: 'الفرنسية', de: 'Französisch' }) : detectedLang.startsWith('es') ? l({ en: 'Spanish', ar: 'الإسبانية', de: 'Spanisch' }) : l({ en: 'English', ar: 'الإنجليزية', de: 'Englisch' }) })}</option>
+                          <option value="tr-TR">{l({ en: 'Turkish (Yelda / Natural)', ar: 'التركية (Yelda / طبيعي)', de: 'Türkisch (Yelda / natürlich)' })}</option>
+                          <option value="en-US">{l({ en: 'English (Samantha / Natural)', ar: 'الإنجليزية (Samantha / طبيعي)', de: 'Englisch (Samantha / natürlich)' })}</option>
+                          <option value="de-DE">{l({ en: 'German (Anna)', ar: 'الألمانية (Anna)', de: 'Deutsch (Anna)' })}</option>
+                          <option value="fr-FR">{l({ en: 'French (Thomas)', ar: 'الفرنسية (Thomas)', de: 'Französisch (Thomas)' })}</option>
+                          <option value="es-ES">{l({ en: 'Spanish (Mónica)', ar: 'الإسبانية (Mónica)', de: 'Spanisch (Mónica)' })}</option>
                         </select>
                       </div>
 
                       {/* Native / System Voice Picker */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-cyan-400" /> Voice
+                          <Sparkles className="w-3 h-3 text-cyan-400" /> {l({ en: 'Voice', ar: 'الصوت', de: 'Stimme' })}
                         </span>
                         <select
                           value={selectedVoiceName}
@@ -1038,11 +1040,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                           }`}
                         >
                           <option value="">
-                            {isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda (Apple Natural)' : 'Samantha (Apple Natural)') : 'Best Natural Voice'}
+                            {isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda (Apple Natural)' : 'Samantha (Apple Natural)') : l({ en: 'Best Natural Voice', ar: 'أفضل صوت طبيعي', de: 'Beste natürliche Stimme' })}
                           </option>
 
                           {activeNativeVoices.length > 0 && (
-                            <optgroup label="macOS System Voices">
+                            <optgroup label={l({ en: 'macOS System Voices', ar: 'أصوات نظام macOS', de: 'macOS-Systemstimmen' })}>
                               {activeNativeVoices.map((v) => (
                                 <option key={v.name} value={v.name}>
                                   {v.name}
@@ -1052,7 +1054,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                           )}
 
                           {activeWebVoices.length > 0 && activeNativeVoices.length === 0 && (
-                            <optgroup label="Installed Voices">
+                            <optgroup label={l({ en: 'Installed Voices', ar: 'الأصوات المثبّتة', de: 'Installierte Stimmen' })}>
                               {activeWebVoices.map((v) => (
                                 <option key={v.name} value={v.name}>
                                   {v.name.replace(/Google|Microsoft|Apple|Online \(Natural\)/gi, '').trim() || v.name}
@@ -1073,7 +1075,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <div className="w-8 h-8 border-4 border-slate-700 border-t-cyan-500 rounded-full animate-spin mb-4" />
-                <p className="text-sm font-medium">Extracting article content...</p>
+                <p className="text-sm font-medium">{l({ en: 'Extracting article content...', ar: 'جارٍ استخراج محتوى المقال...', de: 'Artikelinhalt wird extrahiert...' })}</p>
               </div>
             )}
 
@@ -1093,15 +1095,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   {author && <span className="font-semibold uppercase tracking-wider">{author}</span>}
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
-                    {readingTime} min read
+                    {l({ en: '{n} min read', ar: '{n} دقيقة قراءة', de: '{n} Min. Lesezeit' }, { n: readingTime })}
                   </span>
                   <span className="flex items-center gap-1">
                     <BookOpen className="w-3.5 h-3.5" />
-                    {wordCount.toLocaleString()} words
+                    {l({ en: '{n} words', ar: '{n} كلمة', de: '{n} Wörter' }, { n: wordCount.toLocaleString() })}
                   </span>
                   <span className="flex items-center gap-1 text-cyan-400 font-medium">
                     <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Natural Voice' : 'macOS Samantha Natural Voice') : 'Natural Human Voice'}
+                    {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Natural Voice' : 'macOS Samantha Natural Voice') : l({ en: 'Natural Human Voice', ar: 'صوت بشري طبيعي', de: 'Natürliche Stimme' })}
                   </span>
                 </div>
 
@@ -1142,7 +1144,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-cyan-400 animate-ping' : 'bg-amber-400'}`} />
                     <span className="text-cyan-400 font-bold">
-                      {isPlaying ? 'Reading Aloud' : 'Paused'}
+                      {isPlaying ? l({ en: 'Reading Aloud', ar: 'جارٍ القراءة', de: 'Wird vorgelesen' }) : l({ en: 'Paused', ar: 'متوقف مؤقتاً', de: 'Pausiert' })}
                     </span>
                     <span className="opacity-60 text-[11px]">
                       ({currentSentenceIndex + 1} / {sentences.length} sentences)
@@ -1150,7 +1152,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] opacity-70 font-medium truncate max-w-[140px]">
-                      {selectedVoiceName || (isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda' : 'Samantha') : 'Natural Voice')}
+                      {selectedVoiceName || (isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda' : 'Samantha') : l({ en: 'Natural Voice', ar: 'صوت طبيعي', de: 'Natürliche Stimme' }))}
                     </span>
                     <button
                       onClick={changeSpeechRate}
@@ -1181,14 +1183,14 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                       onClick={prevSentence}
                       disabled={currentSentenceIndex <= 0}
                       className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition-colors cursor-pointer"
-                      title="Previous Sentence"
+                      title={l({ en: 'Previous Sentence', ar: 'الجملة السابقة', de: 'Vorheriger Satz' })}
                     >
                       <SkipBack className="w-4 h-4" />
                     </button>
                     <button
                       onClick={toggleSpeech}
                       className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all shadow-md active:scale-95 cursor-pointer"
-                      title={isPlaying ? "Pause" : "Resume"}
+                      title={isPlaying ? l({ en: 'Pause', ar: 'إيقاف مؤقت', de: 'Pause' }) : l({ en: 'Resume', ar: 'استئناف', de: 'Fortsetzen' })}
                     >
                       {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                     </button>
@@ -1196,7 +1198,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                       onClick={nextSentence}
                       disabled={currentSentenceIndex >= sentences.length - 1}
                       className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition-colors cursor-pointer"
-                      title="Next Sentence"
+                      title={l({ en: 'Next Sentence', ar: 'الجملة التالية', de: 'Nächster Satz' })}
                     >
                       <SkipForward className="w-4 h-4" />
                     </button>
@@ -1205,10 +1207,10 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   <button
                     onClick={stopSpeech}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                    title="Stop Reading"
+                    title={l({ en: 'Stop Reading', ar: 'إيقاف القراءة', de: 'Vorlesen beenden' })}
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
-                    <span>Stop</span>
+                    <span>{l({ en: 'Stop', ar: 'إيقاف', de: 'Stopp' })}</span>
                   </button>
                 </div>
               </motion.div>
@@ -1234,7 +1236,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 onMouseDown={e => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Color</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{l({ en: 'Color', ar: 'اللون', de: 'Farbe' })}</span>
                   <div className="flex gap-2">
                     {highlightColors.map(c => (
                       <button
@@ -1250,7 +1252,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 <textarea
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
-                  placeholder="Add note (optional)..."
+                  placeholder={l({ en: 'Add note (optional)...', ar: 'أضف ملاحظة (اختياري)...', de: 'Notiz hinzufügen (optional)...' })}
                   className="w-full h-20 p-2.5 rounded-xl mb-2.5 resize-none outline-none border text-xs transition-colors"
                   style={{
                     backgroundColor: theme === 'dark' ? '#020617' : '#f8fafc',
@@ -1278,13 +1280,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                       color: theme === 'dark' ? '#cbd5e1' : '#64748b'
                     }}
                   >
-                    Cancel
+                    {l({ en: 'Cancel', ar: 'إلغاء', de: 'Abbrechen' })}
                   </button>
                   <button
                     onClick={saveHighlight}
                     className="px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors text-xs font-bold shadow-xs"
                   >
-                    Highlight
+                    {l({ en: 'Highlight', ar: 'تظليل', de: 'Markieren' })}
                   </button>
                 </div>
               </motion.div>
@@ -1309,12 +1311,12 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 }}
               >
                 <div className="flex justify-between items-center mb-2.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Highlight Note</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{l({ en: 'Highlight Note', ar: 'ملاحظة التظليل', de: 'Markierungsnotiz' })}</span>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => deleteHighlight(viewingNote.id)}
                       className="p-1 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
-                      title="Delete Highlight"
+                      title={l({ en: 'Delete Highlight', ar: 'حذف التظليل', de: 'Markierung löschen' })}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1327,7 +1329,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   </div>
                 </div>
                 <div className="text-xs whitespace-pre-wrap leading-relaxed">
-                  {viewingNote.note || <span className="italic text-slate-400">No note attached to this highlight.</span>}
+                  {viewingNote.note || <span className="italic text-slate-400">{l({ en: 'No note attached to this highlight.', ar: 'لا توجد ملاحظة مرفقة بهذا التظليل.', de: 'Keine Notiz zu dieser Markierung.' })}</span>}
                 </div>
               </motion.div>
             )}

@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import { Keyboard } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
+import { useTranslation, type LocalizedText } from '../../services/i18n';
 
 interface ShortcutAction {
   id: string;
-  label: string;
+  label: LocalizedText;
 }
 
 const SHORTCUT_ACTIONS: ShortcutAction[] = [
-  { id: 'newTab', label: 'New Tab' },
-  { id: 'reopenTab', label: 'Reopen Closed Tab' },
-  { id: 'closeTab', label: 'Close Active Tab' },
-  { id: 'newIncognito', label: 'New Incognito Window' },
-  { id: 'reload', label: 'Reload Page' },
-  { id: 'omnibox', label: 'Focus Address Bar' },
-  { id: 'bookmark', label: 'Bookmark Page' },
-  { id: 'history', label: 'Open History' },
-  { id: 'downloads', label: 'Open Downloads' },
-  { id: 'findInPage', label: 'Find in Page' },
+  { id: 'newTab', label: { en: 'New Tab', ar: 'تبويب جديد', de: 'Neuer Tab' } },
+  { id: 'reopenTab', label: { en: 'Reopen Closed Tab', ar: 'إعادة فتح التبويب المغلق', de: 'Geschlossenen Tab wieder öffnen' } },
+  { id: 'closeTab', label: { en: 'Close Active Tab', ar: 'إغلاق التبويب الحالي', de: 'Aktiven Tab schließen' } },
+  { id: 'newIncognito', label: { en: 'New Incognito Window', ar: 'نافذة تصفح خفي جديدة', de: 'Neues Inkognito-Fenster' } },
+  { id: 'reload', label: { en: 'Reload Page', ar: 'إعادة تحميل الصفحة', de: 'Seite neu laden' } },
+  { id: 'omnibox', label: { en: 'Focus Address Bar', ar: 'التركيز على شريط العنوان', de: 'Adressleiste fokussieren' } },
+  { id: 'bookmark', label: { en: 'Bookmark Page', ar: 'إضافة الصفحة إلى الإشارات المرجعية', de: 'Seite als Lesezeichen speichern' } },
+  { id: 'history', label: { en: 'Open History', ar: 'فتح السجل', de: 'Verlauf öffnen' } },
+  { id: 'downloads', label: { en: 'Open Downloads', ar: 'فتح التنزيلات', de: 'Downloads öffnen' } },
+  { id: 'findInPage', label: { en: 'Find in Page', ar: 'البحث في الصفحة', de: 'Auf Seite suchen' } },
 ];
 
 function buildDefaultShortcuts(): NonNullable<UserSettings['shortcuts']> {
@@ -45,13 +46,14 @@ export const ShortcutsSection: React.FC<ShortcutsSectionProps> = ({
   onUpdateSettings,
 }) => {
   const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
+  const { l } = useTranslation();
   const [shortcutInputValue, setShortcutInputValue] = useState('');
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <section>
         <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Keyboard Shortcuts</h2>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Keyboard Shortcuts', ar: 'اختصارات لوحة المفاتيح', de: 'Tastenkürzel' })}</h2>
           <button
             onClick={() => {
               try {
@@ -64,7 +66,7 @@ export const ShortcutsSection: React.FC<ShortcutsSectionProps> = ({
             }}
             className="text-xs text-blue-500 hover:text-blue-600 font-medium"
           >
-            Reset Defaults
+            {l({ en: 'Reset Defaults', ar: 'استعادة الافتراضي', de: 'Standard wiederherstellen' })}
           </button>
         </div>
 
@@ -108,7 +110,7 @@ export const ShortcutsSection: React.FC<ShortcutsSectionProps> = ({
             return (
               <div key={action.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 gap-3 group hover:bg-slate-50 dark:hover:bg-slate-700/20 rounded-xl transition-colors">
                 <div>
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{action.label}</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{l(action.label)}</p>
                   <p className="text-xs text-slate-500">ID: {action.id}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -126,7 +128,7 @@ export const ShortcutsSection: React.FC<ShortcutsSectionProps> = ({
                           if (e.key === 'Escape') setEditingShortcut(null);
                         }}
                         onBlur={handleSave}
-                        placeholder="Key..."
+                        placeholder={l({ en: 'Key...', ar: 'مفتاح...', de: 'Taste...' })}
                         className="w-16 px-2 py-1 bg-white dark:bg-slate-900 border border-blue-500 rounded-lg text-xs font-mono outline-none"
                       />
                     </div>
@@ -141,7 +143,7 @@ export const ShortcutsSection: React.FC<ShortcutsSectionProps> = ({
                           setEditingShortcut(action.id);
                         }}
                         className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                        title="Edit Shortcut"
+                        title={l({ en: 'Edit Shortcut', ar: 'تعديل الاختصار', de: 'Tastenkürzel bearbeiten' })}
                       >
                         <Keyboard className="w-4 h-4" />
                       </button>

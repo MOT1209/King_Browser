@@ -5,6 +5,7 @@ import { Workspace } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { generateId } from '../utils/idGenerator';
 import { useDialogA11y } from '../hooks/useDialogA11y';
+import { useTranslation } from '../services/i18n';
 
 interface WorkspaceManagerProps {
   isOpen: boolean;
@@ -47,6 +48,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   onSelectWorkspace,
   isIncognito
 }) => {
+  const { l } = useTranslation();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('slate');
@@ -69,7 +71,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   const handleAddWorkspace = () => {
     const newWorkspace: Workspace = {
       id: generateId('ws'),
-      name: 'New Workspace',
+      name: l({ en: 'New Workspace', ar: 'مساحة عمل جديدة', de: 'Neuer Arbeitsbereich' }),
       color: 'blue',
       icon: 'Folder'
     };
@@ -106,7 +108,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
             ref={containerRef}
             role="dialog"
             aria-modal="true"
-            aria-label="Workspaces"
+            aria-label={l({ en: 'Workspaces', ar: 'مساحات العمل', de: 'Arbeitsbereiche' })}
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -124,7 +126,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                 <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                   <LayoutGrid className="w-4 h-4" />
                 </div>
-                <h2 className="text-base font-semibold">Manage Workspaces</h2>
+                <h2 className="text-base font-semibold">{l({ en: 'Manage Workspaces', ar: 'إدارة مساحات العمل', de: 'Arbeitsbereiche verwalten' })}</h2>
               </div>
               <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                 <X className="w-4 h-4" />
@@ -145,7 +147,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                         className={`w-full px-3 py-2 rounded-lg text-xs font-semibold mb-3 outline-none focus:ring-2 focus:ring-cyan-500/50 ${
                           isIncognito ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-700 dark:text-white'
                         } border`}
-                        placeholder="Workspace Name"
+                        placeholder={l({ en: 'Workspace Name', ar: 'اسم مساحة العمل', de: 'Name des Arbeitsbereichs' })}
                         autoFocus
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(workspace.id)}
                       />
@@ -217,7 +219,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                       </div>
                       <div>
                         <div className="font-medium text-xs text-slate-800 dark:text-slate-200">{workspace.name}</div>
-                        {activeWorkspaceId === workspace.id && <div className="text-[9px] text-cyan-600 dark:text-cyan-400 font-bold uppercase tracking-wider">Active</div>}
+                        {activeWorkspaceId === workspace.id && <div className="text-[9px] text-cyan-600 dark:text-cyan-400 font-bold uppercase tracking-wider">{l({ en: 'Active', ar: 'نشطة', de: 'Aktiv' })}</div>}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -252,7 +254,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-cyan-500 hover:text-cyan-500 hover:bg-cyan-500/10 dark:hover:bg-cyan-500/10 transition-all font-medium text-xs text-slate-500 dark:text-slate-400"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Create New Workspace
+                {l({ en: 'Create New Workspace', ar: 'إنشاء مساحة عمل جديدة', de: 'Neuen Arbeitsbereich erstellen' })}
               </button>
             </div>
           </motion.div>

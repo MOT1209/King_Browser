@@ -511,14 +511,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             className="text-slate-400 hover:text-white transition-colors font-medium flex items-center gap-2 text-xs no-drag cursor-pointer"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
-            Back
+            {l({ en: 'Back', ar: 'رجوع', de: 'Zurück' })}
           </button>
           <button
             onClick={goNext}
             className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-7 py-2.5 rounded-xl font-bold text-xs transition-all hover:scale-105 active:scale-95  no-drag cursor-pointer"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
-            {step === TOTAL_STEPS - 2 ? 'Complete' : 'Next'}
+            {step === TOTAL_STEPS - 2 ? l({ en: 'Complete', ar: 'إنهاء', de: 'Fertigstellen' }) : l({ en: 'Next', ar: 'التالي', de: 'Weiter' })}
           </button>
         </div>
       )}

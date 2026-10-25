@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { EmailVerificationRequiredError, syncService } from '../services/syncService';
 import { isSupabaseConfigured } from '../services/supabaseClient';
+import { useTranslation } from '../services/i18n';
 
 /**
  * Must stay in sync with the floor enforced inside KingSyncService.register()
@@ -34,6 +35,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
   compact = false,
   className = ''
 }) => {
+  const { l } = useTranslation();
   const [mode, setMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -76,12 +78,12 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
         await syncService.register(trimmedEmail, password, displayName.trim() || undefined);
         setNotice(
           cloudEnabled
-            ? 'Account created. Your vault is now encrypted with your password.'
-            : 'Local vault created on this device.'
+            ? l({ en: 'Account created. Your vault is now encrypted with your password.', ar: 'تم إنشاء الحساب. خزنتك الآن مشفّرة بكلمة مرورك.', de: 'Konto erstellt. Ihr Tresor ist jetzt mit Ihrem Passwort verschlüsselt.' })
+            : l({ en: 'Local vault created on this device.', ar: 'تم إنشاء خزنة محلية على هذا الجهاز.', de: 'Lokaler Tresor auf diesem Gerät erstellt.' })
         );
       } else {
         await syncService.login(trimmedEmail, password);
-        setNotice(cloudEnabled ? 'Signed in.' : 'Unlocked the local vault on this device.');
+        setNotice(cloudEnabled ? l({ en: 'Signed in.', ar: 'تم تسجيل الدخول.', de: 'Angemeldet.' }) : l({ en: 'Unlocked the local vault on this device.', ar: 'تم فتح الخزنة المحلية على هذا الجهاز.', de: 'Lokaler Tresor auf diesem Gerät entsperrt.' }));
       }
       setPassword('');
       await onAuthenticated?.();
@@ -93,7 +95,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
         setMode('signin');
         setPassword('');
       } else {
-        setError(err instanceof Error ? err.message : 'Authentication failed.');
+        setError(err instanceof Error ? err.message : l({ en: 'Authentication failed.', ar: 'فشلت المصادقة.', de: 'Authentifizierung fehlgeschlagen.' }));
       }
     } finally {
       setBusy(false);
@@ -107,10 +109,10 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
     setBusy(true);
     try {
       await syncService.requestPasswordReset(trimmedEmail);
-      setNotice('Password reset email sent. Check your inbox for the link.');
+      setNotice(l({ en: 'Password reset email sent. Check your inbox for the link.', ar: 'أُرسل بريد إعادة تعيين كلمة المرور. تحقّق من بريدك الوارد.', de: 'E-Mail zum Zurücksetzen gesendet. Prüfen Sie Ihren Posteingang.' }));
       setShowReset(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send the reset email.');
+      setError(err instanceof Error ? err.message : l({ en: 'Could not send the reset email.', ar: 'تعذّر إرسال بريد إعادة التعيين.', de: 'Die E-Mail zum Zurücksetzen konnte nicht gesendet werden.' }));
     } finally {
       setBusy(false);
     }
@@ -129,13 +131,13 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
         <div className="min-w-0">
           <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100">
             {cloudEnabled
-              ? mode === 'signup' ? 'Create a King Cloud account' : 'Sign in to King Cloud'
-              : mode === 'signup' ? 'Create a local vault' : 'Unlock this device'}
+              ? mode === 'signup' ? l({ en: 'Create a King Cloud account', ar: 'إنشاء حساب King Cloud', de: 'King-Cloud-Konto erstellen' }) : l({ en: 'Sign in to King Cloud', ar: 'تسجيل الدخول إلى King Cloud', de: 'Bei King Cloud anmelden' })
+              : mode === 'signup' ? l({ en: 'Create a local vault', ar: 'إنشاء خزنة محلية', de: 'Lokalen Tresor erstellen' }) : l({ en: 'Unlock this device', ar: 'فتح هذا الجهاز', de: 'Dieses Gerät entsperren' })}
           </h3>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
             {cloudEnabled
-              ? 'Your vault is encrypted on this device before it is uploaded.'
-              : 'No King Cloud backend is configured in this build.'}
+              ? l({ en: 'Your vault is encrypted on this device before it is uploaded.', ar: 'تُشفَّر خزنتك على هذا الجهاز قبل رفعها.', de: 'Ihr Tresor wird auf diesem Gerät verschlüsselt, bevor er hochgeladen wird.' })
+              : l({ en: 'No King Cloud backend is configured in this build.', ar: 'لا يوجد خادم King Cloud مُعدّ في هذه النسخة.', de: 'In diesem Build ist kein King-Cloud-Backend konfiguriert.' })}
           </p>
         </div>
       </div>
@@ -144,21 +146,20 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
         <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2">
           <HardDrive className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
-            <strong className="font-semibold">This device only — no sync.</strong>{' '}
-            Bookmarks, history and passwords stay in an encrypted vault on this
-            computer. Nothing is uploaded, and no other device can read it.
+            <strong className="font-semibold">{l({ en: 'This device only — no sync.', ar: 'هذا الجهاز فقط، بلا مزامنة.', de: 'Nur dieses Gerät – keine Synchronisierung.' })}</strong>{' '}
+            {l({ en: 'Bookmarks, history and passwords stay in an encrypted vault on this computer. Nothing is uploaded, and no other device can read it.', ar: 'تبقى الإشارات المرجعية والسجل وكلمات المرور في خزنة مشفّرة على هذا الحاسوب. لا يُرفع شيء، ولا يستطيع أي جهاز آخر قراءتها.', de: 'Lesezeichen, Verlauf und Passwörter bleiben in einem verschlüsselten Tresor auf diesem Computer. Nichts wird hochgeladen, und kein anderes Gerät kann sie lesen.' })}
           </p>
         </div>
       )}
 
       <div
         role="tablist"
-        aria-label="Authentication mode"
+        aria-label={l({ en: 'Authentication mode', ar: 'وضع المصادقة', de: 'Anmeldemodus' })}
         className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-200/60 dark:bg-white/5"
       >
         {([
-          ['signin', cloudEnabled ? 'Sign in' : 'Unlock'],
-          ['signup', cloudEnabled ? 'Create account' : 'New vault']
+          ['signin', cloudEnabled ? l({ en: 'Sign in', ar: 'تسجيل الدخول', de: 'Anmelden' }) : l({ en: 'Unlock', ar: 'فتح', de: 'Entsperren' })],
+          ['signup', cloudEnabled ? l({ en: 'Create account', ar: 'إنشاء حساب', de: 'Konto erstellen' }) : l({ en: 'New vault', ar: 'خزنة جديدة', de: 'Neuer Tresor' })]
         ] as Array<[AuthMode, string]>).map(([value, label]) => (
           <button
             key={value}
@@ -181,7 +182,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
       <form onSubmit={handleSubmit} className="space-y-3" noValidate>
         <div>
           <label htmlFor="king-cloud-email" className="sr-only">
-            Email
+            {l({ en: 'Email', ar: 'البريد الإلكتروني', de: 'E-Mail' })}
           </label>
           <div className="relative">
             <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -201,7 +202,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
         {mode === 'signup' && (
           <div>
             <label htmlFor="king-cloud-name" className="sr-only">
-              Display name
+              {l({ en: 'Display name', ar: 'الاسم الظاهر', de: 'Anzeigename' })}
             </label>
             <div className="relative">
               <User className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -211,7 +212,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
                 autoComplete="nickname"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Display name (optional)"
+                placeholder={l({ en: 'Display name (optional)', ar: 'الاسم الظاهر (اختياري)', de: 'Anzeigename (optional)' })}
                 disabled={busy}
                 className={fieldClass}
               />
@@ -221,7 +222,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
 
         <div>
           <label htmlFor="king-cloud-password" className="sr-only">
-            Password
+            {l({ en: 'Password', ar: 'كلمة المرور', de: 'Passwort' })}
           </label>
           <div className="relative">
             <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -231,7 +232,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
+              placeholder={l({ en: 'Password', ar: 'كلمة المرور', de: 'Passwort' })}
               disabled={busy}
               aria-describedby={mode === 'signup' ? 'king-cloud-password-hint' : undefined}
               className={fieldClass}
@@ -244,7 +245,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
                 passwordTooShort ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'
               }`}
             >
-              At least {MIN_SYNC_PASSWORD_LENGTH} characters. It encrypts your vault, so it cannot be recovered for you.
+              {l({ en: 'At least {n} characters. It encrypts your vault, so it cannot be recovered for you.', ar: '{n} أحرف على الأقل. تُشفِّر خزنتك، لذا لا يمكن استعادتها لك.', de: 'Mindestens {n} Zeichen. Es verschlüsselt Ihren Tresor und kann daher nicht für Sie wiederhergestellt werden.' }, { n: MIN_SYNC_PASSWORD_LENGTH })}
             </p>
           )}
         </div>
@@ -257,7 +258,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
               disabled={busy}
               className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline disabled:opacity-50"
             >
-              Forgot password?
+              {l({ en: 'Forgot password?', ar: 'نسيت كلمة المرور؟', de: 'Passwort vergessen?' })}
             </button>
           </div>
         )}
@@ -265,7 +266,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
         {showReset && (
           <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20 space-y-2">
             <p className="text-[11px] text-slate-600 dark:text-slate-300">
-              Send a reset link to <span className="font-semibold">{trimmedEmail || 'your email'}</span>.
+              {l({ en: 'Send a reset link to {email}.', ar: 'أرسل رابط إعادة التعيين إلى {email}.', de: 'Einen Link zum Zurücksetzen an {email} senden.' }, { email: trimmedEmail || l({ en: 'your email', ar: 'بريدك الإلكتروني', de: 'Ihre E-Mail-Adresse' }) })}
             </p>
             <button
               type="button"
@@ -274,7 +275,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
               className="w-full py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white text-[11px] font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-              <span>Send reset link</span>
+              <span>{l({ en: 'Send reset link', ar: 'إرسال رابط إعادة التعيين', de: 'Link zum Zurücksetzen senden' })}</span>
             </button>
           </div>
         )}
@@ -310,10 +311,10 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
           )}
           <span>
             {busy
-              ? 'Please wait…'
+              ? l({ en: 'Please wait…', ar: 'يرجى الانتظار…', de: 'Bitte warten…' })
               : mode === 'signup'
-                ? cloudEnabled ? 'Create account' : 'Create vault'
-                : cloudEnabled ? 'Sign in' : 'Unlock'}
+                ? cloudEnabled ? l({ en: 'Create account', ar: 'إنشاء حساب', de: 'Konto erstellen' }) : l({ en: 'Create vault', ar: 'إنشاء خزنة', de: 'Tresor erstellen' })
+                : cloudEnabled ? l({ en: 'Sign in', ar: 'تسجيل الدخول', de: 'Anmelden' }) : l({ en: 'Unlock', ar: 'فتح', de: 'Entsperren' })}
           </span>
         </button>
       </form>

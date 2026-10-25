@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { useDialogA11y } from '../hooks/useDialogA11y';
+import { useTranslation } from '../services/i18n';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
   url,
   title
 }) => {
+  const { l } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
@@ -96,7 +98,7 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
             className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden outline-none"
             role="dialog"
             aria-modal="true"
-            aria-label="Share Page"
+            aria-label={l({ en: 'Share Page', ar: 'مشاركة الصفحة', de: 'Seite teilen' })}
             tabIndex={-1}
           >
             {/* Header */}
@@ -105,7 +107,7 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
                 <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                   <Share2 className="w-4 h-4" />
                 </div>
-                <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Share Page</h2>
+                <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Share Page', ar: 'مشاركة الصفحة', de: 'Seite teilen' })}</h2>
               </div>
               <button
                 onClick={onClose}
@@ -120,7 +122,7 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
               {/* QR Code Container */}
               <div className="p-3 bg-white border border-slate-200/80 dark:border-white/20 rounded-2xl shadow-sm flex flex-col items-center gap-2">
                 {qrCodeDataUrl ? (
-                  <img src={qrCodeDataUrl} alt="QR Code" className="w-40 h-40 rounded-lg object-contain" />
+                  <img src={qrCodeDataUrl} alt={l({ en: 'QR Code', ar: 'رمز QR', de: 'QR-Code' })} className="w-40 h-40 rounded-lg object-contain" />
                 ) : qrError ? (
                   <div className="w-40 h-40 rounded-lg flex flex-col items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 text-center">
                     <AlertCircle className="w-8 h-8 text-red-400" />
@@ -133,7 +135,7 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
                 )}
                 <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
                   <QrCode className="w-3 h-3 text-cyan-500" />
-                  {qrError ? 'QR unavailable — use the link below' : 'Scan with mobile phone'}
+                  {qrError ? l({ en: 'QR unavailable — use the link below', ar: 'رمز QR غير متاح، استخدم الرابط أدناه', de: 'QR-Code nicht verfügbar – nutzen Sie den Link unten' }) : l({ en: 'Scan with mobile phone', ar: 'امسحه بهاتفك', de: 'Mit dem Handy scannen' })}
                 </span>
               </div>
 
@@ -153,13 +155,13 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
                 }`}
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? 'Link Copied to Clipboard!' : 'Copy Page Link'}</span>
+                <span>{copied ? l({ en: 'Link Copied to Clipboard!', ar: 'تم نسخ الرابط!', de: 'Link kopiert!' }) : l({ en: 'Copy Page Link', ar: 'نسخ رابط الصفحة', de: 'Seitenlink kopieren' })}</span>
               </button>
 
               {copyError && (
                 <p role="alert" className="text-[11px] text-red-500 dark:text-red-400 flex items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  Copy failed — copy the link above manually.
+                  {l({ en: 'Copy failed — copy the link above manually.', ar: 'فشل النسخ. انسخ الرابط أعلاه يدوياً.', de: 'Kopieren fehlgeschlagen – kopieren Sie den Link oben manuell.' })}
                 </p>
               )}
             </div>

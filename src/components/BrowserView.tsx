@@ -12,6 +12,7 @@ import {
 } from '../services/translationService';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { AGENT_PARTITION, AGENT_PERSIST_PARTITION } from '../utils/appConstants';
+import { useTranslation } from '../services/i18n';
 
 const PasswordPromptModal = lazy(() => import('./PasswordPromptModal').then(m => ({ default: m.PasswordPromptModal })));
 const AILinkPreview = lazy(() => import('./AILinkPreview').then(m => ({ default: m.AILinkPreview })));
@@ -290,6 +291,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onPerformSync,
   isDemo = false
 }) => {
+  const { l } = useTranslation();
   const webviewRef = useRef<any>(null);
 
   const getSafeUrl = (u?: string) => {
@@ -698,7 +700,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       isWebviewReady.current = false;
       setCrashInfo({ crashed: true, reason: 'crashed' });
       if (tab?.id) {
-        onUpdateTab(tab.id, { isLoading: false, title: 'Page Crashed' });
+        onUpdateTab(tab.id, { isLoading: false, title: l({ en: 'Page Crashed', ar: 'تعطّلت الصفحة', de: 'Seite abgestürzt' }) });
         console.error('[Webview] Crashed on tab:', tab.id, 'URL:', tab?.url);
       }
     };
@@ -1146,7 +1148,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           </div>
           <h2 className="text-2xl font-semibold text-white mb-2 line-clamp-1">{tab.title || tab.url}</h2>
           <p className="text-sm text-slate-400 mb-8 leading-relaxed">
-            This tab was suspended to save memory. Click to wake it up instantly.
+            {l({ en: 'This tab was suspended to save memory. Click to wake it up instantly.', ar: 'عُلّق هذا التبويب لتوفير الذاكرة. انقر لإيقاظه فوراً.', de: 'Dieser Tab wurde pausiert, um Speicher zu sparen. Klicken Sie, um ihn sofort zu reaktivieren.' })}
           </p>
           <button
             onClick={(e) => {
@@ -1156,7 +1158,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold text-sm transition-all shadow-md shadow-cyan-950/50 flex items-center gap-2 group-hover:scale-[1.02] cursor-pointer"
           >
             <Zap className="w-4 h-4" />
-            Reload Tab
+            {l({ en: 'Reload Tab', ar: 'إعادة تحميل التبويب', de: 'Tab neu laden' })}
           </button>
         </div>
       </div>
@@ -1333,13 +1335,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         {crashInfo.crashed && (
           <div className="absolute inset-x-0 top-0 z-50 bg-red-950/95 border-b border-red-500/40 text-red-200 px-4 py-3 flex items-center justify-between shadow-lg backdrop-blur-sm">
             <div className="flex items-center gap-3">
-              <span className="font-semibold text-white text-sm">This tab has crashed ({crashInfo.reason || 'render process gone'}).</span>
+              <span className="font-semibold text-white text-sm">{l({ en: 'This tab has crashed ({reason}).', ar: 'تعطّل هذا التبويب ({reason}).', de: 'Dieser Tab ist abgestürzt ({reason}).' }, { reason: crashInfo.reason || 'render process gone' })}</span>
             </div>
             <button
               onClick={handleReloadAfterCrash}
               className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded transition-colors shadow-sm cursor-pointer"
             >
-              Reload
+              {l({ en: 'Reload', ar: 'إعادة التحميل', de: 'Neu laden' })}
             </button>
           </div>
         )}
@@ -1437,7 +1439,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                   rel="noopener noreferrer"
                   className="px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-xs flex items-center gap-1.5 shadow-xl transition-all backdrop-blur-sm"
                 >
-                  <span>Open in new tab</span>
+                  <span>{l({ en: 'Open in new tab', ar: 'فتح في تبويب جديد', de: 'In neuem Tab öffnen' })}</span>
                   <span className="text-[10px]">↗</span>
                 </a>
               </div>
@@ -1459,7 +1461,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           <div className="px-3 py-2 bg-slate-800/80 border-b border-slate-700/50 flex items-center justify-between text-[11px] font-semibold text-slate-400">
             <span className="flex items-center gap-1.5">
               <Key className="w-3.5 h-3.5 text-blue-400" />
-              Saved Accounts ({autofillMenu.accounts.length})
+              {l({ en: 'Saved Accounts ({n})', ar: 'الحسابات المحفوظة ({n})', de: 'Gespeicherte Konten ({n})' }, { n: autofillMenu.accounts.length })}
             </span>
             <span className="text-[10px] text-slate-500 font-mono truncate max-w-[100px]">{autofillMenu.hostname}</span>
           </div>
@@ -1475,7 +1477,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
               >
                 <span className="font-medium text-slate-100">{acc.username || 'Unnamed Account'}</span>
-                <span className="text-[10px] text-slate-400">Click to fill password</span>
+                <span className="text-[10px] text-slate-400">{l({ en: 'Click to fill password', ar: 'انقر لتعبئة كلمة المرور', de: 'Zum Ausfüllen des Passworts klicken' })}</span>
               </button>
             ))}
           </div>

@@ -84,7 +84,7 @@ const DailyWallpaperSection = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 font-medium flex items-center gap-1.5 backdrop-blur-md shadow-sm">
-                    <Check className="w-3.5 h-3.5" /> Active on New Tab
+                    <Check className="w-3.5 h-3.5" /> {l({ en: 'Active on New Tab', ar: 'مفعّلة في التبويب الجديد', de: 'Aktiv im neuen Tab' })}
                   </span>
                 </div>
               </div>

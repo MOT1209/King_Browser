@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus } from 'lucide-react';
+import { useTranslation } from '../../services/i18n';
 
 export interface TabAnimationPreviewBoxProps {
   preset: 'chrome' | 'smooth' | 'snappy' | 'none';
@@ -8,6 +9,7 @@ export interface TabAnimationPreviewBoxProps {
 }
 
 export const TabAnimationPreviewBox: React.FC<TabAnimationPreviewBoxProps> = React.memo(({ preset, isActive }) => {
+  const { l } = useTranslation();
   const [tabVisible, setTabVisible] = useState(true);
 
   const restartTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -180,7 +182,7 @@ export const TabAnimationPreviewBox: React.FC<TabAnimationPreviewBoxProps> = Rea
           layout="position"
           transition={animConfig.buttonTransition}
           className="w-6 h-6 rounded-md bg-slate-200/70 dark:bg-slate-800 hover:bg-slate-300/80 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0 cursor-pointer"
-          title="Replay animation"
+          title={l({ en: 'Replay animation', ar: 'إعادة تشغيل الحركة', de: 'Animation wiederholen' })}
         >
           <Plus className="w-3 h-3" />
         </motion.div>

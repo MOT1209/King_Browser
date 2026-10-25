@@ -47,6 +47,21 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.7',
+    date: 'October 2026',
+    title: 'The whole interface in Arabic, English and German',
+    badge: 'Pre-release',
+    lede: 'Phase two of the translation: every remaining screen now follows the language you pick in Settings > General.',
+    highlights: [
+      'Translated: all settings sections (Advanced, Sync, Shortcuts, Passwords, Extensions, MCP), Help, Reader Mode, the AI side panel, account and sign-in, extensions, sharing, screenshots, site info, toasts and error screens.',
+      'The AI side panel no longer shows hard-coded Turkish text.',
+    ],
+    changes: [
+      { category: 'feature', text: 'About 1,000 interface strings are available in Arabic and German, checked by a test for missing translations and placeholders.' },
+      { category: 'improvement', text: 'MCP tool descriptions stay in English; they are technical names for AI clients.' },
+    ],
+  },
+  {
     version: '0.0.6',
     date: 'October 2026',
     title: 'Arabic, English and German',

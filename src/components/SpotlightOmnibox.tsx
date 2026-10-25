@@ -5,7 +5,7 @@ import { Tab, UserSettings } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
-import { getLocale, getLanguage, useTranslation } from '../services/i18n';
+import { getLocale, getLanguage, useTranslation, l } from '../services/i18n';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface SpotlightOmniboxProps {
@@ -226,7 +226,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
               <input
                 ref={inputRef}
                 type="text"
-                aria-label="Spotlight search and command bar"
+                aria-label={l({ en: 'Spotlight search and command bar', ar: 'شريط البحث والأوامر', de: 'Such- und Befehlsleiste' })}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
@@ -282,7 +282,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                   Press Enter to search with {getSearchEngineName(searchEngine)}
                 </div>
               ) : (
-                <div className="space-y-1" role="listbox" aria-label="Omnibox results">
+                <div className="space-y-1" role="listbox" aria-label={l({ en: 'Omnibox results', ar: 'نتائج البحث', de: 'Suchergebnisse' })}>
                   {items.map((item, idx) => {
                     const isSelected = selectedIndex === idx;
 
@@ -326,7 +326,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                                   onCloseTab(item.tab.id);
                                 }}
                                 className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                                title="Close Tab"
+                                title={l({ en: 'Close Tab', ar: 'إغلاق التبويب', de: 'Tab schließen' })}
                               >
                                 <X className="w-4 h-4" />
                               </button>

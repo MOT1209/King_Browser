@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, Check, Copy } from 'lucide-react';
 import { copyTextToClipboard } from '../utils/clipboard';
+import { l } from '../services/i18n';
 
 interface Props {
   children?: ReactNode;
@@ -87,12 +88,12 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto">
               <AlertTriangle className="w-6 h-6" />
             </div>
-            <h1 className="text-lg font-bold text-slate-100">Something went wrong</h1>
+            <h1 className="text-lg font-bold text-slate-100">{l({ en: 'Something went wrong', ar: 'حدث خطأ ما', de: 'Etwas ist schiefgelaufen' })}</h1>
             <p className="text-xs text-slate-400 leading-relaxed">
-              King Browser encountered an unexpected error in the user interface.
+              {l({ en: 'King Browser encountered an unexpected error in the user interface.', ar: 'واجه King Browser خطأً غير متوقع في الواجهة.', de: 'In der Oberfläche von King Browser ist ein unerwarteter Fehler aufgetreten.' })}
             </p>
             {this.state.error && (
-              <div className="p-3 bg-black/50 border border-white/5 rounded-xl text-[11px] font-mono text-red-400/90 text-left overflow-auto max-h-32 select-text">
+              <div className="p-3 bg-black/50 border border-white/5 rounded-xl text-[11px] font-mono text-red-400/90 text-start overflow-auto max-h-32 select-text">
                 {this.state.error.toString()}
               </div>
             )}
@@ -104,22 +105,22 @@ export class ErrorBoundary extends Component<Props, State> {
                 {this.state.copyState === 'copied' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>
                   {this.state.copyState === 'copied'
-                    ? 'Copied!'
+                    ? l({ en: 'Copied!', ar: 'تم النسخ!', de: 'Kopiert!' })
                     : this.state.copyState === 'failed'
-                      ? 'Copy Failed'
-                      : 'Copy Error'}
+                      ? l({ en: 'Copy Failed', ar: 'فشل النسخ', de: 'Kopieren fehlgeschlagen' })
+                      : l({ en: 'Copy Error', ar: 'نسخ الخطأ', de: 'Fehler kopieren' })}
                 </span>
               </button>
               <button
                 onClick={this.handleReload}
                 className="py-2.5 px-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-500/20 flex-1"
               >
-                Reload App
+                {l({ en: 'Reload App', ar: 'إعادة تحميل التطبيق', de: 'App neu laden' })}
               </button>
             </div>
             {this.state.copyState === 'failed' && (
               <p role="alert" className="text-[11px] text-red-400/90">
-                The clipboard is not available here — select the error text above and copy it manually.
+                {l({ en: 'The clipboard is not available here — select the error text above and copy it manually.', ar: 'الحافظة غير متاحة هنا. حدّد نص الخطأ أعلاه وانسخه يدوياً.', de: 'Die Zwischenablage ist hier nicht verfügbar – markieren Sie den Fehlertext oben und kopieren Sie ihn manuell.' })}
               </p>
             )}
           </div>
