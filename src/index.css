@@ -257,40 +257,40 @@ h1, h2, h3, h4, h5, h6, .font-serif {
 }
 
 /* AI Chat & SidePanel Sleek Custom Scrollbar */
-.nova-chat-scroll {
+.king-chat-scroll {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 
-.dark .nova-chat-scroll {
+.dark .king-chat-scroll {
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
-.nova-chat-scroll::-webkit-scrollbar {
+.king-chat-scroll::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
 
-.nova-chat-scroll::-webkit-scrollbar-track {
+.king-chat-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.nova-chat-scroll::-webkit-scrollbar-thumb {
+.king-chat-scroll::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.35);
   border-radius: 9999px;
 }
 
-.nova-chat-scroll::-webkit-scrollbar-thumb:hover {
+.king-chat-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.6);
 }
 
-.dark .nova-chat-scroll::-webkit-scrollbar-thumb {
+.dark .king-chat-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.18);
 }
 
-.dark .nova-chat-scroll::-webkit-scrollbar-thumb:hover {
+.dark .king-chat-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.32);
 }
 
@@ -497,32 +497,32 @@ button:active:not(:disabled) {
   100% { opacity: 1; }
 }
 /* Keep tasks in the document flow when the assistant narrows the new tab. */
-.nova-newtab { container-type: inline-size; }
-.nova-newtab-layout { position: relative; min-height: 100%; display: grid; justify-content: center; align-content: center; justify-items: center; gap: 32px; padding-block: 40px; }
+.king-newtab { container-type: inline-size; }
+.king-newtab-layout { position: relative; min-height: 100%; display: grid; justify-content: center; align-content: center; justify-items: center; gap: 32px; padding-block: 40px; }
 @container (min-width: 1100px) {
-  .nova-newtab-layout { grid-template-columns: minmax(0, 672px) 288px; gap: 48px; }
-  .nova-newtab-layout:not(:has(.nova-tasks-widget)) { grid-template-columns: minmax(0, 672px); }
+  .king-newtab-layout { grid-template-columns: minmax(0, 672px) 288px; gap: 48px; }
+  .king-newtab-layout:not(:has(.king-tasks-widget)) { grid-template-columns: minmax(0, 672px); }
 }
 
 /* Keep backdrop capture on a permanent decorative layer. Hover/focus belongs
    to the controls above it; changing a shortcut tint or its edit controls
    does not mutate the element that captures the backdrop. */
-.nova-wallpaper-surface,
-.nova-newtab-glass,
-.nova-newtab-clean .nova-clock,
-.nova-newtab-clean .nova-shortcut {
+.king-wallpaper-surface,
+.king-newtab-glass,
+.king-newtab-clean .king-clock,
+.king-newtab-clean .king-shortcut {
   isolation: isolate;
 }
-.nova-wallpaper-surface {
+.king-wallpaper-surface {
   position: relative;
   --nova-glass-tint: rgb(15 23 42 / 0.28);
   background-color: transparent;
   border: 1px solid rgb(255 255 255 / 0.18);
 }
-.nova-wallpaper-surface::before,
-.nova-newtab-glass::before,
-.nova-newtab-clean .nova-clock::before,
-.nova-newtab-clean .nova-shortcut::before {
+.king-wallpaper-surface::before,
+.king-newtab-glass::before,
+.king-newtab-clean .king-clock::before,
+.king-newtab-clean .king-shortcut::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -535,8 +535,8 @@ button:active:not(:disabled) {
   /* A stable compositor layer avoids promotion/demotion at hover boundaries. */
   transform: translateZ(0);
 }
-.nova-shortcut.nova-wallpaper-surface::after,
-.nova-newtab-clean .nova-shortcut::after {
+.king-shortcut.king-wallpaper-surface::after,
+.king-newtab-clean .king-shortcut::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -546,46 +546,46 @@ button:active:not(:disabled) {
   background-color: transparent;
   transition: background-color 160ms ease;
 }
-.nova-shortcut.nova-wallpaper-surface:hover::after,
-.nova-newtab-clean .nova-shortcut:hover::after {
+.king-shortcut.king-wallpaper-surface:hover::after,
+.king-newtab-clean .king-shortcut:hover::after {
   background-color: rgb(255 255 255 / 0.06);
 }
-.nova-newtab-glass { --nova-glass-blur: 24px; }
+.king-newtab-glass { --nova-glass-blur: 24px; }
 @supports not (backdrop-filter: blur(1px)) {
-  .nova-wallpaper-surface::before { background-color: rgb(15 23 42 / 0.65); }
+  .king-wallpaper-surface::before { background-color: rgb(15 23 42 / 0.65); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .nova-shortcut.nova-wallpaper-surface::after { transition: none; }
+  .king-shortcut.king-wallpaper-surface::after { transition: none; }
 }
 
 /* Clean backgrounds use the same stable glass layer, with theme-aware tint. */
-.nova-newtab-clean {
+.king-newtab-clean {
   --nova-clean-tint: rgb(255 255 255 / 0.5);
   --nova-clean-border: rgb(148 163 184 / 0.3);
 }
-.nova-newtab-clean.dark {
+.king-newtab-clean.dark {
   --nova-clean-tint: rgb(255 255 255 / 0.06);
   --nova-clean-border: rgb(255 255 255 / 0.14);
 }
-.nova-newtab-clean .nova-clock,
-.nova-newtab-clean .nova-shortcut,
-.nova-newtab-clean .nova-newtab-glass {
+.king-newtab-clean .king-clock,
+.king-newtab-clean .king-shortcut,
+.king-newtab-clean .king-newtab-glass {
   position: relative;
   --nova-glass-tint: var(--nova-clean-tint);
   background-color: transparent;
   border: 1px solid var(--nova-clean-border);
 }
-.nova-newtab-clean .nova-clock {
+.king-newtab-clean .king-clock {
   padding: 24px 40px;
   border-radius: 16px;
 }
-.nova-newtab-clean .nova-newtab-glass input {
+.king-newtab-clean .king-newtab-glass input {
   background-color: transparent;
   border-color: transparent;
 }
-.nova-newtab-clean .nova-newtab-glass:focus-within {
+.king-newtab-clean .king-newtab-glass:focus-within {
   border-color: var(--nova-accent, #3b82f6);
 }
 @media (prefers-reduced-motion: reduce) {
-  .nova-newtab-clean .nova-shortcut::after { transition: none; }
+  .king-newtab-clean .king-shortcut::after { transition: none; }
 }

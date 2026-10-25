@@ -46,6 +46,10 @@ Dev-only tooling (not packaged with the app, no source imports):
 This is a metadata scan, not a legal review. Rerun the sweep before each release.
 ```
 
+Bundled media assets:
+
+- `video/public/king-tour/noto-sans-arabic.woff2`: Noto Sans Arabic (Copyright 2022 The Noto Project Authors), SIL Open Font License 1.1, from `@fontsource-variable/noto-sans-arabic` 5.3.0. Used only to render the Arabic website film.
+
 ## 4. King Browser itself
 
 King Browser is licensed under the MIT License. See [`LICENSE`](LICENSE).
