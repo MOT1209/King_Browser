@@ -13,7 +13,9 @@ import { requestRendererMcpAction, cancelPendingMcpActions, setMcpActionPhaseLis
 // the renderer bridge. Only types and the engine/classifier values are imported.
 import { ExecutionEngine } from './main/executionEngine.js';
 import { resolveElementRef } from './main/elementRefs.js';
-import { toMcpContent, formatToolError } from './main/mcpContent.js';
+import { handleJsonRpcMessage, type McpProtocolHandlers } from './main/mcpProtocol.js';
+import { formatToolError } from './main/mcpContent.js';
+import { createStreamableHttpHandlers, type McpHttpSession } from './main/mcpStreamableHttp.js';
 import { Recorder, RECORDABLE_TOOLS, createRecordingStore, replaySteps, type Recording, type RecordingStore, type ReplayReport } from './main/recordings.js';
 import { createApprovalModeStore, strictModeRequiresApproval, type ApprovalMode, type ApprovalModeStore } from './main/approvalMode.js';
 import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
@@ -586,6 +588,8 @@ export class BrowserMCPServer {
   private abortStart: (err: Error) => void = () => {};
   private mainWindow: BrowserWindow | null = null;
   private clients: Map<string, SseClient> = new Map();
+  // Streamable HTTP sessions (POST /mcp). Counted with the SSE clients everywhere the UI shows them.
+  private httpSessions: Map<string, McpHttpSession> = new Map();
   private token: string;
   private disabledTools: Set<string> = new Set(DEFAULT_DISABLED_TOOLS);
   private tokenFilePath: string = '';
@@ -1015,15 +1019,31 @@ export class BrowserMCPServer {
   }
 
   public getConnectedClientsInfo() {
-    return Array.from(this.clients.values()).map(c => ({
-      id: c.id,
-      connectedAt: c.connectedAt,
-      userAgent: c.userAgent
-    }));
+    return [
+      ...Array.from(this.clients.values()).map(c => ({
+        id: c.id,
+        connectedAt: c.connectedAt,
+        userAgent: c.userAgent
+      })),
+      ...Array.from(this.httpSessions.values()).map(c => ({
+        id: c.id,
+        connectedAt: c.connectedAt,
+        userAgent: c.clientName ? `${c.clientName} (${c.userAgent})` : c.userAgent
+      }))
+    ];
   }
 
   public getClientCount() {
-    return this.clients.size;
+    return this.clients.size + this.httpSessions.size;
+  }
+
+  private notifyClientsChanged(): void {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send('mcp-client-changed', {
+        count: this.getClientCount(),
+        clients: this.getConnectedClientsInfo()
+      });
+    }
   }
 
   // Terminate every live SSE stream and clear the client registry. The
@@ -1034,6 +1054,12 @@ export class BrowserMCPServer {
       try { client.res.end(); } catch (_) {}
     }
     this.clients.clear();
+    // Streamable HTTP sessions have no open stream to end: dropping the id makes the
+    // next request answer 404, which tells the client to initialize again.
+    if (this.httpSessions.size > 0) {
+      this.httpSessions.clear();
+      this.notifyClientsChanged();
+    }
   }
 
   private sendToClient(clientId: string, event: string, data: any) {
@@ -1436,6 +1462,15 @@ export class BrowserMCPServer {
     return output;
   }
 
+  /** What the transport-independent protocol layer needs from this server. */
+  private protocolHandlers(): McpProtocolHandlers {
+    return {
+      get serverVersion() { return electronApp?.getVersion?.() || '1.5.0'; },
+      listTools: () => TOOLS.filter((tool) => this.isToolAllowed(tool.name)),
+      callTool: (name, args) => this.executeTool(name, args as Record<string, any>)
+    };
+  }
+
   private setupRoutes(app: Express) {
     // Security: Prevent DNS rebinding attacks by strictly validating the Host header
     app.use((req, res, next) => {
@@ -1470,8 +1505,9 @@ export class BrowserMCPServer {
           }
         }
       }
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, Mcp-Session-Id, MCP-Protocol-Version');
+      res.header('Access-Control-Expose-Headers', 'Mcp-Session-Id');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
       next();
     });
 
@@ -1495,7 +1531,7 @@ export class BrowserMCPServer {
           server: 'king-browser-mcp',
           version: appVersion,
           port: this.actualPort || this.requestedPort,
-          connected_clients: this.clients.size,
+          connected_clients: this.getClientCount(),
           clients: this.getConnectedClientsInfo(),
           tools_count: TOOLS.length,
           timestamp: Date.now()
@@ -1612,70 +1648,10 @@ export class BrowserMCPServer {
       };
 
       try {
-        // Handle MCP protocol messages
-        if (body.method === 'initialize') {
-          const appVersion = electronApp?.getVersion?.() || '1.5.0';
-          const responsePayload = {
-            jsonrpc: '2.0',
-            id: body.id,
-            result: {
-              protocolVersion: '2024-11-05',
-              capabilities: { tools: {} },
-              serverInfo: { name: 'king-browser', version: appVersion }
-            }
-          };
-          respondToClient(responsePayload);
-          return res.status(202).json({ status: 'accepted' });
-        }
-
-        if (body.method === 'tools/list') {
-          const responsePayload = {
-            jsonrpc: '2.0',
-            id: body.id,
-            result: { tools: TOOLS.filter((tool) => this.isToolAllowed(tool.name)) }
-          };
-          respondToClient(responsePayload);
-          return res.status(202).json({ status: 'accepted' });
-        }
-
-        if (body.method === 'tools/call') {
-          const toolName = body.params?.name;
-          const args = body.params?.arguments || {};
-
-          try {
-            const result = await this.executeTool(toolName, args);
-            const isError = typeof result === 'string' && result.startsWith('Error:');
-            const responsePayload = {
-              jsonrpc: '2.0',
-              id: body.id,
-              result: {
-                content: toMcpContent(result),
-                ...(isError ? { isError: true } : {})
-              }
-            };
-            respondToClient(responsePayload);
-          } catch (err: any) {
-            const errorPayload = {
-              jsonrpc: '2.0',
-              id: body.id,
-              result: {
-                content: [{ type: 'text', text: formatToolError(err) }],
-                isError: true
-              }
-            };
-            respondToClient(errorPayload);
-          }
-          return res.status(202).json({ status: 'accepted' });
-        }
-
-        // Fallback for unknown methods
-        respondToClient({
-          jsonrpc: '2.0',
-          id: body.id,
-          error: { code: -32601, message: `Method not found: ${body.method}` }
-        });
+        // Same handler as the Streamable HTTP transport; the reply travels over this client's SSE stream.
+        const response = await handleJsonRpcMessage(body, this.protocolHandlers());
+        if (response) respondToClient(response);
         res.status(202).json({ status: 'accepted' });
-
       } catch (err: any) {
         const homeDir = process.env.HOME || process.env.USERPROFILE || '';
         let safeMsg = typeof err?.message === 'string' ? err.message : 'Internal error';
@@ -1684,6 +1660,17 @@ export class BrowserMCPServer {
         res.status(500).json({ error: safeMsg.slice(0, 200) });
       }
     });
+
+    // MCP over Streamable HTTP - one endpoint, no stdio bridge needed
+    const streamable = createStreamableHttpHandlers({
+      authenticate: (req) => this.isAuthenticated(req),
+      handlers: this.protocolHandlers(),
+      sessions: this.httpSessions,
+      onSessionsChanged: () => this.notifyClientsChanged()
+    });
+    app.post('/mcp', streamable.post);
+    app.get('/mcp', streamable.get);
+    app.delete('/mcp', streamable.del);
 
     // Direct tool call endpoint (for testing without full MCP protocol)
     app.post('/call', async (req, res) => {

@@ -1,12 +1,13 @@
 /**
  * Ready-to-paste MCP client configurations (plan.md, Phase 3: one-step OpenCode setup).
  *
- * King Browser serves MCP over legacy SSE, while OpenCode's `remote` transport
- * speaks Streamable HTTP: a `type: "remote"` entry always fails with
- * `Cannot POST /sse (HTTP 404)`. Every client therefore goes through the stdio
- * bridge, which translates stdio to the SSE endpoint. The bridge is bundled to
- * dist-electron/mcp-bridge.cjs and shipped with the app, so the generated
- * config needs no repository checkout.
+ * King Browser serves MCP over Streamable HTTP (/mcp) and legacy SSE (/sse).
+ * The generated configs stay on the stdio bridge, which translates stdio to the
+ * SSE endpoint: it is the setup verified end to end, and it works for every
+ * client that can launch a command. An OpenCode `type: "remote"` entry must use
+ * /mcp, never /sse (a remote entry on /sse fails with `Cannot POST /sse (HTTP
+ * 404)`). The bridge is bundled to dist-electron/mcp-bridge.cjs and shipped with
+ * the app, so the generated config needs no repository checkout.
  *
  * Dependency-free (no Electron imports) so the config can be unit-tested.
  */
