@@ -16,10 +16,10 @@
 - **[رأي]** خطر استراتيجي: "طبقة موافقة" كإضافة لمتصفح موجود أو كخادم MCP وسيط قد تصل لناس أكثر بجهد أقل من متصفح كامل يلزمه تحديث Chromium الأمني كل بضعة أسابيع إلى الأبد. اختبر الطلب قبل أن تستثمر أكثر.
 
 ## 2) الحالة الحالية (حقائق)
-- الإصدار المنشور: `v0.0.1`، وتم دمج ما يخص `v0.0.2` في `main` (تشغيل الإصدار قيد المتابعة).
+- الإصدار المنشور: `v0.0.8` (أكتوبر 2026)، ينشر سير عمل Release إصداراً تلقائياً عند رفع الإصدار في `main`. آخر الإصدارات: 0.0.6-0.0.7 واجهة بالعربية والإنجليزية والألمانية، 0.0.8 إصلاح ثغرات التبعيات (`npm audit --omit=dev` بلا ثغرات؛ بقيت ثغرات في أدوات الفيديو `remotion` فقط).
 - مكتمل ومدموج: إصلاح تحميل الإصدارات؛ سجل النشاط الدائم مع التصدير؛ قواعد المواقع (اسأل/احظر)؛ إنذار حقن الأوامر؛ نافذة موافقة تعرض الصفحة والعنصر؛ ملف معزول للوكيل (اختياري ومؤقت)؛ زر OpenCode؛ اختبار Windows مانع في CI.
 - **غير مجرَّب فعلياً:** المثبّت على Windows، OpenCode الحقيقي، واجهة الإعدادات الجديدة، `browser_login` على مواقع حقيقية.
-- الاختبارات الآلية (أكثر من ألف تأكيد) وCI على Linux وWindows خضراء.
+- الاختبارات الآلية (أكثر من 1300 تأكيد ناجح، 0 إخفاق) و`tsc` و`eslint` (0 أخطاء، 1140 تحذيراً) وCI خضراء على آخر إصدار.
 
 ## 3) حزم العمل (WP)
 الصعوبة والوقت **[رأي]**. "أنا" = ما أستطيع تنفيذه في الكود؛ "أنت" = ما يحتاج جهازك أو مالك أو قراراً.
@@ -88,7 +88,7 @@
 - [منفَّذ ومختبر] تكامل الاختبارات: بقية الأجنحة خضراء في تشغيلين كاملين متتاليين لـ `npm test` (منها 32 فحص اعتماد، 78 فحص صحة مزامنة، 11 فحص لوحة الوكيل، 17 فحص لوح المقص/Q).
 - [منفَّذ ومختبر] مراجعة `supabase_schema.sql`: سياسات RLS سليمة (قبو المستخدم، الدعوات، دالة الاستهلاك security definer). ملاحظة واحدة: العمود `consumed_by` بلا `on delete`، فحذف مستخدم استهلك دعوة سيفشل — لكن ميزة الإقران معطّلة اليوم (`PAIRING_AVAILABLE = false`)، فلا أثر فعلياً.
 - [يحتاج بيئة خارجية] تحقق حي على Supabase حقيقي بحسابين حقيقيين وسياسات RLS الفعلية: لا يوجد مشروع اختبار متاح من هذه البيئة.
-- [يحتاج بيئة خارجية] Workflow الليلي في PR #15 (مدموج في main): ترتيب «حذف ثم رفع» يجعل أي فشل في الروفع يترك بدون نسخة ليلية؛ محلول بمقترح في تقرير المراجعة — لا يُطبَّق هنا.
+- [منفَّذ] Workflow الليلي (PR #15): استُبدل ترتيب «حذف ثم رفع» بالكتابة فوق الملفات في مكانها (الإيداع `b067692`)، فلا يترك فشل الرفع بلا نسخة ليلية.
 
 ---
 
@@ -103,10 +103,10 @@ Ein Open-Source-Browser, in dem ein Coding-Agent (OpenCode u. ä.) einen echten,
 - **[Meinung]** Strategisches Risiko: Eine „Freigabe-Schicht“ als Erweiterung eines bestehenden Browsers oder als vermittelnder MCP-Server erreicht mit weniger Aufwand eventuell mehr Menschen als ein kompletter Browser, der auf Dauer alle paar Wochen Chromium-Sicherheitsupdates braucht. Nachfrage testen, bevor du mehr investierst.
 
 ## 2) Aktueller Stand (Fakten)
-- Veröffentlicht: `v0.0.1`; der Inhalt für `v0.0.2` ist in `main` gemerged (Release-Lauf wird verfolgt).
+- Veröffentlicht: `v0.0.8` (Oktober 2026); der Release-Workflow veröffentlicht automatisch, wenn die Version in `main` erhöht wird. Zuletzt: 0.0.6-0.0.7 Oberfläche auf Arabisch, Englisch und Deutsch, 0.0.8 Behebung von Abhängigkeits-Schwachstellen (`npm audit --omit=dev` ohne Funde; offen bleiben nur Werkzeuge für Video, `remotion`).
 - Fertig und gemerged: Release-Download repariert; dauerhaftes Aktivitätsprotokoll mit Export; Site-Regeln (fragen/blockieren); Injection-Alarm; Freigabe-Dialog mit Seite und Element; isoliertes Agent-Profil (optional, flüchtig); OpenCode-Button; blockierender Windows-Test in der CI.
 - **Nicht real getestet:** Installer unter Windows, echtes OpenCode, neue Einstellungsoberfläche, `browser_login` an echten Seiten.
-- Automatische Tests (über tausend Assertions) und CI auf Linux und Windows sind grün.
+- Automatische Tests (über 1300 bestandene Assertions, 0 Fehlschläge), `tsc` und `eslint` (0 Fehler, 1140 Warnungen) sowie die CI sind beim letzten Release grün.
 
 ## 3) Arbeitspakete (WP)
 Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du“ = braucht deinen Rechner, Besitz oder eine Entscheidung.
@@ -134,7 +134,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - [umgesetzt und getestet] Suite-Integration: alle übrigen Suites sind in zwei aufeinanderfolgenden vollständigen `npm test`-Läufen grün (u. a. 32 Auth-Prüfpunkte, 78 Sync-Richtigkeit, 11 Agent-Panel, 17 Clipboard/QR).
 - [umgesetzt und getestet] Prüfung von `supabase_schema.sql`: RLS-Richtlinien in Ordnung (Benutzer-Vault, Einladungen, security-definer-RPC). Ein Befund: `consumed_by` hat kein `on delete`, das Löschen eines Benutzers, der eine Einladung verbraucht hat, würde fehlschlagen — das Pairing-Feature ist aber derzeit deaktiviert (`PAIRING_AVAILABLE = false`), keine praktische Auswirkung.
 - [benötigt externe Umgebung] Live-Verifikation auf echtem Supabase mit zwei echten Konten und den tatsächlichen RLS-Richtlinien: in dieser Umgebung kein Testprojekt verfügbar.
-- [benötigt externe Umgebung] Der Nightly-Workflow aus PR #15 (bereits in main gemerged): die Reihenfolge „löschen vor hochladen“ lässt das Nightly-Release wegfallen, wenn der Upload fehlschlägt; Korrekturvorschlag steht im Abschlussbericht und wird hier nicht angewendet.
+- [umgesetzt] Nightly-Workflow (PR #15): „löschen vor hochladen“ wurde durch Überschreiben an Ort und Stelle ersetzt (Commit `b067692`); ein fehlgeschlagener Upload hinterlässt keine Lücke mehr.
 
 ### WP4 — Aufzeichnen und Abspielen (ich, nach WP2) — **umgesetzt, weder visuell noch an echten Seiten getestet**
 - Aktionen des Agenten als Schrittfolge aufzeichnen und ohne KI-Modell erneut abspielen, jedes Mal durch dasselbe Freigabe-Tor.
