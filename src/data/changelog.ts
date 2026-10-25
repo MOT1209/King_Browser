@@ -47,6 +47,20 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.8',
+    date: 'October 2026',
+    title: 'Security dependency updates',
+    badge: 'Pre-release',
+    lede: 'Updated runtime dependencies to close known vulnerabilities. No behaviour changes.',
+    highlights: [
+      'Electron, undici, body-parser and ip-address updated to patched versions; the runtime dependency audit now reports no known vulnerabilities.',
+    ],
+    changes: [
+      { category: 'security', text: 'Patched known denial-of-service and integrity-check advisories in runtime dependencies.' },
+      { category: 'improvement', text: 'Stray report files removed from the repository root; benchmark and audit documents moved to docs/.' },
+    ],
+  },
+  {
     version: '0.0.7',
     date: 'October 2026',
     title: 'The whole interface in Arabic, English and German',
