@@ -47,7 +47,7 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
-    version: '0.0.8',
+    version: '0.0.9',
     date: 'October 2026',
     title: 'The new tab page is back in shape',
     badge: 'Pre-release',
@@ -61,6 +61,20 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
       { category: 'fix', text: 'AI side panel: the chat scroll area uses its styles again.' },
       { category: 'fix', text: 'First-run screen: the start button no longer shows “&apos;”.' },
       { category: 'improvement', text: 'Tests now fail when a stylesheet class is no longer used by any component, or when a translated string contains an HTML entity.' },
+    ],
+  },
+  {
+    version: '0.0.8',
+    date: 'October 2026',
+    title: 'Security dependency updates',
+    badge: 'Pre-release',
+    lede: 'Updated runtime dependencies to close known vulnerabilities. No behaviour changes.',
+    highlights: [
+      'Electron, undici, body-parser and ip-address updated to patched versions; the runtime dependency audit now reports no known vulnerabilities.',
+    ],
+    changes: [
+      { category: 'security', text: 'Patched known denial-of-service and integrity-check advisories in runtime dependencies.' },
+      { category: 'improvement', text: 'Stray report files removed from the repository root; benchmark and audit documents moved to docs/.' },
     ],
   },
   {
