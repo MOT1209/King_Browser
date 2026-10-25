@@ -62,7 +62,7 @@ Rather than bloated cloud telemetry or generic hype, King focuses on concrete de
 
 King renders pages with the Chromium build bundled in Electron 43, so page-level JavaScript and rendering performance follow that Chromium version. King has **not** been benchmarked against Chrome, Brave or Safari; earlier comparison tables inherited from the upstream project were removed because they were not measured for this codebase.
 
-What King changes on top of Chromium: idle-tab hibernation (at most 6 live webviews), network-level ad/tracker blocking, and lazily loaded AI runtimes. `npm run benchmark` runs internal micro-benchmarks of these code paths; see [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md). They measure isolated functions in Node, not user-visible page-load speed.
+What King changes on top of Chromium: idle-tab hibernation (at most 6 live webviews), network-level ad/tracker blocking, and lazily loaded AI runtimes. `npm run benchmark` runs internal micro-benchmarks of these code paths; see [`BENCHMARK_REPORT.md`](docs/BENCHMARK_REPORT.md). They measure isolated functions in Node, not user-visible page-load speed.
 
 ### Network connections
 
