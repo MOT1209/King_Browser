@@ -56,7 +56,7 @@ export const copy = {
     releaseBadge: 'A fresh perspective', peaceOfMind: 'A little peace of mind',
     aiChipBadge: 'On your device. In your flow.', backToTop: 'Back to top',
     videoError: 'The video could not load. Check your connection and try again.', retryVideo: 'Retry video',
-    videoTitle: 'A closer look at King', videoDescription: 'A 36-second King film with animated graphics, English female narration and quiet original music. Arabic, English and German captions are available.',
+    videoTitle: 'A closer look at King', videoDescription: 'A 36-second King film with animated graphics, real King screenshots and quiet original music. It has no narration; all text appears on screen in your language.',
     pageTitle: 'King — A little more space.',
   },
   ar: {
@@ -108,7 +108,7 @@ export const copy = {
     releaseBadge: 'منظور جديد', peaceOfMind: 'قليل من راحة البال',
     aiChipBadge: 'على جهازك. وفي انسيابك.', backToTop: 'العودة إلى الأعلى',
     videoError: 'تعذّر تحميل الفيديو. تحقّق من اتصالك وحاول مجدداً.', retryVideo: 'إعادة تحميل الفيديو',
-    videoTitle: 'نظرة أقرب على King', videoDescription: 'فيلم قصير عن King مدته 36 ثانية، فيه رسوم متحركة وتعليق صوتي نسائي بالإنجليزية وموسيقى أصلية هادئة. تتوفر ترجمة نصية بالعربية والإنجليزية والألمانية.',
+    videoTitle: 'نظرة أقرب على King', videoDescription: 'فيلم قصير عن King مدته 36 ثانية، فيه رسوم متحركة ولقطات حقيقية من King وموسيقى أصلية هادئة. لا يوجد تعليق صوتي؛ كل النصوص تظهر على الشاشة بلغتك.',
     pageTitle: 'King — مساحة أكبر قليلاً.',
   },
   de: {
@@ -160,7 +160,7 @@ export const copy = {
     releaseBadge: 'Eine neue Perspektive', peaceOfMind: 'Ein wenig Seelenfrieden',
     aiChipBadge: 'Auf Ihrem Gerät. In Ihrem Fluss.', backToTop: 'Nach oben',
     videoError: 'Das Video konnte nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.', retryVideo: 'Video erneut laden',
-    videoTitle: 'King aus der Nähe', videoDescription: 'Ein 36-sekündiger Film über King mit Animationen, englischer Sprecherin und ruhiger, eigens komponierter Musik. Untertitel auf Arabisch, Englisch und Deutsch sind verfügbar.',
+    videoTitle: 'King aus der Nähe', videoDescription: 'Ein 36-sekündiger Film über King mit Animationen, echten King-Screenshots und ruhiger, eigens komponierter Musik. Ohne Sprecher; alle Texte erscheinen auf dem Bildschirm in Ihrer Sprache.',
     pageTitle: 'King — Ein wenig mehr Raum.',
   },
 }

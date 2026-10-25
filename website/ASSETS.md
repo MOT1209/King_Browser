@@ -14,7 +14,7 @@ Use case: photorealistic-natural. Create a premium panoramic landscape asset for
 
 ## New website product film
 
-`king-tour.mp4` and `king-tour.poster.jpg` replace the original walkthrough in the video dialog. The 27-second, 1080p/30fps film was authored and rendered in Remotion using real King screenshots, the existing generated alpine landscape, and the site’s Manrope font. Its instrumental score was synthesized for this project without third-party music. English and Turkish WebVTT captions are provided. Editable source and render instructions: `video/src/NovaWebsiteTour.tsx` and `video/WEBSITE-TOUR.md`.
+`king-tour.{en,ar,de}.mp4` and `king-tour.{en,ar,de}.poster.jpg` are the website product film, one render per site language. The 36-second, 1080p/30fps film was authored and rendered in Remotion from real screenshots of the current King interface in each language. It has no narration: all text is on screen, so no caption files are needed. Its instrumental score was synthesized for this project without third-party music. Editable source and render instructions: `video/src/KingWebsiteTour.tsx` and `video/WEBSITE-TOUR.md`.
 
 ## Updated tour screenshots — 2026-10-06
 

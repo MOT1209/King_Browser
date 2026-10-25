@@ -5,6 +5,8 @@ import { createRoot } from 'react-dom/client'
 import App, { initialLanguage, platforms, VERSION } from '../src/App'
 import { copy, languages } from '../src/content'
 import pkg from '../../package.json'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 
 /** Expand electron-builder's ${version}/${arch}/${ext} for the arch and extension a download link names. */
 function expectedNames(template: string, ext: string) {
@@ -31,6 +33,15 @@ function assertDownloadNamesMatchBuildConfig() {
 }
 
 /** Every language must carry the same keys and the same list lengths as English, so no screen falls back to an empty string. */
+/** Each site language has its own rendered film and poster. */
+function assertFilmsExist() {
+  for (const { code } of languages) {
+    for (const file of [`king-tour.${code}.mp4`, `king-tour.${code}.poster.jpg`]) {
+      assert.ok(existsSync(join(process.cwd(), 'public/images', file)), `Missing website film asset: ${file}`)
+    }
+  }
+}
+
 function assertCopyParity() {
   assert.deepEqual(languages.map(l => l.code).sort(), ['ar', 'de', 'en'])
   assert.deepEqual(Object.keys(copy).sort(), ['ar', 'de', 'en'], 'Site languages are Arabic, English and German')
@@ -53,6 +64,7 @@ function assertCopyParity() {
 async function run() {
   assertDownloadNamesMatchBuildConfig()
   assertCopyParity()
+  assertFilmsExist()
   const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost/' })
   const w = dom.window
   Object.assign(globalThis, { window: w, document: w.document, localStorage: w.localStorage, Node: w.Node, IS_REACT_ACT_ENVIRONMENT: true })
@@ -110,9 +122,8 @@ async function run() {
   await click(button('Take a closer look'))
   const video = document.querySelector('video')!
   assert.equal(document.body.style.overflow, 'hidden')
-  const tracks = [...document.querySelectorAll('track')]
-  assert.deepEqual(tracks.map(t => t.srclang).sort(), ['ar', 'de', 'en'], 'Video must provide Arabic, English and German caption tracks')
-  assert.equal(tracks.find(t => t.srclang === 'en')?.default, true, 'Captions follow the page language')
+  assert.equal(video.getAttribute('src'), '/images/king-tour.en.mp4', 'The film matches the page language')
+  assert.equal(video.getAttribute('poster'), '/images/king-tour.en.poster.jpg')
   await act(async () => video.dispatchEvent(new w.Event('error')))
   assert.ok(document.querySelector('[role="alert"]'), 'Failed media needs a visible recovery state')
   await click(button('Retry video'))
@@ -125,6 +136,7 @@ async function run() {
   assert.equal(document.documentElement.lang, 'ar')
   assert.equal(document.documentElement.dir, 'rtl', 'Arabic switches the page to right-to-left')
   assert.equal(document.title, copy.ar.pageTitle)
+  assert.equal(document.querySelector('video')?.getAttribute('src'), '/images/king-tour.ar.mp4', 'Arabic visitors get the Arabic film')
   assert.equal(w.localStorage.getItem('king-language'), 'ar', 'The choice is remembered')
   assert.ok(document.querySelector('#hero-title')?.textContent?.includes(copy.ar.hero[0]), 'Arabic copy is rendered')
   await act(async () => { picker.value = 'de'; picker.dispatchEvent(new w.Event('change', { bubbles: true })) })
@@ -134,7 +146,7 @@ async function run() {
   await click(button('Take a closer look'))
   await act(async () => root.unmount())
   assert.equal(document.body.style.overflow, 'clip', 'Unmount while open must release scroll lock')
-  console.log('[PASS] Website languages (ar/en/de, RTL), tab references, keyboard navigation, mobile menu, captions, media recovery and scroll-lock cleanup.')
+  console.log('[PASS] Website languages (ar/en/de, RTL, per-language film), tab references, keyboard navigation, mobile menu, media recovery and scroll-lock cleanup.')
   dom.window.close()
 }
 run().then(() => process.exit(0)).catch(error => { console.error(error); process.exit(1) })
