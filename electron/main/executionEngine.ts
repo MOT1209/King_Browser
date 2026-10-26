@@ -8,6 +8,9 @@
  * - Exactly one action in flight at any time (no uncontrolled parallel actions).
  * - Queued actions are bounded; every submitted action settles exactly once
  *   with a terminal status: completed | failed | cancelled | rejected.
+ * - A paused engine never buffers agent work: a submission that arrives while
+ *   paused fails fast with guidance instead of waiting for a resume that may
+ *   never come.
  * - STOP NOW rejects new submissions immediately, cancels the queue, aborts the
  *   in-flight operation when supported, and silently discards any late
  *   completion (generation guard) so delayed commands can never continue.
@@ -252,6 +255,16 @@ export class ExecutionEngine {
           `Phase "${this.phase.objective}" reached its action budget (${this.phase.maxActions}).`
         ));
       }
+    }
+
+    // A paused engine must answer immediately. Buffering here used to leave the
+    // caller waiting on a promise that only settled after a resume, so the MCP
+    // client timed out while the action stayed behind and then ran anyway.
+    if (this.state === 'paused') {
+      return Promise.reject(new Error(
+        `Execution engine is paused: "${request.toolName}" was not queued. ` +
+        `Call browser_resume (or browser_next_step) to continue, then retry.`
+      ));
     }
 
     return new Promise<ActionRecord>((resolve, reject) => {

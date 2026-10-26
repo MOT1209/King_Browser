@@ -43,6 +43,23 @@ async function agentNavigationAllowed(url: string): Promise<{ ok: boolean; reaso
 }
 import { searchHistoryAndBookmarks, SearchableItem } from '../utils/searchHistoryBookmarks';
 
+// A ref the agent was never issued (or one a navigation invalidated) is
+// forwarded to the page as `[data-king-ref="e12"]`, and the plain "element not
+// found" it got back said nothing about refs. browser_snapshot is the only
+// source of refs and it is disabled by default, so an agent can invent one
+// without ever being able to check it: the error has to name the ref, say why
+// it is gone, and offer the selector route.
+const REF_SELECTOR_PATTERN = /^\[data-king-ref="(e[1-9][0-9]{0,4})"\]$/;
+
+function describeMissingTarget(selector: string, message: unknown): string {
+  const text = typeof message === 'string' && message ? message : 'Element not found.';
+  const ref = REF_SELECTOR_PATTERN.exec(selector)?.[1];
+  if (ref && /not found/i.test(text)) {
+    return `Ref ${ref} is not on the current page. Refs are cleared by navigation and by every new snapshot, and browser_snapshot is disabled by default (enable it in Settings -> MCP). Take a snapshot and use the refs it returns, or pass a CSS selector.`;
+  }
+  return text;
+}
+
 export interface UseBrowserAgentBridgeOptions {
   activeTabId: string | null;
   tabs: Tab[];
@@ -340,7 +357,7 @@ export function useBrowserAgentBridge({
             // The MCP layer only marks a string that starts with "Error:" as a
             // tool failure, so a bare message here would be reported to the
             // agent as a successful click.
-            return `Error: ${result?.error || 'Click failed for an unknown reason.'}`;
+            return `Error: ${describeMissingTarget(safeArgs.selector, result?.error || 'Click failed for an unknown reason.')}`;
           }
           return "Error: No active webview available.";
 
@@ -385,7 +402,7 @@ export function useBrowserAgentBridge({
               }));
               return "Successfully typed text.";
             }
-            return `Error: ${result?.error || 'Typing failed for an unknown reason.'}`;
+            return `Error: ${describeMissingTarget(safeArgs.selector, result?.error || 'Typing failed for an unknown reason.')}`;
           }
           return "Error: No active webview available.";
         }

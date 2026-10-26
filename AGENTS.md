@@ -62,7 +62,7 @@ The authoritative list is `electron/mcpServer.ts`; some names are aliases of eac
 
 ### How to work
 
-1. Take a `browser_snapshot` and target elements by `ref` rather than guessing CSS selectors. Refs are stamped on elements and accepted only in the form `e<number>`; re-snapshot after the page changes.
+1. Target elements by the `ref` that `browser_snapshot` returns rather than guessing CSS selectors. Refs are stamped on elements and accepted only in the form `e<number>`; they are cleared by navigation and by every new snapshot, so snapshot again after the page changes. `browser_snapshot` is a medium tool and is disabled by default: if it is not in `tools/list`, either enable it in Settings -> MCP or pass a CSS selector instead. Never invent a ref you were not given.
 2. Prefer reading tools over acting tools. Act only when the task needs it.
 3. If an action returns "approval required", stop and wait. Do not retry it, rephrase it, or split it into smaller actions to get past the gate.
 4. Use `browser_request_approval` when you are about to do something consequential and the policy may not know it yet.

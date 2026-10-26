@@ -393,6 +393,32 @@ async function run() {
     console.log('[PASS] Execution Engine — event stream ordering');
   }
 
+  // 16. A submit that arrives while the engine is paused is refused at once.
+  // Regression: it used to join the queue and never settle, so the MCP client
+  // timed out while the action stayed behind and ran on the next resume.
+  {
+    const { calls, executor } = makeControlledExecutor();
+    const engine = new ExecutionEngine({ executor });
+    const p1 = engine.submit(req('browser_click'));
+    engine.pause();
+    assert.equal(engine.getState(), 'paused', 'engine is paused');
+
+    const pausedError = await engine.submit(req('browser_scroll')).then(
+      () => null,
+      (error: Error) => error
+    );
+    assert.ok(pausedError, 'paused engine refuses the submission instead of buffering it');
+    assert.match(pausedError!.message, /paused/i, 'the rejection says the engine is paused');
+    assert.match(pausedError!.message, /browser_resume|browser_next_step/, 'the rejection tells the agent how to continue');
+    assert.equal(engine.getQueueLength(), 0, 'nothing was silently queued while paused');
+
+    calls[0].resolve('ok');
+    await p1;
+    await flush();
+    assert.equal(calls.length, 1, 'the refused action never reached the executor');
+    console.log('[PASS] Execution Engine — paused submit fails fast instead of hanging');
+  }
+
   console.log('[PASS] Execution Engine suite complete');
 }
 

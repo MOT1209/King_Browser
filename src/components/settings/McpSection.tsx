@@ -15,11 +15,17 @@ export interface McpSectionProps {
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
 }
 
-const MCP_TOOLS = [
-  { name: 'browser_navigate', desc: 'Navigate to a URL', level: 'safe' },
-  { name: 'browser_read_page', desc: 'Extract full page text + links', level: 'safe' },
-  { name: 'browser_snapshot', desc: 'List interactive elements with refs (e12) for click/type', level: 'safe' },
-  { name: 'browser_screenshot', desc: 'Take a screenshot', level: 'safe' },
+// Display copy for the Settings list. The levels here must mirror
+// electron/mcpServer.ts TOOL_PERMISSIONS exactly: this list drives the visible
+// badge AND the enable/disable toggle, so a level that disagrees with the
+// server tells the user a tool is harmless while the server classifies it as
+// page-reading or sensitive. tools_mcp_catalog.test.ts fails on any drift.
+export const MCP_TOOLS = [
+  { name: 'king_browser_info', desc: 'Browser version and capabilities', level: 'safe' },
+  { name: 'browser_navigate', desc: 'Navigate to a URL', level: 'medium' },
+  { name: 'browser_read_page', desc: 'Extract full page text + links', level: 'medium' },
+  { name: 'browser_snapshot', desc: 'List interactive elements with refs (e12) for click/type', level: 'medium' },
+  { name: 'browser_screenshot', desc: 'Take a screenshot', level: 'medium' },
   { name: 'browser_list_tabs', desc: 'List all open tabs', level: 'safe' },
   { name: 'browser_get_url', desc: 'Get the current tab URL', level: 'safe' },
   { name: 'browser_scroll', desc: 'Scroll the page up/down/top/bottom', level: 'safe' },
@@ -27,7 +33,7 @@ const MCP_TOOLS = [
   { name: 'browser_go_forward', desc: 'Navigate forward in history', level: 'safe' },
   { name: 'browser_reload', desc: 'Reload the current page', level: 'safe' },
   { name: 'browser_wait', desc: 'Wait for N milliseconds', level: 'safe' },
-  { name: 'browser_get_element_text', desc: 'Get an element\'s text content', level: 'safe' },
+  { name: 'browser_get_element_text', desc: 'Get an element\'s text or form value', level: 'medium' },
   { name: 'browser_scroll_to_element', desc: 'Scroll until element is visible', level: 'safe' },
 
   { name: 'browser_click', desc: 'Click an element by CSS selector', level: 'medium' },

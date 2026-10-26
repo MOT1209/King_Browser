@@ -46,7 +46,7 @@ interface McpTool {
   };
 }
 
-const TOOLS: McpTool[] = [
+export const TOOLS: McpTool[] = [
   {
     name: 'king_browser_info',
     description: 'Provides context about King Browser and the MCP integration. You can interact with the browser using browser_* tools according to user instructions and safety approvals. Sensitive actions require explicit user confirmation. Call this tool if you need a reminder of what King Browser is.',
@@ -484,7 +484,7 @@ const INJECTION_GATED_TOOLS = new Set([
 // using the live page URL when the arguments carry none.
 const SITE_RULE_TOOLS = new Set([
   ...PAGE_CONTEXT_TOOLS,
-  'browser_read_page', 'browser_snapshot', 'browser_screenshot', 'browser_full_page_screenshot',
+  'browser_read_page', 'browser_snapshot', 'browser_screenshot',
   'browser_get_element_text', 'browser_find_element', 'browser_run_js',
   'browser_scroll', 'browser_scroll_to_element', 'browser_hover', 'browser_focus',
   'browser_wait_for', 'browser_console_messages', 'browser_element_screenshot'
@@ -508,7 +508,6 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_read_page: 'medium',
   browser_snapshot: 'medium',
   browser_screenshot: 'medium',
-  browser_full_page_screenshot: 'medium',
   browser_get_element_text: 'medium',
   // Medium — navigation & window actions
   browser_navigate: 'medium',
@@ -847,10 +846,9 @@ export class BrowserMCPServer {
   private isToolAllowed(toolName: string): boolean {
     // Allowlist, not blocklist. "Not in the disabled set" let any name the
     // registry never declared — a typo, a tool removed from TOOLS but still
-    // listed in TOOL_PERMISSIONS (browser_full_page_screenshot), or a
-    // non-string such as an absent body.params.name — pass the gate and be
-    // forwarded to the renderer. A name must now be a registered tool AND not
-    // be disabled.
+    // listed in TOOL_PERMISSIONS, or a non-string such as an absent
+    // body.params.name — pass the gate and be forwarded to the renderer. A name
+    // must now be a registered tool AND not be disabled.
     return this.isRegisteredTool(toolName) && !this.disabledTools.has(toolName);
   }
 

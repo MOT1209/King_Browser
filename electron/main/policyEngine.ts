@@ -85,7 +85,6 @@ const READ_ONLY_TOOLS = new Set([
   'browser_read_page',
   'browser_snapshot',
   'browser_screenshot',
-  'browser_full_page_screenshot',
   'browser_get_url',
   'browser_get_element_text',
   'browser_list_tabs',

@@ -26,7 +26,7 @@
 | # | قل لـ OpenCode | المتوقع |
 |---|---|---|
 | 1 | "افتح https://example.com واقرأ العنوان" | ينتقل ويعيد "Example Domain". يظهر مؤشر الوكيل وشريط النشاط. |
-| 2 | "خذ browser_snapshot لهذه الصفحة ثم انقر على رابط More information" | يعرض عناصر بمراجع (`e1`...) وينقر بالمرجع وتنتقل الصفحة. |
+| 2 | "خذ browser_snapshot لهذه الصفحة ثم انقر على رابط More information" | يعرض عناصر بمراجع (`e1`...) وينقر بالمرجع وتنتقل الصفحة. **يلزم تفعيل `browser_snapshot`** من الإعدادات ← MCP (مستوى متوسط، معطّل افتراضياً)؛ إن لم تفعّله فاطلب النقر بمحدّد CSS بدل المرجع. |
 | 3 | على صفحة فيها زر شراء/حذف/إضافة للسلة (صفحة تجريبية، **ليس حسابك الحقيقي**): "انقر على Add to cart" | **تظهر نافذة موافقة** بالموقع والعنصر. اضغط **Reject**: يُبلَّغ الوكيل بالرفض ولا ينفَّذ شيء. |
 | 4 | الإعدادات ← MCP ← وضع الموافقة = **Strict**، ثم "اقرأ الصفحة الحالية" | تظهر نافذة موافقة حتى للقراءة. أعده إلى Balanced بعد الاختبار. |
 | 5 | أضف قاعدة موقع: `example.com` = **Block**، ثم "افتح example.com" | يُرفض بعبارة "Blocked by your site rule". احذف القاعدة بعد الاختبار. |
@@ -72,7 +72,7 @@ Zu jedem: **Erwartet**, dann Ergebnis notieren (ok / Fehler + Meldung).
 | # | Sag zu OpenCode | Erwartet |
 |---|---|---|
 | 1 | „Öffne https://example.com und lies die Überschrift“ | Navigiert, liefert „Example Domain“. Agent-Zeiger und Aktivitätsleiste erscheinen. |
-| 2 | „Mach ein browser_snapshot dieser Seite und klicke den Link More information“ | Listet Elemente mit Referenzen (`e1` …), klickt per Referenz, die Seite wechselt. |
+| 2 | „Mach ein browser_snapshot dieser Seite und klicke den Link More information“ | Listet Elemente mit Referenzen (`e1` …), klickt per Referenz, die Seite wechselt. **`browser_snapshot` muss aktiviert sein** (Einstellungen → MCP; Stufe mittel, standardmäßig aus); sonst stattdessen einen CSS-Selektor verlangen. |
 | 3 | Auf einer Seite mit Kauf-/Lösch-/Warenkorb-Button (Testseite, **nicht dein echtes Konto**): „Klicke auf Add to cart“ | **Freigabe-Dialog** mit Seite und Element. **Reject** drücken: Agent erfährt die Ablehnung, nichts wird ausgeführt. |
 | 4 | Einstellungen → MCP → Freigabemodus = **Strict**, dann „Lies die aktuelle Seite“ | Freigabe-Dialog sogar fürs Lesen. Danach zurück auf Balanced. |
 | 5 | Site-Regel `example.com` = **Block**, dann „Öffne example.com“ | Abgelehnt mit „Blocked by your site rule“. Regel danach löschen. |
