@@ -10,7 +10,7 @@
  */
 
 import type { ActionRecord } from './executionEngine.js';
-import { redactArgs } from './policyEngine.js';
+import { redactArgsForLog } from './policyEngine.js';
 
 export type ActivityLogFormat = 'json' | 'csv';
 
@@ -50,7 +50,7 @@ export function buildActivityLog(history: readonly ActionRecord[]): ActivityLogE
     risk: record.risk,
     status: record.status,
     summary: record.summary ?? '',
-    args: redactArgs(record.toolName, record.args ?? {}),
+    args: redactArgsForLog(record.toolName, record.args ?? {}),
     requestedAt: toIso(record.requestedAt),
     durationMs:
       record.startedAt !== undefined && record.endedAt !== undefined

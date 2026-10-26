@@ -205,6 +205,24 @@ export function redactArgs(
   return out;
 }
 
+/**
+ * Redaction for the persisted/exported activity log. Unlike the approval path,
+ * the log has no element description, so it cannot tell a neutral selector
+ * ("#f1") or an opaque snapshot ref ("[data-king-ref=\"e12\"]") from a password
+ * field. Fail closed: the log keeps the target and the action, never the typed
+ * value. The policy decision still uses redactArgs with the live description.
+ */
+export function redactArgsForLog(
+  toolName: string,
+  args: Record<string, unknown>
+): Record<string, unknown> {
+  const redacted = redactArgs(toolName, args);
+  if (toolName === 'browser_type' && typeof args.text === 'string' && args.text.length > 0) {
+    redacted.text = REDACTED_VALUE;
+  }
+  return redacted;
+}
+
 interface ClassificationContext {
   triggers: ApprovalTrigger[];
   reasons: string[];

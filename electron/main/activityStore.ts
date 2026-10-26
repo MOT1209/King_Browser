@@ -11,7 +11,7 @@
 
 import * as fs from 'node:fs';
 import type { ActionRecord, ActionStatus } from './executionEngine.js';
-import { redactArgs } from './policyEngine.js';
+import { redactArgsForLog } from './policyEngine.js';
 
 const TERMINAL_STATUSES: ReadonlySet<ActionStatus> = new Set(['completed', 'failed', 'cancelled', 'rejected']);
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
@@ -54,7 +54,7 @@ export function createActivityStore(filePath: string, maxBytes: number = DEFAULT
         } catch {
           /* no file yet */
         }
-        const safe: ActionRecord = { ...record, args: redactArgs(record.toolName, record.args ?? {}) };
+        const safe: ActionRecord = { ...record, args: redactArgsForLog(record.toolName, record.args ?? {}) };
         fs.appendFileSync(filePath, JSON.stringify(safe) + '\n', { encoding: 'utf8', mode: 0o600 });
       } catch {
         /* the audit file must never break the agent */
