@@ -19,7 +19,7 @@ function getUserDataPath() {
 }
 function resolveMcpConfig() {
   let port = 3020;
-  let token = process.env.MCP_TOKEN;
+  const token = process.env.MCP_TOKEN;
   if (process.env.MCP_PORT) {
     const parsed = parseInt(process.env.MCP_PORT, 10);
     if (!isNaN(parsed) && parsed > 0 && parsed < 65536) port = parsed;
@@ -74,10 +74,7 @@ async function main() {
       return { tools: [] };
     }
   });
-  // Sensitive tools wait for the user's approval in King Browser (up to
-  // MCP_APPROVAL_WINDOW_MS + MCP_ACTION_TIMEOUT_MS in src/utils/mcpActionTiming.ts).
-  // The SDK's default 60s request timeout would cut that short.
-  const TOOL_CALL_TIMEOUT_MS = 180000;
+  const TOOL_CALL_TIMEOUT_MS = 18e4;
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
       const response = await client.callTool(request.params, void 0, { timeout: TOOL_CALL_TIMEOUT_MS });

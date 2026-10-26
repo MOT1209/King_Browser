@@ -6,7 +6,11 @@ import pkg from '../../package.json'
 
 const REPO = 'https://github.com/MOT1209/King_Browser'
 
-/** Single source of truth: Windows installers carry the package.json version in their file names. */
+/**
+ * Single source of truth: Windows installers carry the package.json version in their file names.
+ * Releases also publish version-free copies (King-Browser-Setup-x64.exe, King-Browser-Portable-x64.exe;
+ * see the release workflow); once the latest release has them, link those instead.
+ */
 export const VERSION = pkg.version
 const RELEASE = `${REPO}/releases/latest/download/`
 // Windows first and selected by default: it is the platform released first.
@@ -16,11 +20,19 @@ export const platforms = [
   { name: 'Linux', icon: Terminal, choices: [{ name: 'AppImage · x64', file: 'King-Browser-x86_64.AppImage', type: '.AppImage' }, { name: 'Debian / Ubuntu', file: 'King-Browser-amd64.deb', type: '.deb' }] },
 ]
 
-/** Saved choice first, then the visitor's browser language; anything else (including the retired Turkish) falls back to English. */
+/**
+ * A ?lang= link first (the hreflang URLs in index.html), then the saved choice,
+ * then the visitor's browser language; anything else (including the retired
+ * Turkish) falls back to English.
+ */
 export function initialLanguage(): SiteLanguage {
   const pick = (value: string | null | undefined): SiteLanguage | null => {
     const code = value?.toLowerCase().split('-')[0]
     return code === 'ar' || code === 'de' || code === 'en' ? code : null
+  }
+  if (typeof location !== 'undefined') {
+    const linked = pick(new URLSearchParams(location.search).get('lang'))
+    if (linked) return linked
   }
   try {
     const saved = pick(localStorage.getItem('king-language'))
@@ -54,6 +66,7 @@ export default function App() {
     document.documentElement.lang = lang
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
     document.title = copy[lang].pageTitle
+    document.querySelector('meta[name="description"]')?.setAttribute('content', copy[lang].intro)
     try { localStorage.setItem('king-language', lang) } catch { /* Storage may be disabled. */ }
   }, [lang])
 
@@ -169,7 +182,7 @@ export default function App() {
             <div className="feature-copy"><h3>{t.privacyTitle}</h3><p>{t.privacyText}</p><a className="text-link" href={`${REPO}#security--privacy-commitment`} target="_blank" rel="noopener noreferrer">{t.privacyLink}<ArrowUpRight size={17} /></a></div>
           </article>
           <article className="ai-feature">
-            <div className="ai-art" aria-hidden="true"><div className="ai-light" /><div className="ai-chip"><div className="chip-label">KING</div><Sparkles size={45} strokeWidth={1.2} /><div className="chip-bottom">LOCAL AI</div></div><div className="ai-art-label"><LockKeyhole size={12} aria-hidden="true" />{t.aiChipBadge}</div></div>
+            <div className="ai-art" aria-hidden="true"><div className="ai-light" /><div className="ai-chip"><div className="chip-label">KING</div><Sparkles size={45} strokeWidth={1.2} /><div className="chip-bottom">{t.aiChip}</div></div><div className="ai-art-label"><LockKeyhole size={12} aria-hidden="true" />{t.aiChipBadge}</div></div>
             <div className="feature-copy"><h3>{t.aiTitle}</h3><p>{t.aiText}</p><span className="feature-note">{t.aiNote}</span></div>
           </article>
         </div>

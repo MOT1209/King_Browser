@@ -2,9 +2,9 @@
 
 All assets are served locally; the site does not request external image or font hosts.
 
-- `public/images/king-icon.png`, `king-mark.png`, `public/logo.png`, `public/king-icon.png`: the King app icon (`build/icon.png`, crown and globe), resized.
-- `newtab.png`, `assistant.png`, `sync.png`: original repository screenshots. The assistant image is displayed as a CSS crop of the actual sidebar; no UI was invented or redrawn.
-- `tour.webm`, `tour-poster.jpg`: existing King product walkthrough from `website/public/demo/`. The walkthrough is silent and has a descriptive text label.
+- `public/images/king-icon.png`, `king-mark.png`: the King app icon (`build/icon.png`, crown and globe), resized. `public/logo.svg` is the vector master named in `docs/brand-guidelines.md`.
+- `images/*-clean-light.jpg`: the screenshots the page shows. `images/newtab.png` and `images/assistant.png` are kept only for the Linux AppStream metadata (`build/com.kingbrowser.app.metainfo.xml`), which links them from GitHub.
+- `images/king-tour.{en,ar,de}.mp4` and their `.poster.jpg`: the product film in each site language, chosen by the page language.
 - Manrope: installed through `@fontsource-variable/manrope`, served by Vite. Lucide icons: `lucide-react`.
 - `alpine.webp`: generated for this website with the built-in image generation tool, then converted to WebP at quality 86 (approximately 135 KB).
 

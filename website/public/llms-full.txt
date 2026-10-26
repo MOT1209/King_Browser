@@ -2,7 +2,8 @@
 
 > A free, open-source desktop browser with local AI, workspaces, network filtering, encrypted sync, and native MCP integration.
 
-King is available for macOS (Apple Silicon and Intel), Windows x64, and Linux x64. It is built with Electron, React and TypeScript and licensed under MIT.
+King is available for macOS (Apple Silicon and Intel), Windows x64, and Linux x64. Website: https://king-browser.vercel.app
+It is built with Electron, React and TypeScript and licensed under MIT.
 
 ## Features
 
@@ -18,9 +19,10 @@ King is available for macOS (Apple Silicon and Intel), Windows x64, and Linux x6
 - Source code: https://github.com/MOT1209/King_Browser (derived from https://github.com/unitybtw/nova-browser)
 - Latest release and installers: https://github.com/MOT1209/King_Browser/releases/latest
 - Report an issue: https://github.com/MOT1209/King_Browser/issues
-- License: https://github.com/unitybtw/nova-browser/blob/main/LICENSE
+- License (MIT): https://github.com/MOT1209/King_Browser/blob/main/LICENSE
+- Upstream attribution: https://github.com/MOT1209/King_Browser/blob/main/THIRD_PARTY_LICENSES.md
 
-The website offers English and Turkish copy. Download the installer matching your operating system and processor architecture from official GitHub releases.
+The website is available in English, Arabic and German (https://king-browser.vercel.app/?lang=en, ?lang=ar, ?lang=de). The browser interface is available in the same three languages. Download the installer matching your operating system and processor architecture from official GitHub releases.
 
 ## Local AI requirements
 

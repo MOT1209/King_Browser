@@ -155,6 +155,18 @@ jobs:
           path: release-files
           merge-multiple: true
 
+      # The website links /releases/latest/download/<name>. Versioned Windows
+      # names would make a version bump point the site at a file that is not
+      # published yet, so every release also carries version-free copies.
+      - name: Stable Windows download names
+        working-directory: release-files
+        run: |
+          setup=$(ls King-Browser-Setup-*-x64.exe 2>/dev/null | head -n 1 || true)
+          portable=$(ls King-Browser-*-x64.exe 2>/dev/null | grep -v -- '-Setup-' | head -n 1 || true)
+          if [ -n "$setup" ]; then cp "$setup" King-Browser-Setup-x64.exe; fi
+          if [ -n "$portable" ]; then cp "$portable" King-Browser-Portable-x64.exe; fi
+          ls -la
+
       - name: SHA256SUMS
         working-directory: release-files
         run: sha256sum $(ls | grep -v '\.yml$') > SHA256SUMS.txt

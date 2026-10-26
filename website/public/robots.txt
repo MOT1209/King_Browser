@@ -31,3 +31,8 @@ User-agent: OAI-SearchBot
 Allow: /
 
 # Sitemaps & Structured LLM Context
+Sitemap: https://king-browser.vercel.app/sitemap.xml
+
+# Plain-text summaries for language models
+# https://king-browser.vercel.app/llms.txt
+# https://king-browser.vercel.app/llms-full.txt

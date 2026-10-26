@@ -227,6 +227,8 @@
   .hero-actions { animation: quiet-arrive 650ms var(--ease) 260ms backwards; }
   .availability { animation: quiet-arrive 650ms var(--ease) 330ms backwards; }
   .platform-file-list { display: flex; flex-direction: column; gap: 9px; animation: fade-in 250ms var(--ease); }
+  /* WCAG 2.2 target size: the small text links still get a 24px hit area. */
+  .text-link, .all-releases, .footer-top a, .footer-bottom a { min-height: 24px; }
   .button > svg, .text-link > svg, .download-file > svg, .footer-top a > svg { transition: transform 200ms var(--ease); }
   .button:hover > svg, .text-link:hover > svg, .footer-top a:hover > svg { transform: translate(2px, -2px); }
   .hero-actions .button:hover > svg, .download-file:hover > svg { transform: translateY(2px); }

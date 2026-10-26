@@ -20,6 +20,7 @@ import { recordConsoleMessage, getConsoleMessages, clearConsoleMessages, normali
 import { classifyAction } from '../electron/main/policyEngine';
 import { resolveElementRef } from '../electron/main/elementRefs';
 import { displayWorkspaceName, seedDictionary, setLanguage } from '../src/services/i18n';
+import { replyLanguage, say } from '../src/services/aiAgent/intentParser';
 
 console.log('--- Agent browser tools ---');
 let passed = 0;
@@ -77,6 +78,19 @@ check('a renamed default workspace keeps its name', displayWorkspaceName({ id: '
 check('a user workspace called Personal is not translated', displayWorkspaceName({ id: 'w2', name: 'Personal' }) === 'Personal');
 setLanguage('en');
 check('English shows Personal', displayWorkspaceName({ id: 'default', name: 'Personal' }) === 'Personal');
+
+// --- agent reply language -----------------------------------------------------
+// German shares ü/ö with Turkish; it used to be answered in Turkish.
+setLanguage('en');
+check('Arabic text gets Arabic replies', replyLanguage('افتح يوتيوب') === 'ar');
+check('German with umlauts is not Turkish', replyLanguage('Öffne bitte die Seite für Nachrichten') === 'de');
+check('German "über" is not Turkish', replyLanguage('Suche über Electron') === 'de');
+check('Turkish-only letters are Turkish', replyLanguage('sayfayı aşağı kaydır') === 'tr');
+check('plain English stays English', replyLanguage('open youtube') === 'en');
+check('say falls back to English', say('de', { en: 'x', tr: 't', ar: 'a', de: '' } as any) === '' && say('xx' as any, { en: 'x', tr: 't', ar: 'a', de: 'd' }) === 'x');
+const agentSource = readFileSync(join(__dirname, '..', 'src', 'services', 'aiAgent.ts'), 'utf8');
+check('no agent message is left Turkish/English only', !/\bisTr\b/.test(agentSource));
+check('the goal report labels are not Turkish for everyone', !agentSource.includes('**Baglanti:**') && !agentSource.includes('**Detay:**'));
 
 // --- bridge source guarantees -------------------------------------------------
 const bridge = readFileSync(join(__dirname, '..', 'src', 'hooks', 'useBrowserAgentBridge.ts'), 'utf8');

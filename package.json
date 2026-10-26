@@ -149,6 +149,7 @@
     "lint": "eslint . --quiet",
     "check:i18n": "node scripts/check-i18n.cjs",
     "check:strings": "node scripts/check-hardcoded-strings.cjs",
+    "build:bridge": "esbuild mcp-bridge.ts --format=esm --platform=node --outfile=mcp-bridge.mjs --log-level=warning",
     "benchmark": "esbuild tests/benchmark_suite.ts --bundle --platform=node --outfile=dist-test/benchmark_suite.cjs && node dist-test/benchmark_suite.cjs",
     "benchmark:speedometer": "esbuild scripts/speedometer_runner.ts --bundle --platform=node --outfile=dist-test/speedometer_runner.cjs --external:electron && electron dist-test/speedometer_runner.cjs",
     "pack:win": "npm run build && electron-builder --win",

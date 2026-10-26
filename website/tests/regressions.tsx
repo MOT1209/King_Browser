@@ -77,10 +77,18 @@ async function run() {
   let loads = 0
   w.HTMLMediaElement.prototype.pause = () => {}
   w.HTMLMediaElement.prototype.load = () => { loads++ }
+  // Node exposes the machine's own language as navigator.language; pin it so
+  // the fallback checks do not depend on where the tests run.
+  Object.defineProperty(globalThis, 'navigator', { value: { language: 'en-US', languages: ['en-US'] }, configurable: true })
   w.localStorage.setItem('king-language', 'tr')
   assert.equal(initialLanguage(), 'en', 'A saved Turkish choice from the old site falls back to English')
   w.localStorage.setItem('king-language', 'de')
   assert.equal(initialLanguage(), 'de', 'A saved language wins')
+  Object.defineProperty(globalThis, 'location', { value: { search: '?lang=ar' }, configurable: true })
+  assert.equal(initialLanguage(), 'ar', 'A ?lang= link (the hreflang URLs) wins over a saved choice')
+  Object.defineProperty(globalThis, 'location', { value: { search: '?lang=tr' }, configurable: true })
+  assert.equal(initialLanguage(), 'de', 'An unsupported ?lang= is ignored')
+  delete (globalThis as any).location
   w.localStorage.removeItem('king-language')
   const root = createRoot(document.getElementById('root')!)
   await act(async () => root.render(<App />))

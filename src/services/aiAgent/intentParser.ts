@@ -1,9 +1,38 @@
-import { getLocale } from '../i18n';
+import { getLocale, getLanguage } from '../i18n';
+
+// ü, ö and ç are shared with German (für, schön), so on their own they do not
+// mean Turkish; German text is ruled out before they are considered.
+const GERMAN_TEXT = /[äßÄ]|\b(der|die|das|und|ist|nicht|bitte|mit|für|über|eine?n?|ich|wie|was|zeige?|öffne|suche|schließe?)\b/i;
+const ARABIC_SCRIPT = /[؀-ۿݐ-ݿࢠ-ࣿ]/;
 
 export function isTurkishContext(str: string): boolean {
   if (getLocale() === 'tr-TR') return true;
-  if (/[ığüşöçİĞÜŞÖÇ]/.test(str)) return true;
+  if (/[ığşİĞŞ]/.test(str)) return true;
+  if (GERMAN_TEXT.test(str)) return false;
+  if (/[üöçÜÖÇ]/.test(str)) return true;
   return /\b(merhaba|selam|selamlar|nasılsın|nasilsin|naber|lütfen|lutfen|teşekkür|tesekkur|sekme|sekmeyi|sayfa|sayfayı|sayfayi|özetle|ozetle|özet|ozet|kapat|kaydır|kaydir|gecmis|gecmisi|ara|bul|aç|ac|yenile)\b/i.test(str);
+}
+
+export type ReplyLanguage = 'en' | 'tr' | 'ar' | 'de';
+
+/**
+ * Language for the agent's own status messages and reports: the language the
+ * user wrote in when it is recognisable, otherwise the interface language.
+ */
+export function replyLanguage(...texts: unknown[]): ReplyLanguage {
+  const text = texts.filter((t): t is string => typeof t === 'string').join(' ');
+  if (ARABIC_SCRIPT.test(text)) return 'ar';
+  if (text && isTurkishContext(text)) return 'tr';
+  if (GERMAN_TEXT.test(text)) return 'de';
+  const ui = getLanguage();
+  // Latin text in an Arabic interface is most likely English.
+  if (ui === 'de' || (ui === 'ar' && !text.trim())) return ui;
+  return 'en';
+}
+
+/** Picks the message for the reply language, falling back to English. */
+export function say(language: ReplyLanguage, texts: Record<ReplyLanguage, string>): string {
+  return texts[language] ?? texts.en;
 }
 const isTurkishText = isTurkishContext;
 

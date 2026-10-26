@@ -40,6 +40,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Interface translations
+        run: npm run check:i18n && npm run check:strings
+
+      # mcp-bridge.mjs is what ships and what users point their MCP config at;
+      # it is generated from mcp-bridge.ts and must not drift from it.
+      - name: MCP bridge matches its source
+        run: npm run build:bridge && git diff --exit-code mcp-bridge.mjs
+
       # The pretest step builds the renderer (vite) and the Electron bundles.
       - name: Build and test
         run: npm test

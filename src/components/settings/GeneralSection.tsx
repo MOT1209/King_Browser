@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
-import { useTranslation } from '../../services/i18n';
+import { useTranslation, type LocalizedText } from '../../services/i18n';
 import { normalizeLanguage } from '../../services/language';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
@@ -12,6 +12,22 @@ export interface GeneralSectionProps {
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
   onClearHistory?: () => void;
 }
+
+// Page translation targets: the name in each interface language, plus the
+// language's own name so it is recognisable whatever the interface language.
+const TRANSLATION_LANGUAGES: Array<{ code: string; name: LocalizedText; native: string }> = [
+  { code: 'en', name: { en: 'English', ar: 'الإنجليزية', de: 'Englisch' }, native: 'English' },
+  { code: 'tr', name: { en: 'Turkish', ar: 'التركية', de: 'Türkisch' }, native: 'Türkçe' },
+  { code: 'de', name: { en: 'German', ar: 'الألمانية', de: 'Deutsch' }, native: 'Deutsch' },
+  { code: 'fr', name: { en: 'French', ar: 'الفرنسية', de: 'Französisch' }, native: 'Français' },
+  { code: 'es', name: { en: 'Spanish', ar: 'الإسبانية', de: 'Spanisch' }, native: 'Español' },
+  { code: 'it', name: { en: 'Italian', ar: 'الإيطالية', de: 'Italienisch' }, native: 'Italiano' },
+  { code: 'ru', name: { en: 'Russian', ar: 'الروسية', de: 'Russisch' }, native: 'Русский' },
+  { code: 'ar', name: { en: 'Arabic', ar: 'العربية', de: 'Arabisch' }, native: 'العربية' },
+  { code: 'ja', name: { en: 'Japanese', ar: 'اليابانية', de: 'Japanisch' }, native: '日本語' },
+  { code: 'zh', name: { en: 'Chinese', ar: 'الصينية', de: 'Chinesisch' }, native: '中文' },
+  { code: 'az', name: { en: 'Azerbaijani', ar: 'الأذربيجانية', de: 'Aserbaidschanisch' }, native: 'Azərbaycan' },
+];
 
 export const GeneralSection: React.FC<GeneralSectionProps> = ({
   settings,
@@ -188,17 +204,10 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
               onChange={(e) => onUpdateSettings({ defaultTranslationLanguage: e.target.value })}
               className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
             >
-              <option value="en">English</option>
-              <option value="tr">Turkish (Türkçe)</option>
-              <option value="de">German (Deutsch)</option>
-              <option value="fr">French (Français)</option>
-              <option value="es">Spanish (Español)</option>
-              <option value="it">Italian (Italiano)</option>
-              <option value="ru">Russian (Русский)</option>
-              <option value="ar">Arabic (العربية)</option>
-              <option value="ja">Japanese (日本語)</option>
-              <option value="zh">Chinese (中文)</option>
-              <option value="az">Azərbaycan (Azerbaycan)</option>
+              {TRANSLATION_LANGUAGES.map(({ code, name, native }) => {
+                const label = l(name);
+                return <option key={code} value={code}>{label === native ? label : `${label} (${native})`}</option>;
+              })}
             </select>
           </div>
         </div>

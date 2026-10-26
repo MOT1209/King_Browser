@@ -8,6 +8,7 @@ export const languages: { code: SiteLanguage, label: string }[] = [
 
 export const copy = {
   en: {
+    aiChip: 'LOCAL AI',
     nav: ['The experience', 'Made for you', 'Open source'], get: 'Get King', skip: 'Skip to content',
     hero: ['A little more space.', 'A lot more possibility.'],
     intro: 'Meet King. A calmer, more personal browser with local AI, thoughtful workspaces, and privacy built in.',
@@ -60,6 +61,7 @@ export const copy = {
     pageTitle: 'King — A little more space.',
   },
   ar: {
+    aiChip: 'ذكاء محلي',
     nav: ['التجربة', 'مصمَّم لك', 'مفتوح المصدر'], get: 'احصل على King', skip: 'انتقل إلى المحتوى',
     hero: ['مساحة أكبر قليلاً.', 'وإمكانات أكثر بكثير.'],
     intro: 'تعرّف على King. متصفح أهدأ وأكثر خصوصية لك، فيه ذكاء اصطناعي محلي ومساحات عمل مدروسة وحماية مدمجة للخصوصية.',
@@ -112,6 +114,7 @@ export const copy = {
     pageTitle: 'King — مساحة أكبر قليلاً.',
   },
   de: {
+    aiChip: 'LOKALE KI',
     nav: ['Das Erlebnis', 'Für Sie gemacht', 'Open Source'], get: 'King holen', skip: 'Zum Inhalt springen',
     hero: ['Ein wenig mehr Raum.', 'Viel mehr Möglichkeiten.'],
     intro: 'Das ist King. Ein ruhigerer, persönlicherer Browser mit lokaler KI, durchdachten Arbeitsbereichen und eingebautem Datenschutz.',
