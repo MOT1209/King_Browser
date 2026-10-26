@@ -363,7 +363,7 @@ Clients that speak Streamable HTTP can connect straight to King Browser, without
 
 The same tools, approval gate, site rules, activity log and tool settings apply as on the other transports; the protocol code is shared between `/mcp` and `/message`. The server accepts at most 32 sessions, expires idle ones after an hour, and drops all of them when the token is rotated. A call that needs your approval keeps its request open for up to 135 seconds, so set the client timeout to at least 180000 ms.
 
-Examples (set `MCP_TOKEN` in your environment first; none of these were run against the real product, see [Compatibility status](#compatibility-status)):
+Examples (set `MCP_TOKEN` in your environment first; see [Compatibility status](#compatibility-status) for which clients have been tried):
 
 ```bash
 # Claude Code
@@ -398,16 +398,16 @@ Config keys follow the clients' own documentation: [Codex](https://developers.op
 
 #### Compatibility status
 
-What has actually been verified. "Automated" means a test in this repository drives the real `BrowserMCPServer` with the official MCP SDK client (`tests/mcp_server_transports.test.ts`, `tests/mcp_streamable_http.test.ts`); it does not mean the product itself was run.
+What has actually been verified. "Automated" means a test in this repository drives the real `BrowserMCPServer` with the official MCP SDK client (`tests/mcp_server_transports.test.ts`, `tests/mcp_streamable_http.test.ts`); it does not mean the product itself was run. "Manual" means the maintainer tried the product and reported that it works (2026-10-26); the connection method used (`/mcp` or the bridge) and the tools exercised were not recorded.
 
 | Client | Connection | Verified | Notes |
 |---|---|---|---|
-| OpenCode (baseline) | stdio bridge `mcp-bridge.mjs` to `/sse` | Automated: the bridge process is spawned and lists tools and receives tool errors. Not run with OpenCode itself in this session | Config generator unchanged (`tests/mcp_client_config.test.ts`) |
+| OpenCode (baseline) | stdio bridge `mcp-bridge.mjs` to `/sse` | Automated: the bridge process is spawned and lists tools and receives tool errors. Manual: OpenCode reported working | Config generator unchanged (`tests/mcp_client_config.test.ts`) |
 | Any MCP SDK client | Streamable HTTP `/mcp` | Automated: initialize, tool discovery, read tool, failing tool, unknown tool, concurrent calls, session end, server shutdown | |
 | Any MCP SDK client | Legacy SSE `/sse` | Automated: same tool list and error path as `/mcp` | |
-| Claude Code | `/mcp` or bridge | Not tested with the product | Config shape taken from third-party guides |
-| Codex | `/mcp` or bridge | Not tested with the product | Config keys taken from the official Codex docs |
-| OpenCode `remote` | `/mcp` | Not tested with the product | Config keys taken from the official OpenCode docs |
+| Claude Code | `/mcp` or bridge | Manual: reported working | Config shape taken from third-party guides |
+| Codex | `/mcp` or bridge | Not tested (no Codex access) | Config keys taken from the official Codex docs |
+| OpenCode `remote` | `/mcp` | Manual: OpenCode reported working; whether through `remote` was not recorded | Config keys taken from the official OpenCode docs |
 | Cursor, Windsurf, Gemini CLI, Claude Desktop | bridge, or `/mcp` where supported | Not tested | Cursor forum reports mention custom headers being dropped on some tool calls; use the bridge if `/mcp` answers 401 only on `tools/call` |
 
 Known limits: browser-driving tools (click, type, navigate) were exercised only up to the point where a browser window is required; that part is covered by the renderer tests, not by the transport tests.
