@@ -2,7 +2,7 @@ import { SENSITIVE_FIELD_PATTERN } from '../utils/sensitiveField';
 import { resolveLoginCredential, buildLoginFillScript, describeLoginResult, LOGIN_REQUIRED_PROBE } from '../utils/agentLogin';
 import { useEffect, useRef, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import type { Bookmark, HistoryItem, Tab, UserSettings } from '../types/browser';
-import { aiAgent } from '../services/aiAgent';
+import { publishActionContext } from '../services/aiActionContext';
 import { orchestrator } from '../services/agentOrchestrator';
 // The agent boundary uses the strict destination policy, not the general
 // navigation one: agent-supplied URLs are untrusted, and the general predicate
@@ -863,7 +863,7 @@ export function useBrowserAgentBridge({
     };
 
     // 2. Original aiAgent context setup
-    aiAgent.setActionContext({
+    publishActionContext({
       onNavigate: async (url: string) => {
         // Same untrusted-input boundary as the MCP tools above: these URLs come
         // from LLM output, which page content can influence.

@@ -109,6 +109,7 @@ import './site_rules.test';
 import './injection_detector.test';
 import './mcp_client_config.test';
 import './mcp_streamable_http.test';
+import './ai_agent_lazy_load.test';
 import './mcp_server_transports.test';
 import './element_refs.test';
 import './approval_mode.test';
