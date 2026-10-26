@@ -21,11 +21,21 @@ import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../../
 import { getLanguage, getLocale, useTranslation, displayTabTitle } from '../../services/i18n';
 import { getUrlSecurityInfo, formatDisplayUrl } from '../../utils/securityUtils';
 import { SiteInfoPopover } from '../SiteInfoPopover';
-import { PermissionPromptPopover } from '../PermissionPromptPopover';
-import { PageTranslatePopover } from '../PageTranslatePopover';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../../utils/suggestionCache';
 import { getElectronAPI } from '../../utils/electronBridge';
 import { logger } from '../../utils/logger';
+
+// On-demand overlays stay out of the startup chunk. The permission bubble only
+// exists while a site is actually asking for a permission, and the translate
+// panel only mounts on a web page tab (never on the new-tab or king:// pages),
+// so neither has to be parsed before the first window paints. React.lazy loads
+// each one from disk the first time it is rendered.
+const PermissionPromptPopover = React.lazy(() =>
+  import('../PermissionPromptPopover').then((m) => ({ default: m.PermissionPromptPopover }))
+);
+const PageTranslatePopover = React.lazy(() =>
+  import('../PageTranslatePopover').then((m) => ({ default: m.PageTranslatePopover }))
+);
 
 export interface OmniboxBarProps {
   activeTab?: Tab;
@@ -367,18 +377,20 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
           {/* Chrome-Style Permission Prompt Bubble */}
           {!isPermissionPromptDismissed && relevantPermissionRequests.length > 0 && onRespondPermission && (
-            <PermissionPromptPopover
-              requests={relevantPermissionRequests}
-              onRespond={(requestId, allow, remember) => {
-                onRespondPermission(requestId, allow, remember);
-              }}
-              onDismiss={(requestId) => {
-                if (onDismissPermission) {
-                  onDismissPermission(requestId);
-                }
-                setIsPermissionPromptDismissed(true);
-              }}
-            />
+            <React.Suspense fallback={null}>
+              <PermissionPromptPopover
+                requests={relevantPermissionRequests}
+                onRespond={(requestId, allow, remember) => {
+                  onRespondPermission(requestId, allow, remember);
+                }}
+                onDismiss={(requestId) => {
+                  if (onDismissPermission) {
+                    onDismissPermission(requestId);
+                  }
+                  setIsPermissionPromptDismissed(true);
+                }}
+              />
+            </React.Suspense>
           )}
 
           {/* Chrome-Style Omnibox Permission Chip */}
@@ -534,17 +546,19 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                   )}
                 </button>
 
-                <PageTranslatePopover
-                  isOpen={isTranslateOpen}
-                  onClose={() => setIsTranslateOpen(false)}
-                  onTranslate={handleTranslatePage}
-                  onRestoreOriginal={handleRestoreOriginal}
-                  isTranslated={!!activeTab?.isTranslated}
-                  isLoading={isTranslating}
-                  currentSourceLang={sourceLang}
-                  currentTargetLang={targetLang}
-                  error={translationError}
-                />
+                <React.Suspense fallback={null}>
+                  <PageTranslatePopover
+                    isOpen={isTranslateOpen}
+                    onClose={() => setIsTranslateOpen(false)}
+                    onTranslate={handleTranslatePage}
+                    onRestoreOriginal={handleRestoreOriginal}
+                    isTranslated={!!activeTab?.isTranslated}
+                    isLoading={isTranslating}
+                    currentSourceLang={sourceLang}
+                    currentTargetLang={targetLang}
+                    error={translationError}
+                  />
+                </React.Suspense>
               </div>
             )}
 

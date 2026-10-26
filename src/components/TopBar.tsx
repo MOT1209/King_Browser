@@ -55,7 +55,6 @@ import {
 import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, DownloadItem } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getLanguage, getLocale, useTranslation, displayTabTitle, displayWorkspaceName } from '../services/i18n';
-import { AdBlockerPopover } from './AdBlockerPopover';
 import { ADBLOCK_WHITELIST_EVENT } from '../utils/adblockWhitelist';
 import { KingAssistantIcon } from './ui/KingAssistantIcon';
 import { logger } from '../utils/logger';
@@ -66,6 +65,12 @@ import { getElectronAPI } from '../utils/electronBridge';
 import { OmniboxBar } from './topbar/OmniboxBar';
 import { useTitlebarInsets } from '../hooks/useTitlebarInsets';
 export { OmniboxBar };
+
+// The ad-blocker panel is only mounted after the toolbar shield is clicked, so
+// it does not belong in the startup chunk. React.lazy fetches it on first open.
+const AdBlockerPopover = React.lazy(() =>
+  import('./AdBlockerPopover').then((m) => ({ default: m.AdBlockerPopover }))
+);
 
 /** Stable identity handed to the downloads popover while it is closed. */
 const EMPTY_DOWNLOADS: DownloadItem[] = [];
@@ -1529,14 +1534,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               )}
             </button>
             {isAdBlockerOpen && (
-              <AdBlockerPopover
-                blockedCount={activeTab?.blockedAdsCount || 0}
-                isWhitelisted={isWhitelisted}
-                onToggleWhitelist={handleToggleWhitelist}
-                onClose={() => setIsAdBlockerOpen(false)}
-                hostname={currentHostname}
-                buttonRef={adBlockerBtnRef}
-              />
+              <React.Suspense fallback={null}>
+                <AdBlockerPopover
+                  blockedCount={activeTab?.blockedAdsCount || 0}
+                  isWhitelisted={isWhitelisted}
+                  onToggleWhitelist={handleToggleWhitelist}
+                  onClose={() => setIsAdBlockerOpen(false)}
+                  hostname={currentHostname}
+                  buttonRef={adBlockerBtnRef}
+                />
+              </React.Suspense>
             )}
           </div>
 
