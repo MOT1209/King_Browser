@@ -31,6 +31,30 @@ const history: ActionRecord[] = [
 }
 
 {
+  const refHistory: ActionRecord[] = [
+    {
+      id: 'r1', toolName: 'browser_type', args: { selector: '[data-king-ref="e12"]', text: 'hunter2' },
+      risk: 'sensitive', status: 'completed', requestedAt: 1_700_000_000_000
+    },
+    {
+      id: 'r2', toolName: 'browser_type', args: { selector: '#f1', text: 'hunter3' },
+      risk: 'sensitive', status: 'rejected', requestedAt: 1_700_000_001_000
+    },
+    {
+      id: 'r3', toolName: 'browser_type', args: { selector: '#search-input', text: 'weather cairo' },
+      risk: 'safe', status: 'completed', requestedAt: 1_700_000_002_000
+    }
+  ];
+  const entries = buildActivityLog(refHistory);
+  assert.equal(entries[0].args.text, '••••••••', 'ref target is redacted');
+  assert.equal(entries[1].args.text, '••••••••', 'neutral target is redacted');
+  assert.equal(entries[2].args.text, '••••••••', 'the log has no field description, so typing fails closed');
+  assert.ok(!exportActivityLog(refHistory, 'json').includes('hunter2'), 'ref secret never appears');
+  assert.ok(!exportActivityLog(refHistory, 'json').includes('hunter3'), 'neutral secret never appears');
+  console.log('[PASS] Activity log — ref and neutral typed values are redacted');
+}
+
+{
   const parsed = JSON.parse(exportActivityLog(history, 'json'));
   assert.equal(parsed.count, 3);
   assert.equal(parsed.entries[1].tool, 'browser_click');

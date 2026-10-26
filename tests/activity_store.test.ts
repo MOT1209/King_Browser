@@ -28,6 +28,18 @@ const record = (id: string, status: ActionRecord['status'], args: Record<string,
 }
 
 {
+  // A snapshot ref and a neutral selector carry no field description, so the
+  // log cannot know whether the target is a password field. It must fail closed.
+  const opaque = path.join(dir, 'opaque.jsonl');
+  const store = createActivityStore(opaque);
+  store.append(record('r1', 'completed', { selector: '[data-king-ref="e12"]', text: 'hunter2' }));
+  store.append(record('r2', 'rejected', { selector: '#f1', text: 'hunter3' }));
+  const text = fs.readFileSync(opaque, 'utf8');
+  assert.ok(!text.includes('hunter2') && !text.includes('hunter3'), 'ref and neutral typed values are redacted on disk');
+  console.log('[PASS] Activity store — redacts ref and neutral typed values');
+}
+
+{
   fs.appendFileSync(file, '{"id":"torn","toolName":"x"\n');
   assert.deepEqual(createActivityStore(file).readAll().map(r => r.id), ['a3', 'a4'], 'a torn line is skipped');
   console.log('[PASS] Activity store — tolerates a torn last line');
