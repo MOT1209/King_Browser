@@ -597,9 +597,15 @@ function createWindow() {
       hardenedIncognitoPartitions.delete(partName);
       // The persistent agent profile is the one partition that must survive.
       if (partName === AGENT_PERSIST_PARTITION) continue;
+      // clearStorageData() rejects asynchronously, so a try/catch alone never
+      // saw a failed wipe; private-tab data could survive with no trace.
       try {
-        session.fromPartition(partName, { cache: false }).clearStorageData();
-      } catch (_) {}
+        session.fromPartition(partName, { cache: false }).clearStorageData().catch((err: unknown) => {
+          console.error(`[Privacy] Failed to wipe private partition ${partName}:`, err);
+        });
+      } catch (err) {
+        console.error(`[Privacy] Failed to wipe private partition ${partName}:`, err);
+      }
     }
   });
 
@@ -768,8 +774,8 @@ function createWindow() {
         //    kept here only so the two prod copies stay byte-identical.
         responseHeaders['Content-Security-Policy'] = [
           isDev
-            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
-            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
+            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com https://www.bing.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com https://www.bing.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
         ];
         responseHeaders['X-Content-Type-Options'] = ['nosniff'];
       }
@@ -1511,7 +1517,7 @@ app.whenReady().then(async () => {
     const vpnConfigPath = path.join(app.getPath('userData'), 'vpn_proxy.json');
     if (fs.existsSync(vpnConfigPath)) {
       if (process.platform !== 'win32') {
-        try { fs.chmodSync(vpnConfigPath, 0o600); } catch (_) {}
+        try { fs.chmodSync(vpnConfigPath, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
       }
       const raw = fs.readFileSync(vpnConfigPath);
       let savedVpn: any = null;
@@ -1649,7 +1655,7 @@ app.whenReady().then(async () => {
       const tmpFile = PERMISSIONS_FILE + '.tmp';
       try {
         fs.writeFileSync(tmpFile, JSON.stringify(obj, null, 2), { encoding: 'utf8', mode: 0o600 });
-        try { fs.chmodSync(tmpFile, 0o600); } catch (_) {}
+        try { fs.chmodSync(tmpFile, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
         fs.renameSync(tmpFile, PERMISSIONS_FILE);
       } catch (writeErr) {
         try { fs.unlinkSync(tmpFile); } catch (_) {}
@@ -2243,7 +2249,7 @@ app.whenReady().then(async () => {
         const tempDir = path.join(app.getPath('temp'), `king_update_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`);
         fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
         if (process.platform !== 'win32') {
-          try { fs.chmodSync(tempDir, 0o700); } catch (_) {}
+          try { fs.chmodSync(tempDir, 0o700); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
         }
         const scriptPath = path.join(tempDir, 'update_and_relaunch.sh');
 
@@ -2514,7 +2520,7 @@ exit
           const currentAppImage = process.env.APPIMAGE || '';
           const tempDir = path.join(app.getPath('temp'), `king_update_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`);
           fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
-          try { fs.chmodSync(tempDir, 0o700); } catch (_) {}
+          try { fs.chmodSync(tempDir, 0o700); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
           const scriptPath = path.join(tempDir, 'update_and_relaunch.sh');
           const scriptContent = `#!/bin/bash
 FILE_PATH="$1"
@@ -3078,8 +3084,12 @@ fi
         // Security: Block dangerous file extensions that could execute on the host OS,
         // unless it is an official release package from the verified King repository.
         const pathname = parsed.pathname.toLowerCase();
-        const isOfficialRelease = (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com' || parsed.hostname === 'objects.githubusercontent.com') &&
-          (pathname.startsWith('/MOT1209/King_Browser/releases') || pathname.includes('/MOT1209/King_Browser/releases/'));
+        // pathname is lowercased, so the repository prefix must be too; the
+        // mixed-case literal never matched and every release link was blocked.
+        // Release asset CDN paths do not carry the repository name, so only
+        // github.com release URLs qualify (GitHub redirects them to the CDN).
+        const isOfficialRelease = (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com') &&
+          pathname.startsWith('/mot1209/king_browser/releases/');
 
         const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)($|\?|#)/i;
         const queryHasDangerousExt = Array.from(parsed.searchParams.values()).some(val => DANGEROUS_EXT_REGEX.test(val.toLowerCase())) ||
@@ -4476,7 +4486,7 @@ ipcMain.handle('copy-mcp-token', (event) => {
         if (clipboard.readText() === token) {
           clipboard.clear();
         }
-      } catch (_) {}
+      } catch (err) { console.warn('[Security] Could not clear the MCP token from the clipboard; clear it manually:', err); }
     }, 15000);
     return true;
   }
@@ -4508,7 +4518,7 @@ ipcMain.handle('copy-mcp-config', (event, kind?: unknown) => {
       if (clipboard.readText() === config) {
         clipboard.clear();
       }
-    } catch (_) {}
+    } catch (err) { console.warn('[Security] Could not clear the MCP token from the clipboard; clear it manually:', err); }
   }, 15000);
   return { ok: true, autoClearSec: 15 };
 });
@@ -4778,7 +4788,7 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
               secret = crypto.randomBytes(32);
               fs.writeFileSync(secretPath, secret, { mode: 0o600 });
               if (process.platform !== 'win32') {
-                try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
+                try { fs.chmodSync(secretPath, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
               }
             } else {
               throw err;
@@ -5118,7 +5128,7 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
       const encrypted = encryptDataWithFallback(payload, app.getPath('userData'), safeStorage);
       fs.writeFileSync(vpnConfigPath, encrypted, { mode: 0o600 });
       if (process.platform !== 'win32') {
-        try { fs.chmodSync(vpnConfigPath, 0o600); } catch (_) {}
+        try { fs.chmodSync(vpnConfigPath, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
       }
     } else if (fs.existsSync(vpnConfigPath)) {
       fs.unlinkSync(vpnConfigPath);

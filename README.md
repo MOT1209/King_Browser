@@ -72,7 +72,7 @@ King has no telemetry endpoint, but these built-in features contact third-party 
 | :--- | :--- | :--- |
 | Update check & release notes | `api.github.com`, `github.com` | Shortly after start and every 4 hours |
 | Search suggestions | `suggestqueries.google.com` (or the selected engine) | While typing in the omnibox |
-| New-tab wallpapers | `images.unsplash.com`, `api.unsplash.com` | When an Unsplash wallpaper is shown |
+| New-tab wallpapers | `images.unsplash.com`, `api.unsplash.com`, `www.bing.com` | When an Unsplash wallpaper or the daily Bing wallpaper is shown |
 | Page translation | `translate.googleapis.com` | When the user translates a page |
 | Local AI / Whisper model download | `huggingface.co`, `hf.co` | First use of a local model |
 | Ad-block filter lists | Filter-list hosts | Start-up / list refresh |

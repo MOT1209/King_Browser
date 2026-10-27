@@ -731,7 +731,7 @@ export class BrowserMCPServer {
           const encrypted = safeStorage.encryptString(newToken);
           fs.writeFileSync(this.tokenFilePath, encrypted, { mode: 0o600 });
           if (process.platform !== 'win32') {
-            try { fs.chmodSync(this.tokenFilePath, 0o600); } catch (_) {}
+            try { fs.chmodSync(this.tokenFilePath, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
           }
         } else {
           const keyBuf = this.getFallbackMcpKey();
@@ -742,7 +742,7 @@ export class BrowserMCPServer {
           const payload = Buffer.concat([Buffer.from('NMCP', 'utf8'), iv, tag, enc]);
           fs.writeFileSync(this.tokenFilePath, payload, { mode: 0o600 });
           if (process.platform !== 'win32') {
-            try { fs.chmodSync(this.tokenFilePath, 0o600); } catch (_) {}
+            try { fs.chmodSync(this.tokenFilePath, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
           }
         }
       }
