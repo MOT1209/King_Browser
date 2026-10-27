@@ -517,7 +517,7 @@ King Browser features an entirely local-first neural execution architecture:
 | **Cloud Sync & Vault** | [Supabase Realtime](https://supabase.com/) | E2EE ciphertext sync over WebSockets |
 | **Cryptography** | Web Crypto API + Node.js `crypto` | PBKDF2-SHA256 (600k iterations) + AES-256-GCM |
 | **AdBlock & Filtering** | [`@ghostery/adblocker-electron`](https://github.com/ghostery/adblocker) | EasyList, EasyPrivacy, Peter Lowe network filtering |
-| **AI Protocol** | [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) | JSON-RPC over HTTP/SSE server |
+| **AI Protocol** | [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) | JSON-RPC over Streamable HTTP and legacy SSE (loopback server) |
 | **On-Device LLM Runtime** | [WebLLM / WebGPU](https://webllm.mlc.ai/) | Client-side neural model execution |
 | **Speech Recognition** | [Transformers.js](https://huggingface.co/docs/transformers.js) / ONNX | Local Whisper speech-to-text pipeline |
 
@@ -672,7 +672,7 @@ flowchart TB
         syncVault["Zero-Knowledge E2EE Vault<br/>AES-256-GCM / Supabase Realtime"]
     end
 
-    agentClient <-->|"JSON-RPC / SSE"| mcp
+    agentClient <-->|"JSON-RPC over HTTP (/mcp) or SSE"| mcp
     mcp <-->|"CDP Automation"| ipcMain
     ipcMain <-->|"Strict IPC"| preloadAPI
     preloadAPI <-->|"Typed API"| uiShell
@@ -716,12 +716,12 @@ flowchart TB
 
 | Process / Layer | Security Boundary & Context | Primary Responsibilities | Key Source Files |
 | :--- | :--- | :--- | :--- |
-| **Main Process** | Privileged Node.js runtime (`sandbox: false`) | Lifecycle, window management, network request interception, native OS keychain, MCP HTTP/SSE server | `electron/main.ts`, `electron/mcpServer.ts`, `electron/main/*` |
+| **Main Process** | Privileged Node.js runtime (`sandbox: false`) | Lifecycle, window management, network request interception, native OS keychain, MCP server (Streamable HTTP and SSE) | `electron/main.ts`, `electron/mcpServer.ts`, `electron/main/*` |
 | **Preload Bridge** | Context bridge barrier (`contextIsolation: true`) | Selective unidirectional API exposure via `window.electronAPI`, guest webview isolation | `electron/preload.ts`, `electron/guest-preload.ts` |
 | **Renderer Process** | Sandboxed Chromium UI (`nodeIntegration: false`) | React 18 UI shell, 27 modular state hooks, tab virtualization, dual split-screen geometry | `src/App.tsx`, `src/hooks/*`, `src/components/*` |
 | **AI Web Worker** | Isolated worker thread | Off-thread WebGPU neural inference (Llama 3.2, Phi 3.5, Qwen 2.5), local Whisper ONNX speech recognition | `src/workers/aiWorker.ts`, `src/services/localSpeechRecognition.ts` |
 | **Encrypted Vault** | Zero-knowledge client-side encryption | PBKDF2 (600k) + AES-256-GCM encrypted cloud sync over Supabase Realtime WebSockets | `src/services/syncService.ts`, `src/services/syncCrypto.ts` |
-| **External Agents** | Authenticated JSON-RPC over port 3020 | Autonomous agent navigation, DOM interaction, and inspection via 41 built-in tools | Claude Desktop, Cursor, Windsurf, Antigravity, OpenCode |
+| **External Agents** | Authenticated JSON-RPC over port 3020 | Autonomous agent navigation, DOM interaction, and inspection via 45 built-in tools | Claude Desktop, Cursor, Windsurf, Antigravity, OpenCode |
 
 ### Architectural Subsystem Breakdown
 
@@ -729,7 +729,7 @@ flowchart TB
    - **Process Sandboxing & IPC Guards**: Every IPC channel strictly enforces `isTrustedSender(event)` verification (validating sender frame, origin, and protocol) to prevent untrusted guest frames from invoking privileged host operations. Webviews execute with `contextIsolation: true` and `nodeIntegration: false`.
    - **Atomic File Descriptors & Anti-TOCTOU**: Operations on crash logs, bookmarks, and caching avoid path-based checks before read/write operations. Instead, atomic descriptor operations (`fs.openSync`, `fs.fstatSync`, `fs.readSync`, `fs.ftruncateSync`, `fs.writeSync`) guarantee immunity against Time-of-Check to Time-of-Use (TOCTOU) file race conditions.
    - **Network Privacy Shield & Anti-SSRF**: High-performance request filtering via Chromium session webRequest hooks and `@ghostery/adblocker-electron` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters). In-memory hash set domain classification paired with DNS SSRF guards that fail closed against private RFC 1918, link-local, loopback, and CGNAT IP resolutions.
-   - **Native Model Context Protocol (MCP) Server**: Embedded HTTP/SSE server running on port `3020` with Bearer token authentication (`Authorization: Bearer <token>`, the only accepted form; `X-MCP-Token` is rejected), DNS rebinding protection via Host header verification, and rate limiting. Directly bridges 26 browser control and inspection tools plus 13 alias and execution-governance tools to external AI coding agents.
+   - **Native Model Context Protocol (MCP) Server**: Embedded server on port `3020` serving Streamable HTTP (`/mcp`) and legacy SSE (`/sse`, `/message`), with Bearer token authentication (`Authorization: Bearer <token>`, the only accepted form; `X-MCP-Token` is rejected), DNS rebinding protection via Host header verification on every route, Origin verification on `/mcp`, and rate limiting. Exposes 45 tools (browser control, inspection, aliases and execution governance) to external AI coding agents; only the 19 classed safe are enabled by default.
    - **In-Memory CRX3 Extension Engine**: Direct CRX3 package download, archive integrity validation, zip-slip directory traversal prevention, and extension permission auditing before installation.
 
 2. **Preload Security & Context Isolation (`electron/preload.ts`, `electron/webstore-preload.ts`, `electron/guest-preload.ts`)**:

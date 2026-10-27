@@ -16,10 +16,10 @@
 - **[رأي]** خطر استراتيجي: "طبقة موافقة" كإضافة لمتصفح موجود أو كخادم MCP وسيط قد تصل لناس أكثر بجهد أقل من متصفح كامل يلزمه تحديث Chromium الأمني كل بضعة أسابيع إلى الأبد. اختبر الطلب قبل أن تستثمر أكثر.
 
 ## 2) الحالة الحالية (حقائق)
-- الإصدار المنشور: `v0.0.8` (أكتوبر 2026)، ينشر سير عمل Release إصداراً تلقائياً عند رفع الإصدار في `main`. آخر الإصدارات: 0.0.6-0.0.7 واجهة بالعربية والإنجليزية والألمانية، 0.0.8 إصلاح ثغرات التبعيات (`npm audit --omit=dev` بلا ثغرات؛ بقيت ثغرات في أدوات الفيديو `remotion` فقط).
-- مكتمل ومدموج: إصلاح تحميل الإصدارات؛ سجل النشاط الدائم مع التصدير؛ قواعد المواقع (اسأل/احظر)؛ إنذار حقن الأوامر؛ نافذة موافقة تعرض الصفحة والعنصر؛ ملف معزول للوكيل (اختياري ومؤقت)؛ زر OpenCode؛ اختبار Windows مانع في CI.
-- **غير مجرَّب فعلياً:** المثبّت على Windows، OpenCode الحقيقي، واجهة الإعدادات الجديدة، `browser_login` على مواقع حقيقية.
-- الاختبارات الآلية (أكثر من 1300 تأكيد ناجح، 0 إخفاق) و`tsc` و`eslint` (0 أخطاء، 1140 تحذيراً) وCI خضراء على آخر إصدار.
+- الإصدار المنشور: `v0.0.9` (أكتوبر 2026)، ينشر سير عمل Release إصداراً تلقائياً عند رفع الإصدار في `main`. آخر الإصدارات: 0.0.6-0.0.7 واجهة بالعربية والإنجليزية والألمانية، 0.0.8 إصلاح ثغرات التبعيات (`npm audit --omit=dev` بلا ثغرات؛ بقيت ثغرات في أدوات الفيديو `remotion` فقط)، 0.0.9 موقع بثلاث لغات مع فيلم جديد وإصلاح تخطيط التبويب الجديد.
+- مكتمل ومدموج: إصلاح تحميل الإصدارات؛ سجل النشاط الدائم مع التصدير؛ قواعد المواقع (اسأل/احظر)؛ إنذار حقن الأوامر؛ نافذة موافقة تعرض الصفحة والعنصر؛ ملف معزول للوكيل (اختياري ومؤقت)؛ زر OpenCode؛ اختبار Windows مانع في CI؛ نقل MCP عبر Streamable HTTP (`/mcp`) بجانب SSE القديم، مع اختبارات آلية بعملاء SDK الرسميين.
+- **غير مجرَّب فعلياً:** المثبّت على Windows، واجهة الإعدادات الجديدة، Codex (لا يوجد وصول)؛ أُبلغ يدوياً أن OpenCode وClaude Code يعملان دون تسجيل طريقة الاتصال، `browser_login` على مواقع حقيقية.
+- الاختبارات الآلية (أكثر من 1300 تأكيد ناجح، 0 إخفاق) و`tsc` و`eslint` (0 أخطاء، 1165 تحذيراً) وCI خضراء على آخر إصدار.
 
 ## 3) حزم العمل (WP)
 الصعوبة والوقت **[رأي]**. "أنا" = ما أستطيع تنفيذه في الكود؛ "أنت" = ما يحتاج جهازك أو مالك أو قراراً.
@@ -103,10 +103,10 @@ Ein Open-Source-Browser, in dem ein Coding-Agent (OpenCode u. ä.) einen echten,
 - **[Meinung]** Strategisches Risiko: Eine „Freigabe-Schicht“ als Erweiterung eines bestehenden Browsers oder als vermittelnder MCP-Server erreicht mit weniger Aufwand eventuell mehr Menschen als ein kompletter Browser, der auf Dauer alle paar Wochen Chromium-Sicherheitsupdates braucht. Nachfrage testen, bevor du mehr investierst.
 
 ## 2) Aktueller Stand (Fakten)
-- Veröffentlicht: `v0.0.8` (Oktober 2026); der Release-Workflow veröffentlicht automatisch, wenn die Version in `main` erhöht wird. Zuletzt: 0.0.6-0.0.7 Oberfläche auf Arabisch, Englisch und Deutsch, 0.0.8 Behebung von Abhängigkeits-Schwachstellen (`npm audit --omit=dev` ohne Funde; offen bleiben nur Werkzeuge für Video, `remotion`).
-- Fertig und gemerged: Release-Download repariert; dauerhaftes Aktivitätsprotokoll mit Export; Site-Regeln (fragen/blockieren); Injection-Alarm; Freigabe-Dialog mit Seite und Element; isoliertes Agent-Profil (optional, flüchtig); OpenCode-Button; blockierender Windows-Test in der CI.
-- **Nicht real getestet:** Installer unter Windows, echtes OpenCode, neue Einstellungsoberfläche, `browser_login` an echten Seiten.
-- Automatische Tests (über 1300 bestandene Assertions, 0 Fehlschläge), `tsc` und `eslint` (0 Fehler, 1140 Warnungen) sowie die CI sind beim letzten Release grün.
+- Veröffentlicht: `v0.0.9` (Oktober 2026); der Release-Workflow veröffentlicht automatisch, wenn die Version in `main` erhöht wird. Zuletzt: 0.0.6-0.0.7 Oberfläche auf Arabisch, Englisch und Deutsch, 0.0.8 Behebung von Abhängigkeits-Schwachstellen (`npm audit --omit=dev` ohne Funde; offen bleiben nur Werkzeuge für Video, `remotion`), 0.0.9 dreisprachige Website mit neuem Film und korrigiertes Layout des neuen Tabs.
+- Fertig und gemerged: Release-Download repariert; dauerhaftes Aktivitätsprotokoll mit Export; Site-Regeln (fragen/blockieren); Injection-Alarm; Freigabe-Dialog mit Seite und Element; isoliertes Agent-Profil (optional, flüchtig); OpenCode-Button; blockierender Windows-Test in der CI; MCP über Streamable HTTP (`/mcp`) neben dem alten SSE, mit automatischen Tests über die offiziellen SDK-Clients.
+- **Nicht real getestet:** Installer unter Windows, neue Einstellungsoberfläche, Codex (kein Zugang); manuell berichtet, dass OpenCode und Claude Code funktionieren, ohne die Verbindungsart festzuhalten, `browser_login` an echten Seiten.
+- Automatische Tests (über 1300 bestandene Assertions, 0 Fehlschläge), `tsc` und `eslint` (0 Fehler, 1165 Warnungen) sowie die CI sind beim letzten Release grün.
 
 ## 3) Arbeitspakete (WP)
 Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du“ = braucht deinen Rechner, Besitz oder eine Entscheidung.

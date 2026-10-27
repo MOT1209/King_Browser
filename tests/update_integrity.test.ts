@@ -1,67 +1,28 @@
+import { assessUpdateIntegrity } from '../electron/main/updateIntegrity';
+import fs0 from 'node:fs';
+
 /**
- * Update-package integrity expectations.
+ * Update-package integrity.
  *
- * The previous implementation scraped a 64-hex string out of the GitHub
- * release BODY. When no hash was found it computed the download's SHA-256,
- * logged it, and then ignored it — so the update was reported exactly like a
- * verified one while nothing had been checked. And because a King release
- * carries ~18 assets plus a checksums block, a loose scrape could also pick up
- * a DIFFERENT asset's hash and reject a perfectly good download.
+ * electron-updater verifies the downloaded installer against the digest in the
+ * release metadata (latest*.yml), but only when the metadata has one: with no
+ * digest it downloads unchecked and still reports success. The app used to tell
+ * the UI `integrityVerified: true` for every download. These tests pin the real
+ * module that now decides it, and check that electron/main.ts uses it.
  *
- * These tests pin the new order of trust (GitHub's per-asset `digest` first,
- * the body only as a strict fallback) and the "unverified" outcome. The digest
- * shapes below are copied from real `MOT1209/King_Browser` release payloads.
+ * (An earlier version of this suite tested a hand-copied mirror of a function
+ * nested in main.ts that computed a SHA-256 which nothing ever compared. That
+ * function and its mirror are gone.)
  */
 
-const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
+console.log('\n--- Update Integrity (digest availability) ---');
 
-// Mirrors electron/main.ts. Kept in sync deliberately: the function is nested
-// inside the main-process module and cannot be imported, and the previous
-// security suite's problem was a copy that drifted from the original.
-export function extractExpectedSha256(release: any, assetName: string): string | undefined {
-  if (!release) return undefined;
-
-  if (assetName && Array.isArray(release.assets)) {
-    const asset = release.assets.find(
-      (a: any) => a && typeof a.name === 'string' && a.name === assetName
-    );
-    const digest = asset?.digest;
-    if (typeof digest === 'string') {
-      const match = /^sha256:([a-fA-F0-9]{64})$/.exec(digest.trim());
-      if (match) return match[1].toLowerCase();
-    }
-  }
-
-  if (typeof release.body === 'string' && assetName) {
-    const escapedName = assetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const p1 = new RegExp(`([a-fA-F0-9]{64})\\s+[*]?${escapedName}(?![^\\n]*[a-fA-F0-9])`, 'i');
-    const m1 = release.body.match(p1);
-    if (m1 && SHA256_HEX_RE.test(m1[1].toLowerCase())) return m1[1].toLowerCase();
-
-    const p2 = new RegExp(`${escapedName}[^a-fA-F0-9\\n]*([a-fA-F0-9]{64})`, 'i');
-    const m2 = release.body.match(p2);
-    if (m2 && SHA256_HEX_RE.test(m2[1].toLowerCase())) return m2[1].toLowerCase();
-  }
-  return undefined;
-}
-
-console.log('\n--- Update Integrity (expected SHA-256 resolution) ---');
-
-const EXE = 'King-Browser-1.4.8-x64.exe';
-const EXE_SHA = 'fca1051bf784c48090970ef6b3049d93cf0843b325c6ae038f3356baa2702931';
-const DMG_SHA = 'b'.repeat(64);
-const OTHER_SHA = 'c'.repeat(64);
-
-// A real-shaped release: 18 assets, each with GitHub's `digest`.
-const realRelease = {
-  tag_name: 'v1.4.8',
-  body: `## Checksums\n${'d'.repeat(64)}  King-Browser-1.4.8-arm64.dmg\n${EXE_SHA}  ${EXE}\n`,
-  assets: [
-    { name: 'latest-mac.yml', digest: `sha256:${'a'.repeat(64)}` },
-    { name: EXE, digest: `sha256:${EXE_SHA}` },
-    { name: 'King-Browser-1.4.8-arm64.dmg', digest: `sha256:${DMG_SHA}` }
-  ]
-};
+// Shapes copied from electron-builder output: base64 sha512 is 88 characters.
+const SHA512_B64 = 'Zm9v'.repeat(21) + 'Zg==';          // 86 base64 chars + "=="
+const SHA512_B64_2 = 'YmFy'.repeat(21) + 'Yg==';
+const SHA512_HEX = 'a'.repeat(128);
+const SHA256_HEX = 'b'.repeat(64);
+const EXE = 'King-Browser-0.0.9-x64.exe';
 
 let passed = 0;
 function check(name: string, cond: boolean, extra = '') {
@@ -74,68 +35,58 @@ function check(name: string, cond: boolean, extra = '') {
   }
 }
 
-// 1. the API digest wins over whatever the body claims
-check(
-  'asset.digest is preferred over the release body',
-  extractExpectedSha256(realRelease, EXE) === EXE_SHA,
-  `got ${extractExpectedSha256(realRelease, EXE)}`
-);
-check(
-  'each asset resolves to its own digest',
-  extractExpectedSha256(realRelease, 'King-Browser-1.4.8-arm64.dmg') === DMG_SHA
-);
+check('test fixtures have the documented lengths', SHA512_B64.length === 88 && SHA512_B64_2.length === 88);
 
-// 2. no digest anywhere -> explicitly unverified, never a guess
-check(
-  'no digest and no body hash -> undefined (caller must mark it unverified)',
-  extractExpectedSha256({ tag_name: 'v1', body: 'no hashes here', assets: [{ name: EXE }] }, EXE) === undefined
-);
-check(
-  'absent digest field is not treated as a digest',
-  extractExpectedSha256({ assets: [{ name: EXE }] }, EXE) === undefined
-);
-check(
-  'unknown asset name resolves to undefined, not another asset\'s hash',
-  extractExpectedSha256(realRelease, 'King-Browser-1.4.9-x64.exe') === undefined
-);
+// 1. a digest for the downloaded file means it was checked
+{
+  const r = assessUpdateIntegrity({ files: [{ url: EXE, sha512: SHA512_B64 }], downloadedFile: `/tmp/pending/${EXE}` });
+  check('base64 sha512 for the downloaded file -> verified', r.verified && r.algorithm === 'sha512', JSON.stringify(r));
+}
+check('hex sha512 is accepted (electron-updater accepts it too)',
+  assessUpdateIntegrity({ files: [{ url: EXE, sha512: SHA512_HEX }] }).algorithm === 'sha512');
+check('sha2 (sha256 hex) counts and is reported as sha256',
+  assessUpdateIntegrity({ files: [{ url: EXE, sha2: SHA256_HEX }] }).algorithm === 'sha256');
 
-// 3. a malformed digest must not be silently accepted or coerced
-for (const bad of [
-  'sha256:tooshort',
-  `sha256:${'z'.repeat(64)}`,
-  'md5:' + 'a'.repeat(32),
-  `sha256:${'a'.repeat(63)}`,
-  `sha256:${'a'.repeat(64)}extra`
-]) {
-  check(
-    `malformed digest rejected: ${bad.slice(0, 24)}`,
-    extractExpectedSha256({ assets: [{ name: EXE, digest: bad }] }, EXE) === undefined
-  );
+// 2. no digest -> unverified, never assumed verified
+check('no files and no digest -> unverified', !assessUpdateIntegrity({}).verified);
+check('null and non-object inputs -> unverified', !assessUpdateIntegrity(null).verified && !assessUpdateIntegrity(undefined).verified);
+check('a file entry without any digest -> unverified', !assessUpdateIntegrity({ files: [{ url: EXE }] }).verified);
+check('empty files list and no top-level digest -> unverified', !assessUpdateIntegrity({ files: [] }).verified);
+
+// 3. a malformed digest is not a digest
+for (const bad of ['', 'short', 'z'.repeat(88), SHA512_B64.slice(0, 87), SHA512_B64 + 'x', 'a'.repeat(127), 42, null, {}]) {
+  check(`malformed sha512 rejected: ${JSON.stringify(bad).slice(0, 20)}`,
+    !assessUpdateIntegrity({ files: [{ url: EXE, sha512: bad }] }).verified);
+}
+check('malformed sha2 rejected', !assessUpdateIntegrity({ files: [{ url: EXE, sha2: 'b'.repeat(63) }] }).verified);
+
+// 4. which entry counts
+{
+  const files = [{ url: 'other.dmg', sha512: SHA512_B64_2 }, { url: EXE }];
+  check('the downloaded file has no digest even though another file does -> unverified',
+    !assessUpdateIntegrity({ files, downloadedFile: `C:\\cache\\${EXE}` }).verified);
+  const files2 = [{ url: 'other.dmg' }, { url: EXE, sha512: SHA512_B64 }];
+  check('the downloaded file has a digest although another file has none -> verified',
+    assessUpdateIntegrity({ files: files2, downloadedFile: `/cache/${EXE}` }).verified);
+  check('downloaded file unknown: every entry must carry a digest',
+    !assessUpdateIntegrity({ files: files2 }).verified && assessUpdateIntegrity({ files: [{ url: 'a', sha512: SHA512_B64 }, { url: 'b', sha512: SHA512_B64_2 }] }).verified);
+  check('url-encoded file names are matched',
+    assessUpdateIntegrity({ files: [{ url: 'King%20Browser%20Setup.exe', sha512: SHA512_B64 }], downloadedFile: '/c/King Browser Setup.exe' }).verified);
+  check('mixed sha512 and sha256 is reported as the weaker algorithm',
+    assessUpdateIntegrity({ files: [{ url: 'a', sha512: SHA512_B64 }, { url: 'b', sha2: SHA256_HEX }] }).algorithm === 'sha256');
 }
 
-// 4. body fallback still works for old releases, exact name only
-const legacyRelease = {
-  body: `## Checksums\n${'d'.repeat(64)}  King-Browser-1.4.8-arm64.dmg\n${EXE_SHA}  ${EXE}\n`,
-  assets: [{ name: EXE }]
-};
-check('legacy release falls back to an exact body match', extractExpectedSha256(legacyRelease, EXE) === EXE_SHA);
-check(
-  'body fallback does not leak another asset\'s hash',
-  extractExpectedSha256(legacyRelease, 'King-Browser-1.4.8-arm64.dmg') === 'd'.repeat(64),
-  'arm64 name is legitimately listed in that body, so this is the correct hash'
-);
+// 5. metadata from older electron-builder versions has only top-level fields
+check('legacy top-level sha512 with path -> verified', assessUpdateIntegrity({ path: EXE, sha512: SHA512_B64 }).verified);
+check('legacy metadata without sha512 -> unverified', !assessUpdateIntegrity({ path: EXE }).verified);
 
-// 5. the old single-asset loose fallback is gone: a bare hex elsewhere in the
-//    body must not be adopted for an unrelated asset
-check(
-  'bare hex in the body is NOT adopted for an unrelated asset',
-  extractExpectedSha256({ body: `${OTHER_SHA}\n\nunrelated notes\n`, assets: [] }, EXE) === undefined
-);
-
-// 6. every returned value is a well-formed sha-256
-for (const name of [EXE, 'King-Browser-1.4.8-arm64.dmg', 'latest-mac.yml']) {
-  const v = extractExpectedSha256(realRelease, name);
-  check(`returned value for ${name} is 64 lowercase hex`, typeof v === 'string' && SHA256_HEX_RE.test(v));
+// 6. main.ts reports what happened instead of a constant
+{
+  const main = fs0.readFileSync('electron/main.ts', 'utf8');
+  check('main.ts no longer hardcodes integrityVerified: true', !/integrityVerified:\s*true/.test(main));
+  check('main.ts derives integrityVerified from assessUpdateIntegrity', /integrityVerified:\s*integrity\.verified/.test(main) && /assessUpdateIntegrity\(info\)/.test(main));
+  check('an unchecked package is not installed silently on quit', /autoInstallOnAppQuit\s*=\s*integrity\.verified/.test(main));
+  check('the unused expected-hash plumbing is gone', !/extractExpectedSha256|expectedSha256|targetExpectedSha/.test(main));
 }
 
 console.log(`\n${passed} update-integrity checks passed\n`);

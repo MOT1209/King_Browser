@@ -86,7 +86,13 @@ if (fs.existsSync(indexHtmlPath)) {
 if (indexChunk && webLlmChunk) {
   const indexContent = fs.readFileSync(path.join(ASSETS_DIR, indexChunk), 'utf8');
   assert(!indexContent.includes('TVMRuntime') && !indexContent.includes('tvmjs'), '[Index Entry Isolation] index-*.js does not contain TVM runtime');
-  assert(indexContent.includes(webLlmChunk), '[Dynamic Import Linkage] index-*.js links to web-llm chunk via dynamic import()', webLlmChunk);
+  // The link lives in whichever chunk holds the agent: the agent is split out of
+  // the entry chunk, so the entry must reach web-llm only through that chunk.
+  const jsFiles = assetFiles.filter((f) => f.endsWith('.js') && f !== webLlmChunk);
+  const linkers = jsFiles.filter((f) => fs.readFileSync(path.join(ASSETS_DIR, f), 'utf8').includes(`import("./${webLlmChunk}")`));
+  assert(linkers.length > 0, '[Dynamic Import Linkage] a chunk links to the web-llm chunk via dynamic import()', webLlmChunk);
+  const staticLink = new RegExp(`from\\s*["']\\./${webLlmChunk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`);
+  assert(!staticLink.test(indexContent), '[Dynamic Import Linkage] the entry chunk does not import web-llm statically');
 }
 
 // 2.4 Verify src/services/aiAgent.ts uses type-only import

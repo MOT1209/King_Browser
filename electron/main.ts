@@ -147,6 +147,7 @@ export { isLocalOrIntranetHost } from './main/hostPolicy';
 import { enforceModelCacheBudget, MAX_MODEL_CACHE_FILE_BYTES } from './main/modelCacheQuota.js';
 import { isAgentNavigationHostPublic } from './main/agentNavigationGuard.js';
 import { shouldReloadAfterRendererGone, markQuitting } from './main/rendererRecovery.js';
+import { assessUpdateIntegrity } from './main/updateIntegrity.js';
 
 /**
  * Validates URLs for context-menu media saving and address copying.
@@ -2189,54 +2190,6 @@ app.whenReady().then(async () => {
     return assets.find((a: any) => typeof a.name === 'string' && !a.name.endsWith('.blockmap') && !a.name.endsWith('.yml')) || assets[0];
   }
 
-  const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
-
-  /**
-   * The expected SHA-256 for a release asset, in order of trust:
-   *
-   * 1. `asset.digest` — GitHub's own per-asset metadata ("sha256:<64 hex>"),
-   *    served by the Releases API. This is the source to use: it is structured,
-   *    per-asset, and cannot be accidentally altered by pasting free text.
-   * 2. The release body text, for releases published before digests existed.
-   *    This is a weak fallback and only an exact asset-name match is accepted:
-   *    a King release carries ~18 assets and a checksums block, so a loose
-   *    "64 hex characters" match can easily pick up a DIFFERENT asset's hash
-   *    and then fail a perfectly good download.
-   *
-   * Returns undefined only when no usable digest exists at all. Callers must
-   * treat that as "unverified" rather than "verified" - see the download path.
-   */
-  function extractExpectedSha256(release: any, assetName: string): string | undefined {
-    if (!release) return undefined;
-
-    // 1. GitHub's structured per-asset digest.
-    if (assetName && Array.isArray(release.assets)) {
-      const asset = release.assets.find(
-        (a: any) => a && typeof a.name === 'string' && a.name === assetName
-      );
-      const digest = asset?.digest;
-      if (typeof digest === 'string') {
-        const match = /^sha256:([a-fA-F0-9]{64})$/.exec(digest.trim());
-        if (match) return match[1].toLowerCase();
-        // A digest we cannot parse is a hard signal, not something to guess at.
-        console.warn(`[Updater] Ignoring unrecognised digest format for ${assetName}: ${digest.slice(0, 32)}`);
-      }
-    }
-
-    // 2. Release body fallback, exact asset-name match only.
-    if (typeof release.body === 'string' && assetName) {
-      const escapedName = assetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const p1 = new RegExp(`([a-fA-F0-9]{64})\\s+[*]?${escapedName}(?![^\\n]*[a-fA-F0-9])`, 'i');
-      const m1 = release.body.match(p1);
-      if (m1 && SHA256_HEX_RE.test(m1[1].toLowerCase())) return m1[1].toLowerCase();
-
-      const p2 = new RegExp(`${escapedName}[^a-fA-F0-9\\n]*([a-fA-F0-9]{64})`, 'i');
-      const m2 = release.body.match(p2);
-      if (m2 && SHA256_HEX_RE.test(m2[1].toLowerCase())) return m2[1].toLowerCase();
-    }
-    return undefined;
-  }
-
   // Auto Updater Configuration
   autoUpdater.autoDownload = false;
   autoUpdater.allowPrerelease = false;
@@ -2250,7 +2203,6 @@ app.whenReady().then(async () => {
     releaseNotes?: string;
     releaseName?: string;
     publishedAt?: string;
-    expectedSha256?: string;
   } | null = null;
   const downloadedUpdateFilePath: string | null = null;
   let isDownloadingUpdate = false;
@@ -2689,15 +2641,13 @@ fi
             const currentVersion = app.getVersion();
             if (latestTag && isNewerVersion(latestTag, currentVersion)) {
               const platformAsset = getPlatformAsset(latestRelease.assets || []);
-              const expectedSha = extractExpectedSha256(latestRelease, platformAsset?.name || '');
               latestReleaseDownloadInfo = {
                 version: latestTag,
                 downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
                 assetName: platformAsset?.name || '',
                 releaseNotes: latestRelease.body || '',
                 releaseName: latestRelease.name || `v${latestTag}`,
-                publishedAt: latestRelease.published_at || new Date().toISOString(),
-                expectedSha256: expectedSha
+                publishedAt: latestRelease.published_at || new Date().toISOString()
               };
               sendToMainWindow('update-available', {
                 version: latestTag,
@@ -2737,15 +2687,13 @@ fi
             const currentVersion = app.getVersion();
             if (latestTag && isNewerVersion(latestTag, currentVersion)) {
               const platformAsset = getPlatformAsset(latestRelease.assets || []);
-              const expectedSha = extractExpectedSha256(latestRelease, platformAsset?.name || '');
               latestReleaseDownloadInfo = {
                 version: latestTag,
                 downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
                 assetName: platformAsset?.name || '',
                 releaseNotes: latestRelease.body || '',
                 releaseName: latestRelease.name || `v${latestTag}`,
-                publishedAt: latestRelease.published_at || new Date().toISOString(),
-                expectedSha256: expectedSha
+                publishedAt: latestRelease.published_at || new Date().toISOString()
               };
               sendToMainWindow('update-available', {
                 version: latestTag,
@@ -2806,11 +2754,18 @@ fi
 
   autoUpdater.on('update-downloaded', (info) => {
     isUpdateDownloaded = true;
-    console.log('Update downloaded:', info.version);
+    // electron-updater checks the download against the digest in the release
+    // metadata, but only when the metadata has one. Report what actually
+    // happened, and never install a package that was not checked behind the
+    // user's back when the app quits: it then needs the explicit Install click,
+    // next to the warning the update widget shows.
+    const integrity = assessUpdateIntegrity(info);
+    autoUpdater.autoInstallOnAppQuit = integrity.verified;
+    console.log('Update downloaded:', info.version, integrity.verified ? `(${integrity.algorithm} checked)` : '(no digest to check against)');
     sendToMainWindow('update-downloaded', {
       version: info.version,
       releaseDate: info.releaseDate,
-      integrityVerified: true
+      integrityVerified: integrity.verified
     });
   });
 
@@ -2851,7 +2806,6 @@ fi
     let targetUrl = (typeof customUrl === 'string' && customUrl.trim()) ? customUrl.trim() : latestReleaseDownloadInfo?.downloadUrl;
     let targetVersion = latestReleaseDownloadInfo?.version || '';
     let assetName = latestReleaseDownloadInfo?.assetName || '';
-    let targetExpectedSha = latestReleaseDownloadInfo?.expectedSha256;
 
     // If no URL stored yet, query GitHub releases API directly
     if (!targetUrl) {
@@ -2868,9 +2822,6 @@ fi
             const platformAsset = getPlatformAsset(latestRelease.assets || []);
             targetUrl = platformAsset?.browser_download_url || latestRelease.html_url;
             assetName = platformAsset?.name || '';
-            if (!targetExpectedSha) {
-              targetExpectedSha = extractExpectedSha256(latestRelease, assetName);
-            }
           }
         }
       } catch (fetchErr: any) {

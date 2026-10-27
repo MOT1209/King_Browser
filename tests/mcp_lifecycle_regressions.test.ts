@@ -56,7 +56,7 @@ async function run() {
     CustomEvent: class {}, setTimeout, clearTimeout
   }, {
     react: { useEffect: (fn: Function) => fn(), useRef: (current: unknown) => ({ current }) },
-    '../services/aiAgent': { aiAgent: { setActionContext: () => {} } },
+    '../services/aiActionContext': { publishActionContext: () => {} },
     '../services/agentOrchestrator': { orchestrator: {
       enqueueAction: () => ({ id: 'approval', done: new Promise<boolean>(resolve => { approve = resolve; }) }),
       denyAction: () => { denied++; approve(false); }, updateActionState: () => {}

@@ -4,7 +4,6 @@ import { generateId } from '../utils/idGenerator';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { reorderTabsWithinGroup } from '../utils/verticalTabs';
 import { tabThumbnailCache } from '../services/thumbnailCache';
-import { aiAgent } from '../services/aiAgent';
 import { getElectronAPI } from '../utils/electronBridge';
 import { showAlert } from '../utils/confirmDialog';
 import { logger } from '../utils/logger';
@@ -90,6 +89,8 @@ export function useTabOperations({
     tabThumbnailCache.clear();
     // 3. Terminate background AI worker and release GPU VRAM
     try {
+      // Loaded on demand: the agent is not part of the startup bundle.
+      const { aiAgent } = await import('../services/aiAgent');
       await aiAgent.unload();
     } catch (err) {
       console.warn('Purge AI worker error:', err);

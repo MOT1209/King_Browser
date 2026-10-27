@@ -5,6 +5,7 @@ import { orchestrator } from "./agentOrchestrator";
 import { generateId } from "../utils/idGenerator";
 import { logger } from "../utils/logger";
 import { getLocale } from "./i18n";
+import { subscribeActionContext } from "./aiActionContext";
 import { sanitizeAgentInput } from "./aiAgent/inputSanitizer";
 
 // ---------------------------------------------------------------------------
@@ -3530,3 +3531,5 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 }
 
 export const aiAgent = new AIAgent();
+// The bridge publishes the action context without importing this module.
+subscribeActionContext((context) => aiAgent.setActionContext(context));
