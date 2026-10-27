@@ -769,7 +769,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onRespondPermission,
   onDismissPermission
 }) => {
-  const { l } = useTranslation();
+  const { l, t } = useTranslation();
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
 
   useEffect(() => {
@@ -1341,7 +1341,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     ? 'text-slate-400 hover:bg-slate-700/80 hover:text-slate-200'
                     : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
                 }`}
-                title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
+                title={t('tabs.newTabWithShortcut', { shortcut: isMac ? 'Cmd+T' : 'Ctrl+T' })}
               >
                 <Plus className="w-4 h-4" />
               </motion.button>

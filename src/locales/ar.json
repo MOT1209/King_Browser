@@ -48,7 +48,8 @@
     "wake": "تنشيط التبويب",
     "sleeping": "التبويب في وضع السكون",
     "sleepingDesc": "تم إيقاف هذا التبويب مؤقتا لتوفير الذاكرة والمعالج.",
-    "wakeUp": "إيقاظ التبويب"
+    "wakeUp": "إيقاظ التبويب",
+    "newTabWithShortcut": "تبويب جديد ({shortcut})"
   },
   "settings": {
     "title": "الإعدادات",
@@ -316,7 +317,6 @@
   "agentPanel": {
     "title": "التحكم بالوكيل",
     "expand": "التحكم بالوكيل",
-    "shortcutHint": "Ctrl+Shift+.",
     "states": {
       "idle": "خامل",
       "running": "قيد التشغيل",
@@ -365,7 +365,18 @@
     "statusCancelled": "ملغاة",
     "statusRejected": "مرفوضة",
     "statusRunning": "قيد التشغيل",
-    "statusRequested": "في الانتظار"
+    "statusRequested": "في الانتظار",
+    "ageSeconds": "منذ {count} ث",
+    "ageMinutes": "منذ {count} د",
+    "ageHours": "منذ {count} س",
+    "moveHint": "اسحب لتحريكه. الأسهم تحركه، والنقر المزدوج يعيده لمكانه.",
+    "hidePill": "إخفاء حالة الوكيل",
+    "hidePillHint": "إخفاء حالة الوكيل ({shortcut} لإظهارها مجددا)",
+    "pillHideWhenIdle": "إخفاء حالة الوكيل عند الخمول",
+    "pillHideWhenIdleHint": "يظهر الزر فقط أثناء عمل الوكيل أو عندما يحتاج موافقتك.",
+    "pillShow": "إظهار زر حالة الوكيل",
+    "pillShowHint": "أوقفه لإغلاق الزر العائم. طلب الموافقة يعيده دائما.",
+    "pillSettingsTitle": "زر حالة الوكيل"
   },
   "appearance": {
     "wallpaper": {
@@ -488,6 +499,58 @@
         "name": "رابط فيديو / صورة",
         "badge": "مخصص"
       }
+    }
+  },
+  "shortcuts": {
+    "title": "اختصارات لوحة المفاتيح",
+    "subtitle": "انقر على الاختصار ثم اضغط المفاتيح الجديدة. Esc للإلغاء.",
+    "search": "ابحث في الاختصارات",
+    "resetAll": "استعادة الكل",
+    "resetOne": "استعادة الافتراضي",
+    "edit": "تغيير الاختصار",
+    "pressKeys": "اضغط المفاتيح...",
+    "needsModifier": "استخدم Ctrl أو Cmd أو Alt مع المفتاح (أو مفتاح F).",
+    "conflict": "مستخدم مسبقا في \"{action}\". اختر مجموعة أخرى.",
+    "customized": "معدّل",
+    "fixedTitle": "متاحة دائما",
+    "noResults": "لا يوجد اختصار يطابق البحث.",
+    "groups": {
+      "tabs": "التبويبات",
+      "navigation": "التنقل",
+      "page": "الصفحة",
+      "panels": "اللوحات",
+      "agent": "التحكم بالوكيل"
+    },
+    "actions": {
+      "newTab": "تبويب جديد",
+      "closeTab": "إغلاق التبويب",
+      "reopenTab": "إعادة فتح التبويب المغلق",
+      "newIncognito": "نافذة خاصة جديدة",
+      "nextTab": "التبويب التالي",
+      "prevTab": "التبويب السابق",
+      "omnibox": "بحث سريع (Spotlight)",
+      "focusAddress": "التركيز على شريط العنوان",
+      "goBack": "رجوع",
+      "goForward": "تقدم",
+      "reload": "إعادة تحميل الصفحة",
+      "bookmark": "إضافة إشارة مرجعية",
+      "history": "فتح السجل",
+      "downloads": "فتح التنزيلات",
+      "findInPage": "البحث في الصفحة",
+      "zoomIn": "تكبير",
+      "zoomOut": "تصغير",
+      "resetZoom": "إعادة التكبير للوضع الافتراضي",
+      "print": "طباعة الصفحة",
+      "screenshot": "لقطة شاشة",
+      "devtools": "أدوات المطور",
+      "toggleSidebar": "إظهار أو إخفاء الشريط الجانبي",
+      "toggleAiPanel": "إظهار أو إخفاء مساعد King",
+      "toggleAgentPanel": "فتح أو إغلاق التحكم بالوكيل",
+      "toggleAgentPill": "إظهار أو إخفاء زر حالة الوكيل",
+      "agentStopNow": "إيقاف الوكيل فورا",
+      "switchTab": "الانتقال إلى التبويب 1-9",
+      "help": "مركز المساعدة",
+      "shortcutsHelp": "دليل الاختصارات"
     }
   }
 }

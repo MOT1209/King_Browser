@@ -540,7 +540,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   isCollapsed = false,
   onReorderTabs
 }) => {
-  const { l } = useTranslation();
+  const { l, t } = useTranslation();
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
   const isMac = useMemo(() => {
@@ -1278,7 +1278,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <button
               onClick={() => onNewTab()}
               className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-              title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
+              title={t('tabs.newTabWithShortcut', { shortcut: isMac ? 'Cmd+T' : 'Ctrl+T' })}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>

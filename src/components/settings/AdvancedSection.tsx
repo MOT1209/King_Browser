@@ -23,7 +23,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
   const [isPurgingMemory, setIsPurgingMemory] = useState(false);
   const [purgedFeedback, setPurgedFeedback] = useState(false);
   const { setSafeTimeout } = useSafeTimeout();
-  const { l } = useTranslation();
+  const { l, t } = useTranslation();
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -53,6 +53,36 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               ariaLabel={l({ en: 'Toggle password manager', ar: 'تشغيل أو إيقاف مدير كلمات المرور', de: 'Passwortmanager umschalten' })}
               checked={settings.passwordManagerEnabled}
               onToggle={() => onUpdateSettings({ passwordManagerEnabled: !settings.passwordManagerEnabled })}
+              activeColorClass="bg-indigo-500"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">{t('agentPanel.pillSettingsTitle')}</h2>
+        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
+          <div className="p-5 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('agentPanel.pillShow')}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('agentPanel.pillShowHint')}</div>
+            </div>
+            <ToggleSwitch
+              ariaLabel={t('agentPanel.pillShow')}
+              checked={!settings.agentPillHidden}
+              onToggle={() => onUpdateSettings({ agentPillHidden: !settings.agentPillHidden })}
+              activeColorClass="bg-indigo-500"
+            />
+          </div>
+          <div className="p-5 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('agentPanel.pillHideWhenIdle')}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('agentPanel.pillHideWhenIdleHint')}</div>
+            </div>
+            <ToggleSwitch
+              ariaLabel={t('agentPanel.pillHideWhenIdle')}
+              checked={settings.agentPillHideWhenIdle !== false}
+              onToggle={() => onUpdateSettings({ agentPillHideWhenIdle: settings.agentPillHideWhenIdle === false })}
               activeColorClass="bg-indigo-500"
             />
           </div>

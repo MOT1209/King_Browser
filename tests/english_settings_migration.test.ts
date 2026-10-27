@@ -5,6 +5,7 @@ import ts from 'typescript';
 import { defaultSettings, detectSystemLanguage } from '../src/types/browser';
 import { normalizeLanguage } from '../src/services/language';
 import { safeParseObjectWithBackup } from '../src/utils/safeStorage';
+import { buildDefaultShortcuts } from '../src/utils/shortcutCatalog';
 
 // Execute the real settings hook with a synchronous state adapter. This covers
 // local startup and the shared setter used by disk restore, backup and sync.
@@ -23,7 +24,8 @@ function runSettingsHook(userSettings: string | null, bootLanguage: string | nul
     },
     '../types/browser': { defaultSettings },
     '../services/language': { normalizeLanguage },
-    '../utils/safeStorage': { safeParseObjectWithBackup }
+    '../utils/safeStorage': { safeParseObjectWithBackup },
+    '../utils/shortcutCatalog': { buildDefaultShortcuts }
   };
 
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/hooks/useSettings.ts', 'utf8'), {

@@ -340,6 +340,11 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               setIsSiteInfoOpen(prev => !prev);
             }}
             className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer h-7 px-1 rounded-md"
+            // The omnibox keeps a physical layout in every language (URLs read
+            // left to right and the input padding is not mirrored). Pin the
+            // offsets inline so the RTL `.left-2` mirror rule cannot move the
+            // badge onto the action icons.
+            style={{ left: '0.5rem', right: 'auto' }}
           >
             {isIncognito ? (
               <div className="flex items-center gap-1.5 text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-lg shadow-xs hover:bg-cyan-500/25 transition-colors" title={l({ en: 'Private & Incognito Mode (Click for Site Info)', ar: 'وضع التصفح الخفي (انقر لمعلومات الموقع)', de: 'Privater Inkognito-Modus (für Website-Infos klicken)' })}>
@@ -496,6 +501,9 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               position: 'absolute',
               top: 0,
               right: '0.5rem',
+              // Without this the RTL `.right-2` rule adds `left: 0.5rem` and
+              // the actions box spans the whole input, swallowing clicks.
+              left: 'auto',
               bottom: 0,
               display: 'flex',
               alignItems: 'center',

@@ -48,6 +48,8 @@ import './link_preview_lru.test';
 import './workspace_state_management.test';
 import './adblock_filter_engine.test';
 import './keyboard_shortcuts.test';
+import './agent_pill_placement.test';
+import './rtl_overlay_regressions.test';
 import './reader_mode_sanitization.test';
 import './session_isolation.test';
 import './history_bookmarks_search.test';
