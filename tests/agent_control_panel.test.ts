@@ -290,7 +290,10 @@ async function renderSuite() {
     {
       const container = mounted[mounted.length - 1].container;
       const pill = container.querySelector('button[aria-expanded]');
-      check('pill exposes the keyboard shortcut hint', (pill.getAttribute('title') || '').includes('Ctrl+Shift+.'));
+      // The hint names the platform modifier: Cmd on macOS runners, Ctrl elsewhere.
+      const { isMac } = await import('../src/utils/appConstants');
+      const hint = `${isMac ? 'Cmd' : 'Ctrl'}+Shift+.`;
+      check('pill exposes the keyboard shortcut hint', (pill.getAttribute('title') || '').includes(hint), pill.getAttribute('title') || '');
     }
   } finally {
     for (const { root, container } of mounted) {
