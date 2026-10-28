@@ -101,7 +101,8 @@ Bundle impact: none (test-only). Install impact: 5 packages, none with an instal
 
 - `ci.yml`: actions pinned to commit SHAs (`actions/checkout` v4.4.0, `actions/setup-node` v4.4.0, `actions/upload-artifact` v4.6.2); new blocking "Production dependency audit" step; new `electron-e2e` job (Linux, `continue-on-error: true` until it has passed a few times, matching how `test-macos` was introduced). Workflow permissions stay `contents: read`.
 - `codeql.yml` (new): CodeQL for JavaScript/TypeScript, `build-mode: none`, on pushes to `main`, pull requests and weekly; job-level `security-events: write` only. Pinned to `github/codeql-action` v4.39.1. The repository is public, so code scanning is available without extra licences.
-- `release.yml` and `dependabot.yml`: unchanged. Dependabot version updates are disabled on purpose; GitHub Dependabot security alerts are a repository setting, not a file, and were not checked from here. `release.yml` still uses tag references (`softprops/action-gh-release@v2` has `contents: write`); pinning it is recommended but left to the owner because AGENTS.md requires approval for release workflow changes.
+- `release.yml`: actions pinned to the commit SHAs their tags resolved to on 2026-10-28 (including `softprops/action-gh-release` v2.6.2, which runs with `contents: write`), approved by the owner. No other change to the release workflow.
+- `dependabot.yml`: unchanged. Dependabot version updates are disabled on purpose, so pinned SHAs are not bumped automatically; update them by hand with the version comment. GitHub Dependabot security alerts are a repository setting, not a file, and were not checked from here.
 
 ## 5. Troubleshooting
 

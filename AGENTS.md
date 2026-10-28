@@ -167,7 +167,7 @@ Add a package only after checking that nothing in the tree already does the job,
 
 ### CI
 
-`.github/workflows/ci.yml`: Linux job (typecheck, lint, i18n and string checks, MCP bridge drift, production dependency audit, `npm test`, website build and tests), Windows job (typecheck, `npm test`), macOS job (same, non-blocking), and `electron-e2e` (Playwright smoke and axe on Linux, non-blocking while new). `.github/workflows/codeql.yml` runs CodeQL on pushes, pull requests and weekly. Actions in these workflows are pinned to commit SHAs. `.github/workflows/release.yml` builds installers (see Rules: Release).
+`.github/workflows/ci.yml`: Linux job (typecheck, lint, i18n and string checks, MCP bridge drift, production dependency audit, `npm test`, website build and tests), Windows job (typecheck, `npm test`), macOS job (same, non-blocking), and `electron-e2e` (Playwright smoke and axe on Linux, non-blocking while new). `.github/workflows/codeql.yml` runs CodeQL on pushes, pull requests and weekly. Actions in all workflows, including `.github/workflows/release.yml` (which builds installers), are pinned to commit SHAs (see Rules: Release).
 
 ### Definition of done
 

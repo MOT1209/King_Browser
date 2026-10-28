@@ -19,7 +19,7 @@ Keep the process boundaries that make a browser safe to point at hostile pages.
 - Permissions: `setPermissionRequestHandler` / `setPermissionCheckHandler` per session, fail closed; prompts in `src/hooks/usePermissionRequests.ts`.
 - Other windows: `electron/windows/sourceViewer.ts`, the OAuth popup window near the end of `main.ts`; same prefs required.
 - Fuses: `scripts/apply-fuses.cjs` (electron-builder `afterPack`) flips RunAsNode, NODE_OPTIONS, inspect args, file-protocol privileges off and cookie encryption, asar-only and asar integrity on. Dev runs (`npm run dev`) are NOT fused.
-- Command-line switches near the top of `main.ts`. Known, deliberate exception: on Linux `no-sandbox` is appended when running as root or when `/proc/sys/kernel/unprivileged_userns_clone` is `0`, with a user warning. Changing that is a policy decision for the owner.
+- Command-line switches near the top of `main.ts`. Known, deliberate exception: on Linux `no-sandbox` is appended (with a user warning) only when `electron/main/linuxSandbox.ts` decides Chromium cannot sandbox: running as root, or `/proc/sys/kernel/unprivileged_userns_clone` is `0` and no root-owned setuid `chrome-sandbox` exists. Widening that fallback is a policy decision for the owner; `tests/linux_sandbox_fallback.test.ts` covers it.
 
 ## Workflow
 1. For any new window or webContents, copy the hardened prefs block; never inherit defaults.
