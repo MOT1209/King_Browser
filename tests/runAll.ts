@@ -139,6 +139,10 @@ import './runtime_error_fixes.test';
 import './website_login_fixes.test';
 // Renders the §10 control panel in jsdom with its own window/document globals.
 import './agent_control_panel.test';
+// Static guards: every IPC handler under electron/, the shipped CSP, agent skills.
+import './ipc_sender_guard_coverage.test';
+import './csp_parity.test';
+import './agent_skills_integrity.test';
 
 // Very last on purpose. This behaviour-level auth suite (register, login,
 // logout, restore and cross-account isolation driven through the real service
