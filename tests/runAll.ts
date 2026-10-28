@@ -143,6 +143,7 @@ import './agent_control_panel.test';
 // Static guards: every IPC handler under electron/, the shipped CSP, agent skills.
 import './ipc_sender_guard_coverage.test';
 import './csp_parity.test';
+import './linux_sandbox_fallback.test';
 import './agent_skills_integrity.test';
 
 // Very last on purpose. This behaviour-level auth suite (register, login,

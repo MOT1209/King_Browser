@@ -132,6 +132,7 @@ import {
 } from './main/adblockManager.js';
 import { BrowserMCPServer } from './mcpServer.js';
 import { registerEngineIpc } from './main/engineIpc.js';
+import { decideLinuxSandbox, readLinuxSandboxInput } from './main/linuxSandbox.js';
 import { escapeHtmlForTranslation, unescapeHtmlForTranslation } from './main/translationText.js';
 import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig.js';
 import { initMcpBridge } from './main/mcpBridge.js';
@@ -284,26 +285,22 @@ if (process.platform === 'win32') {
 if (process.platform === 'linux') {
   // Prevent blurry fonts and rendering under Wayland (GNOME / KDE)
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
-  if (typeof process.getuid === 'function' && process.getuid() === 0) {
-    console.warn('[Security] Running as root. Linux sandboxing disabled. User will be notified after window ready.');
+  // Sandbox fallback only where Chromium cannot sandbox at all; with user
+  // namespaces disabled, a root-owned setuid chrome-sandbox still sandboxes.
+  const sandbox = decideLinuxSandbox(readLinuxSandboxInput(process.execPath));
+  if (sandbox.reason === 'setuid-helper') {
+    console.warn('[Security] Linux unprivileged user namespaces disabled in kernel. Using the setuid sandbox helper.');
+  }
+  if (sandbox.disableSandbox) {
+    console.warn(sandbox.reason === 'root'
+      ? '[Security] Running as root. Linux sandboxing disabled. User will be notified after window ready.'
+      : '[Security] Linux unprivileged user namespaces disabled in kernel and no usable setuid chrome-sandbox. Falling back to un-sandboxed mode. User will be notified after window ready.');
     app.commandLine.appendSwitch('no-sandbox');
     app.commandLine.appendSwitch('disable-setuid-sandbox');
+    // Flag sandbox warning to be shown after the main window is fully ready.
+    // dialog cannot be used before app.whenReady() resolves.
     (global as any).__sandboxDisabledWarning = true;
   }
-  // Safe sandbox fallback: If unprivileged user namespaces are disabled in kernel
-  try {
-    if (fs.existsSync('/proc/sys/kernel/unprivileged_userns_clone')) {
-      const userns = fs.readFileSync('/proc/sys/kernel/unprivileged_userns_clone', 'utf-8').trim();
-      if (userns === '0') {
-        console.warn('[Security] Linux unprivileged user namespaces disabled in kernel. Falling back to un-sandboxed mode. User will be notified after window ready.');
-        app.commandLine.appendSwitch('no-sandbox');
-        app.commandLine.appendSwitch('disable-setuid-sandbox');
-        // Flag sandbox warning to be shown after the main window is fully ready.
-        // dialog cannot be used before app.whenReady() resolves.
-        (global as any).__sandboxDisabledWarning = true;
-      }
-    }
-  } catch (_) {}
 }
 
 // Increase v8 memory limit if doing heavy Local AI tasks in WebWorkers

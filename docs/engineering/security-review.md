@@ -27,11 +27,13 @@ Date: 2026-10-28. Scope: the areas below, reviewed by reading the source at comm
 
 ## Findings
 
-### F1. Linux sandbox is disabled when unprivileged user namespaces are off (decision needed)
+### F1. Linux sandbox was disabled when unprivileged user namespaces are off (fixed 2026-10-28)
 
 `electron/main.ts` appends `--no-sandbox` when running as root (Chromium requires it) and also when `/proc/sys/kernel/unprivileged_userns_clone` is `0`. In the second case Chromium could instead use its setuid sandbox helper if `chrome-sandbox` is installed setuid root (as `.deb` packages usually do), keeping renderer sandboxing. The app warns the user, so the trade-off is visible, but the fallback is broader than necessary for installs where the helper is configured.
 
-Status: not changed. Changing sandbox fallback behaviour affects which systems can start the app at all; needs the owner's decision and testing on the affected distributions. Possible direction: only fall back when the helper is not setuid root.
+Status: fixed with the owner's go-ahead. `electron/main/linuxSandbox.ts` now disables the sandbox only as root, or when namespaces are off AND `chrome-sandbox` next to the executable is not a root-owned setuid executable (the same conditions Chromium checks). Covered by `tests/linux_sandbox_fallback.test.ts`. Verified: the decision table in tests and the real reader in a root container (decision `root`, unchanged). Not verified: a real start on a distribution with `unprivileged_userns_clone = 0` and a `.deb` install (no such system was available). Systems that started before still start: the fallback still applies wherever the helper is unusable.
+
+Observation, not changed: the check only reads the Debian-style `unprivileged_userns_clone` sysctl. Ubuntu 24.04 restricts namespaces through AppArmor (`kernel.apparmor_restrict_unprivileged_userns`) instead, where an AppImage without a usable helper may fail to start; widening the fallback to that case would turn the sandbox off on more systems and is a separate decision.
 
 ### F2. electronegativity findings (all reviewed)
 
@@ -40,7 +42,7 @@ Status: not changed. Changing sandbox fallback behaviour affects which systems c
 | REMOTE_MODULE_JS_CHECK (3) | `BrowserWindow` in `main.ts` (main, OAuth popup), `windows/sourceViewer.ts` | False positive: the `remote` module was removed in Electron 14; the tool assumed Electron 0.1 because it could not detect the version. |
 | AUXCLICK_JS_CHECK (3) | same windows | Low. Middle-click opens go through the same `setWindowOpenHandler` and rate limiter as other opens. |
 | OPEN_EXTERNAL_JS_CHECK (7) | `main.ts` | Reviewed each: fixed OS-settings URIs, release URLs validated against the official repository path, `canOpenInSystemBrowser`, `open-external` IPC checks. No unvalidated input. |
-| CUSTOM_ARGUMENTS_JS_CHECK (4) | `main.ts` switches | Performance switches are benign; `no-sandbox` is F1. |
+| CUSTOM_ARGUMENTS_JS_CHECK (4) | `main.ts` switches | Performance switches are benign; `no-sandbox` is F1 (now limited to root or no usable sandbox). |
 | PROTOCOL_HANDLER_JS_CHECK | `setAsDefaultProtocolClient('king')` | Informational; `king:` URLs are matched against an exact allowlist before being trusted. |
 | PRELOAD_JS_CHECK | main window preload | Informational; reviewed under "Preload exposure". |
 | CSP_GLOBAL_CHECK | `main.ts` header | Tool could not parse a template literal; CSP is checked by `csp_parity` instead. |
