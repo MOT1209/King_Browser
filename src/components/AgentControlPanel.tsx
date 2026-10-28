@@ -461,6 +461,20 @@ export function AgentControlPanel({
                   )}
                   {pending.summary && <span className="block mt-0.5">{pending.summary}</span>}
                 </div>
+                {pending.details && pending.details.length > 0 && (
+                  <ul
+                    data-testid="approval-details"
+                    className="rounded-lg bg-white/70 dark:bg-black/20 border border-amber-200 dark:border-amber-900 px-2.5 py-1.5 space-y-0.5 text-xs text-gray-800 dark:text-gray-200"
+                  >
+                    {pending.details.map((line, index) => (
+                      <li key={index} className="break-words" dir="auto">
+                        {line.kind === 'other'
+                          ? line.text
+                          : <><span className="font-semibold">{t(`agentPanel.approvalDetails.${line.kind}`)}:</span> {line.text}</>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="flex gap-2 pt-0.5">
                   <button
                     type="button"

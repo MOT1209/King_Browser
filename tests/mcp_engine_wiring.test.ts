@@ -42,6 +42,8 @@ async function run() {
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const approvalDetailsModule = loadSource('electron/main/approvalDetails.ts', {}, {});
+  const uiStringsModule = loadSource('electron/main/uiStrings.ts', {}, {});
 
   const serverModule = loadSource('electron/mcpServer.ts', { process, Buffer, setTimeout, clearTimeout }, {
     electron: {
@@ -80,6 +82,8 @@ async function run() {
     },
     './main/executionEngine.js': executionEngineModule,
     './main/policyEngine.js': policyEngineModule,
+    './main/approvalDetails.js': approvalDetailsModule,
+    './main/uiStrings.js': uiStringsModule,
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
     './main/elementRefs.js': elementRefsModule,
@@ -176,11 +180,27 @@ async function run() {
     );
     assert.ok(dialogCalls >= 1, 'approval dialog was shown for the sensitive action');
     assert.equal(forwarded.length, before, 'rejected action never reaches the renderer');
-
     dialogResponse = 0;
     const out = await server.executeTool('browser_type', { selector: '#q', text: 'hello' });
     assert.equal(forwarded[forwarded.length - 1].tool, 'browser_type', 'approved action forwarded');
     assert.equal(out, 'ok:browser_type');
+  }
+
+  // 6a) the approval dialog shows what the action will do, from redacted args only
+  {
+    const server = makeServer();
+    server.firstUseApproved = true; // isolate the action approval from the first-use dialog
+    server.setPolicyEnforcement(true);
+    server.approvalModeStoreInstance = { get: () => 'strict', set: () => 'strict' }; // typing in a plain field is otherwise not gated
+    dialogResponse = 1;
+    await assert.rejects(server.executeTool('browser_type', { selector: '#q', text: 'hello' }), /./);
+    assert.match(lastDialogDetail, /Will type: hello/, 'the approval dialog shows what will be typed');
+
+    // A password typed into a field is masked in the approval dialog.
+    await assert.rejects(server.executeTool('browser_type', { selector: '#password', text: 'topsecret-xyz' }), /./);
+    assert.ok(!lastDialogDetail.includes('topsecret'), 'a secret never reaches the approval dialog');
+    assert.match(lastDialogDetail, /Will type: ••••/, 'the secret is shown as a mask');
+    dialogResponse = 0; // later blocks start from the approving default
   }
 
   // 6b) browser_login: never without approval enforcement; origin pinned by the

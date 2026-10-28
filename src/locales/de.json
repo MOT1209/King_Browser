@@ -354,7 +354,16 @@
     "pillShowHint": "Ausschalten schließt die schwebende Schaltfläche. Eine Freigabeanfrage holt sie immer zurück.",
     "pillSettingsTitle": "Agentenstatus-Schaltfläche",
     "tabMarker": "Der Agent arbeitet in diesem Tab",
-    "pageMarker": "Der Agent arbeitet auf dieser Seite"
+    "pageMarker": "Der Agent arbeitet auf dieser Seite",
+    "approvalDetails": {
+      "type": "Wird eingeben",
+      "value": "Wert",
+      "url": "Wird öffnen",
+      "key": "Wird drücken",
+      "option": "Wird wählen"
+    },
+    "waitingForApproval": "Wartet auf Ihre Freigabe",
+    "waitingForApprovalAt": "Wartet auf Ihre Freigabe - {domain}"
   },
   "appearance": {
     "wallpaper": {

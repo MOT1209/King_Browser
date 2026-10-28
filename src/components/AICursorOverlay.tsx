@@ -4,6 +4,7 @@ import { MousePointer2, Keyboard, ShieldAlert } from 'lucide-react';
 import { generateId } from '../utils/idGenerator';
 import { getElectronAPI } from '../utils/electronBridge';
 import { mergeActivity, toActivityLine } from '../utils/agentActivity';
+import { useTranslation } from '../services/i18n';
 import type { ElectronEngineActionRecord, ElectronEnginePendingApproval } from '../vite-env';
 
 export interface AICursorEvent {
@@ -28,12 +29,30 @@ const STATUS_DOT: Record<string, string> = {
   cancelled: 'bg-slate-400'
 };
 
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  completed: 'agentPanel.statusCompleted',
+  running: 'agentPanel.statusRunning',
+  requested: 'agentPanel.statusRequested',
+  failed: 'agentPanel.statusFailed',
+  rejected: 'agentPanel.statusRejected',
+  cancelled: 'agentPanel.statusCancelled'
+};
+
 export const AICursorOverlay: React.FC = () => {
+  const { t } = useTranslation();
   const [cursor, setCursor] = useState<AICursorEvent | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [ripples, setRipples] = useState<{id: string, x: number, y: number}[]>([]);
   const [activity, setActivity] = useState<ElectronEngineActionRecord[]>([]);
   const [pending, setPending] = useState<ElectronEnginePendingApproval | null>(null);
+  const [highlight, setHighlight] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+
+  // The element behind a pending approval, measured by the agent bridge.
+  useEffect(() => {
+    const onHighlight = (e: Event) => setHighlight((e as CustomEvent<typeof highlight>).detail ?? null);
+    window.addEventListener('ai-highlight', onHighlight);
+    return () => window.removeEventListener('ai-highlight', onHighlight);
+  }, []);
 
   useEffect(() => {
     let hideTimeout: ReturnType<typeof setTimeout>;
@@ -88,10 +107,19 @@ export const AICursorOverlay: React.FC = () => {
 
   const lines = activity.map(toActivityLine).reverse();
 
-  if (!cursor && lines.length === 0 && !pending) return null;
+  if (!cursor && lines.length === 0 && !pending && !highlight) return null;
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999]">
+      {/* The element the agent wants to act on, while the human decides */}
+      {highlight && pending && (
+        <div
+          data-testid="approval-highlight"
+          className="absolute rounded-md ring-2 ring-amber-400 bg-amber-400/10 animate-pulse"
+          style={{ left: highlight.x - 3, top: highlight.y - 3, width: highlight.width + 6, height: highlight.height + 6 }}
+        />
+      )}
+
       {/* Click Ripples */}
       <AnimatePresence>
         {ripples.map(ripple => (
@@ -159,7 +187,7 @@ export const AICursorOverlay: React.FC = () => {
           {pending && (
             <div className="flex items-center gap-1.5 font-semibold text-amber-300">
               <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Waiting for your approval{pending.domain ? ` — ${pending.domain}` : ''}</span>
+              <span>{pending.domain ? t('agentPanel.waitingForApprovalAt', { domain: pending.domain }) : t('agentPanel.waitingForApproval')}</span>
             </div>
           )}
           {lines.map(line => (
@@ -167,7 +195,7 @@ export const AICursorOverlay: React.FC = () => {
               <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[line.status] ?? 'bg-slate-400'}`} />
               <span className="font-medium capitalize">{line.label}</span>
               {line.site && <span className="text-slate-400 truncate">{line.site}</span>}
-              <span className="ml-auto text-slate-400">{line.status}</span>
+              <span className="ml-auto text-slate-400">{STATUS_LABEL_KEYS[line.status] ? t(STATUS_LABEL_KEYS[line.status]) : line.status}</span>
             </div>
           ))}
         </div>

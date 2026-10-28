@@ -378,7 +378,16 @@
     "pillShowHint": "أوقفه لإغلاق الزر العائم. طلب الموافقة يعيده دائما.",
     "pillSettingsTitle": "زر حالة الوكيل",
     "tabMarker": "الوكيل يعمل في هذا التبويب",
-    "pageMarker": "الوكيل يعمل في هذه الصفحة"
+    "pageMarker": "الوكيل يعمل في هذه الصفحة",
+    "approvalDetails": {
+      "type": "سيكتب",
+      "value": "القيمة",
+      "url": "سيفتح",
+      "key": "سيضغط",
+      "option": "سيختار"
+    },
+    "waitingForApproval": "بانتظار موافقتك",
+    "waitingForApprovalAt": "بانتظار موافقتك - {domain}"
   },
   "appearance": {
     "wallpaper": {

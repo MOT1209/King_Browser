@@ -109,6 +109,8 @@ async function run() {
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const approvalDetailsModule = loadSource('electron/main/approvalDetails.ts', {}, {});
+  const uiStringsModule = loadSource('electron/main/uiStrings.ts', {}, {});
   const serverModule = loadSource('electron/mcpServer.ts', { process, Buffer, setTimeout, clearTimeout }, {
     electron: { app: { isPackaged: false }, powerMonitor: { on: (name: string, fn: Function) => lockEvents.set(name, fn) },
       dialog: { showMessageBox: () => new Promise(resolve => { resolveDialog = resolve; }) } },
@@ -116,6 +118,8 @@ async function run() {
     './main/mcpBridge.js': { requestRendererMcpAction: async () => { forwarded++; return 'ok'; }, cancelPendingMcpActions: () => {} },
     './main/executionEngine.js': executionEngineModule,
     './main/policyEngine.js': policyEngineModule,
+    './main/approvalDetails.js': approvalDetailsModule,
+    './main/uiStrings.js': uiStringsModule,
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
     './main/elementRefs.js': elementRefsModule,

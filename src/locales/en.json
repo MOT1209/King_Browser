@@ -354,7 +354,16 @@
     "pillShowHint": "Turn off to close the floating button. An approval request always brings it back.",
     "pillSettingsTitle": "Agent status button",
     "tabMarker": "The agent is working in this tab",
-    "pageMarker": "The agent is working on this page"
+    "pageMarker": "The agent is working on this page",
+    "approvalDetails": {
+      "type": "Will type",
+      "value": "Value",
+      "url": "Will open",
+      "key": "Will press",
+      "option": "Will choose"
+    },
+    "waitingForApproval": "Waiting for your approval",
+    "waitingForApprovalAt": "Waiting for your approval - {domain}"
   },
   "appearance": {
     "wallpaper": {

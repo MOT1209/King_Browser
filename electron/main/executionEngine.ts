@@ -23,6 +23,8 @@
  * Side effects are injected: executor, abortInFlight, askApproval, persist.
  */
 
+import type { ApprovalDetailLine } from './approvalDetails.js';
+
 export type EngineState =
   | 'idle'
   | 'running'
@@ -48,6 +50,10 @@ export interface ActionRequest {
   risk: ActionRisk;
   summary?: string;
   domain?: string;
+  /** Redacted lines for the approval screen (what will be typed, opened, pressed). Not persisted. */
+  details?: ApprovalDetailLine[];
+  /** Selector of the element to highlight while the approval is pending. Not persisted. */
+  previewSelector?: string;
 }
 
 export interface ActionRecord {
@@ -71,6 +77,8 @@ export interface PendingApproval {
   args: Record<string, unknown>;
   summary?: string;
   domain?: string;
+  details?: ApprovalDetailLine[];
+  previewSelector?: string;
 }
 
 export type PhaseCondition =
@@ -438,7 +446,9 @@ export class ExecutionEngine {
       toolName: record.toolName,
       args: record.args,
       summary: record.summary,
-      domain: record.domain
+      domain: record.domain,
+      details: entry.request.details,
+      previewSelector: entry.request.previewSelector
     };
     this.transition('awaiting_approval', `approval required for ${record.toolName}`);
     this.emit({ type: 'approval_needed', approval: { ...this.pendingApproval } });

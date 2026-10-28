@@ -87,12 +87,21 @@ export interface ElectronEngineActionRecord {
 }
 
 /** Action awaiting an explicit Approve/Reject decision. */
+export interface ElectronApprovalDetailLine {
+  kind: 'type' | 'value' | 'url' | 'key' | 'option' | 'other';
+  text: string;
+}
+
 export interface ElectronEnginePendingApproval {
   actionId: string;
   toolName: string;
   args: Record<string, unknown>;
   summary?: string;
   domain?: string;
+  /** Redacted, bounded lines describing what the action will do. */
+  details?: ElectronApprovalDetailLine[];
+  /** Selector of the element to highlight while waiting for the decision. */
+  previewSelector?: string;
 }
 
 /** Active phase progress shown by the control panel. */

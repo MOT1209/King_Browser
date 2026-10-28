@@ -23,6 +23,8 @@ import { createSiteRuleStore, matchSiteRule, type SiteRule, type SiteRuleStore }
 import { createActivityStore, type ActivityStore } from './main/activityStore.js';
 import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from './main/executionEngine.js';
 import { classifyAction, buildApprovalSummary, redactArgs } from './main/policyEngine.js';
+import { describeApprovalArgs, previewSelectorFor } from './main/approvalDetails.js';
+import { approvalDialogStrings, buildApprovalDialogDetail, type UiLanguage } from './main/uiStrings.js';
 
 // Security: Screen-lock tracking prevents MCP execution while user is away
 let isScreenLocked = false;
@@ -982,19 +984,15 @@ export class BrowserMCPServer {
     const authorizationGeneration = this.authorizationGeneration;
     const lockGeneration = screenLockGeneration;
     try {
-      const detailLines = [
-        approval.domain ? `Site: ${approval.domain}` : null,
-        approval.summary ? `Action: ${approval.summary}` : null,
-        `Tool: ${approval.toolName}`
-      ].filter(Boolean).join('\n');
+      const strings = approvalDialogStrings(this.uiLanguageProvider?.() ?? 'en');
       const dialogPromise = dialog.showMessageBox(this.mainWindow, {
         type: 'warning',
-        buttons: ['Approve', 'Reject'],
+        buttons: [strings.approve, strings.reject],
         defaultId: 1,
         cancelId: 1,
-        title: 'King Browser - Action Approval',
-        message: 'The agent is requesting approval for a sensitive action.',
-        detail: detailLines,
+        title: strings.title,
+        message: strings.message,
+        detail: buildApprovalDialogDetail(approval, strings),
         noLink: true
       });
 
@@ -1013,6 +1011,13 @@ export class BrowserMCPServer {
       console.warn('[MCP Server] Error prompting for action approval:', err);
       return false;
     }
+  }
+
+  private uiLanguageProvider: (() => UiLanguage) | null = null;
+
+  /** The interface language, so native dialogs match the rest of the UI. */
+  public setUiLanguageProvider(provider: () => UiLanguage): void {
+    this.uiLanguageProvider = provider;
   }
 
   private engineEventObserver: ((event: EngineEvent) => void) | null = null;
@@ -1451,7 +1456,10 @@ export class BrowserMCPServer {
           ]
             .filter((part): part is string => Boolean(part))
             .join(' — ')
-        : undefined
+        : undefined,
+      // Built from the policy engine's redacted args, never the raw request.
+      details: approvalSummary ? describeApprovalArgs(canonicalTool, approvalSummary.details) : undefined,
+      previewSelector: approvalSummary ? previewSelectorFor(args) : undefined
     };
 
     const record: ActionRecord = await this.engine().submit(actionRequest);

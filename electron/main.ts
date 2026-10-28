@@ -2069,6 +2069,7 @@ app.whenReady().then(async () => {
   // §11/§12: forwarded agent actions go through the policy classifier and the
   // execution engine (approval dialog for sensitive decisions, STOP NOW support).
   mcpServer.setPolicyEnforcement(true);
+  mcpServer.setUiLanguageProvider(() => currentUiLanguage);
   // Approvals requested while King is in the background notify the human and
   // flash the taskbar entry, so an unseen dialog does not silently time out.
   const approvalAttention = createApprovalAttention({

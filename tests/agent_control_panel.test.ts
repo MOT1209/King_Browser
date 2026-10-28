@@ -230,6 +230,7 @@ async function renderSuite() {
 
       check('approval request auto-surfaces', container.textContent.includes('browser_submit_form'), container.textContent.slice(0, 300));
       check('approval shows the target domain', container.textContent.includes('example.com'));
+      check('no details block when the action has none', !container.querySelector('[data-testid="approval-details"]'));
 
       const approveButton = findButton(container, 'Approve');
       await act(async () => { approveButton.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); });
@@ -239,6 +240,30 @@ async function renderSuite() {
         approvals.some(a => a.actionId === 'act_42' && a.approved === true),
         JSON.stringify(approvals)
       );
+    }
+
+    // 3b. The approval shows what the action will do, from redacted details only.
+    {
+      const container = mounted[mounted.length - 1].container;
+      statusPayload = makeStatus({
+        state: 'awaiting_approval',
+        pendingApproval: {
+          actionId: 'act_50',
+          toolName: 'browser_type',
+          // The raw args carry the secret on purpose: the card must render only `details`.
+          args: { selector: '#f1', text: 'hunter2-secret' },
+          summary: 'Type into a field',
+          domain: 'example.com',
+          details: [{ kind: 'type', text: '••••••••' }, { kind: 'url', text: 'https://example.com/pay' }, { kind: 'other', text: 'delay: 5' }]
+        }
+      });
+      await emitEngineEvent(container);
+      await settle(container, html => html.includes('Will type'));
+      const details = container.querySelector('[data-testid="approval-details"]');
+      check('approval card lists what will be typed', Boolean(details) && details.textContent.includes('Will type: ••••••••'), details?.textContent);
+      check('approval card lists the address it will open', details.textContent.includes('Will open: https://example.com/pay'));
+      check('other arguments are shown as key: value', details.textContent.includes('delay: 5'));
+      check('a secret in the raw args never reaches the card', !container.textContent.includes('hunter2'));
     }
 
     // 4. Reject carries the exact action id and refuses the binding.
