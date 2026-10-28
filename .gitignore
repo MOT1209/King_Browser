@@ -54,3 +54,7 @@ graphify-out/
 electron/keys/*private*.pem
 *.pem.private
 *.private.key
+
+# Playwright Electron checks (tests/electron)
+test-results/
+playwright-report/
