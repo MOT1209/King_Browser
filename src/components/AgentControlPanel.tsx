@@ -30,6 +30,7 @@ import { useTranslation } from '../services/i18n';
 import { formatBinding, matchesShortcut } from '../utils/keyboardShortcuts';
 import { isMac } from '../utils/appConstants';
 import { buildDefaultShortcuts } from '../utils/shortcutCatalog';
+import { setAgentEngineState } from '../services/agentTabStore';
 import {
   clampPillPosition,
   defaultPillPosition,
@@ -178,6 +179,11 @@ export function AgentControlPanel({
   }, [open]);
 
   const pending = status?.pendingApproval ?? null;
+
+  // Shared with the tab strip so it can mark the tab the agent works in.
+  useEffect(() => {
+    setAgentEngineState(status?.state ?? null);
+  }, [status?.state]);
 
   useEffect(() => {
     if (pending) setOpen(true);

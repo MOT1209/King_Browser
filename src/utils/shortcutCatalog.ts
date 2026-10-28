@@ -7,7 +7,7 @@
  * Ctrl+1..9) stay hardcoded in App.tsx and are listed in `FIXED_SHORTCUTS`
  * so the settings page can show them read-only.
  */
-import type { ShortcutBindingLike } from './keyboardShortcuts';
+import { sameBinding, type ShortcutBindingLike } from './keyboardShortcuts';
 
 export type ShortcutGroup = 'tabs' | 'navigation' | 'page' | 'panels' | 'agent';
 
@@ -88,17 +88,71 @@ export function buildDefaultShortcuts(isMac: boolean): Record<string, Required<S
 }
 
 /**
- * Keys that always work in addition to the configurable ones. `mod` marks
- * entries that need the primary modifier (Cmd on macOS, Ctrl elsewhere).
+ * Keys that always work in addition to the configurable ones, as separate key
+ * labels. `mod` prefixes the primary modifier (Cmd on macOS, Ctrl elsewhere).
+ * Shown read-only in Settings > Shortcuts and in the F1 help.
  */
-export const FIXED_SHORTCUTS: Array<{ id: string; keys: string; mod?: boolean }> = [
-  { id: 'reload', keys: 'F5' },
-  { id: 'zoomIn', keys: '+', mod: true },
-  { id: 'devtools', keys: 'F12' },
-  { id: 'toggleSidebar', keys: 'B', mod: true },
-  { id: 'goBack', keys: 'Alt+Left' },
-  { id: 'goForward', keys: 'Alt+Right' },
-  { id: 'switchTab', keys: '1-9', mod: true },
-  { id: 'help', keys: 'F1' },
-  { id: 'shortcutsHelp', keys: '/', mod: true },
+export const FIXED_SHORTCUTS: Array<{ id: string; keys: string[]; mod?: boolean }> = [
+  { id: 'newWindow', keys: ['N'], mod: true },
+  { id: 'reload', keys: ['F5'] },
+  { id: 'forceReload', keys: ['Shift', 'R'], mod: true },
+  { id: 'zoomIn', keys: ['+'], mod: true },
+  { id: 'devtools', keys: ['F12'] },
+  { id: 'toggleSidebar', keys: ['B'], mod: true },
+  { id: 'goBack', keys: ['Alt', 'Left'] },
+  { id: 'goForward', keys: ['Alt', 'Right'] },
+  { id: 'switchTab', keys: ['1-9'], mod: true },
+  { id: 'settings', keys: [','], mod: true },
+  { id: 'help', keys: ['F1'] },
+  { id: 'shortcutsHelp', keys: ['/'], mod: true },
 ];
+
+export function fixedShortcutParts(entry: { keys: string[]; mod?: boolean }, isMac: boolean): string[] {
+  return entry.mod ? [isMac ? 'Cmd' : 'Ctrl', ...entry.keys] : entry.keys;
+}
+
+/**
+ * The configurable bindings the user changed from their defaults. Sent to the
+ * main process so the application menu follows them; unchanged actions keep
+ * the menu's own defaults.
+ */
+export function customizedBindings(
+  shortcuts: Partial<Record<string, ShortcutBindingLike>> | undefined,
+  isMac: boolean
+): Record<string, Required<ShortcutBindingLike>> {
+  const defaults = buildDefaultShortcuts(isMac);
+  const result: Record<string, Required<ShortcutBindingLike>> = {};
+  if (!shortcuts) return result;
+  for (const { id } of SHORTCUT_ACTIONS) {
+    const binding = shortcuts[id];
+    if (binding && !sameBinding(binding, defaults[id])) {
+      result[id] = { key: binding.key.toLowerCase(), shift: !!binding.shift, meta: !!binding.meta, alt: !!binding.alt };
+    }
+  }
+  return result;
+}
+
+/**
+ * Combinations a custom binding may not take: editing keys every page relies
+ * on, and the fixed browser keys above. Returns the id of the owner, or null.
+ */
+export function reservedOwner(binding: ShortcutBindingLike, isMac: boolean): string | null {
+  const key = binding.key.toLowerCase();
+  const plain = !binding.alt;
+  const mod = !!binding.meta;
+  if (mod && plain && !binding.shift) {
+    const editing: Record<string, string> = { c: 'copy', v: 'paste', x: 'cut', a: 'selectAll', z: 'undo', n: 'newWindow', ',': 'settings', '/': 'shortcutsHelp', '+': 'zoomIn' };
+    if (editing[key]) return editing[key];
+    if (/^[1-9]$/.test(key)) return 'switchTab';
+    if (key === 'q' && isMac) return 'quit';
+  }
+  if (mod && plain && binding.shift && key === 'z') return 'redo';
+  if (mod && plain && binding.shift && key === 'r') return 'forceReload';
+  if (!mod && !binding.shift && !binding.alt && (key === 'f1' || key === 'f5' || key === 'f12')) {
+    return key === 'f1' ? 'help' : key === 'f5' ? 'reload' : 'devtools';
+  }
+  if (!mod && binding.alt && !binding.shift && (key === 'arrowleft' || key === 'arrowright')) {
+    return key === 'arrowleft' ? 'goBack' : 'goForward';
+  }
+  return null;
+}

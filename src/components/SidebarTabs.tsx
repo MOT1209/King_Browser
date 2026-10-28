@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { AgentTabMarker } from './ui/AgentTabMarker';
+import { useAgentTabId } from '../services/agentTabStore';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -184,6 +186,8 @@ interface SidebarTabItemProps {
   isActive: boolean;
   isDragOver: boolean;
   isNested: boolean;
+  /** The agent is working in this tab (or its split partner). */
+  isAgentTab?: boolean;
   tabsLength: number;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
@@ -205,6 +209,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
   isActive,
   isDragOver,
   isNested,
+  isAgentTab = false,
   tabsLength,
   onSelectTab,
   onCloseTab,
@@ -451,6 +456,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
           </div>
         </>
       )}
+      {isAgentTab && <AgentTabMarker />}
     </motion.div>
   );
 }, (prev: SidebarTabItemProps, next: SidebarTabItemProps): boolean => {
@@ -458,6 +464,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
     prev.isActive === next.isActive &&
     prev.isDragOver === next.isDragOver &&
     prev.isNested === next.isNested &&
+    prev.isAgentTab === next.isAgentTab &&
     // For non-split tabs, activeTabId doesn't affect rendering because isActive captures whether this tab is active.
     // For split tabs, we only care whether this tab or the split partner is the active one.
     (
@@ -541,6 +548,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onReorderTabs
 }) => {
   const { l, t } = useTranslation();
+  const tabIds = useMemo(() => tabs.map(tab => tab.id), [tabs]);
+  const agentTabId = useAgentTabId(tabIds);
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
   const isMac = useMemo(() => {
@@ -1388,6 +1397,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                                   isActive={isActive}
                                   isDragOver={dragOverTabId === tab.id}
                                   isNested={true}
+                                  isAgentTab={agentTabId !== null && (agentTabId === tab.id || agentTabId === splitTab?.id)}
                                   tabsLength={tabs.length}
                                   onSelectTab={onSelectTab}
                                   onCloseTab={onCloseTab}
@@ -1438,6 +1448,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     isActive={isActive}
                     isDragOver={dragOverTabId === tab.id}
                     isNested={false}
+                    isAgentTab={agentTabId !== null && (agentTabId === tab.id || agentTabId === splitTab?.id)}
                     tabsLength={tabs.length}
                     onSelectTab={onSelectTab}
                     onCloseTab={onCloseTab}

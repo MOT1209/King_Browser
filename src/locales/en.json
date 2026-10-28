@@ -352,7 +352,9 @@
     "pillHideWhenIdleHint": "The status button appears only while the agent works or needs your approval.",
     "pillShow": "Show agent status button",
     "pillShowHint": "Turn off to close the floating button. An approval request always brings it back.",
-    "pillSettingsTitle": "Agent status button"
+    "pillSettingsTitle": "Agent status button",
+    "tabMarker": "The agent is working in this tab",
+    "pageMarker": "The agent is working on this page"
   },
   "appearance": {
     "wallpaper": {
@@ -526,7 +528,18 @@
       "agentStopNow": "STOP the agent now",
       "switchTab": "Go to tab 1-9",
       "help": "Help center",
-      "shortcutsHelp": "Shortcuts guide"
-    }
+      "shortcutsHelp": "Shortcuts guide",
+      "newWindow": "New window",
+      "forceReload": "Reload without cache",
+      "settings": "Open settings",
+      "copy": "Copy",
+      "paste": "Paste",
+      "cut": "Cut",
+      "selectAll": "Select all",
+      "undo": "Undo",
+      "redo": "Redo",
+      "quit": "Quit"
+    },
+    "reserved": "Reserved for \"{action}\". Choose another combination."
   }
 }

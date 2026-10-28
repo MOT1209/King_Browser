@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
-import { PanelRight, PanelLeft, Columns2, ArrowLeftRight, X, Globe } from 'lucide-react';
+import { PanelRight, PanelLeft, Columns2, ArrowLeftRight, X, Globe, Bot } from 'lucide-react';
 import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
 // Downloads / history / permission domains were extracted into hooks under
@@ -108,7 +108,9 @@ const UpdateToast = lazyWithRetry(() => import('./components/UpdateToast').then(
 const VPN_ANCHOR_REF: React.RefObject<HTMLButtonElement> = { current: null };
 
 import { isTombstonedRow } from './services/syncService';
-import { l } from './services/i18n';
+import { l, t } from './services/i18n';
+import { useAgentTabId } from './services/agentTabStore';
+import { customizedBindings } from './utils/shortcutCatalog';
 import { logger } from './utils/logger';
 import {
   EMPTY_ARRAY,
@@ -472,6 +474,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     demoBg: demoParams.bg,
     isMac,
   });
+  // The application menu's accelerators follow the shortcuts the user changed.
+  useEffect(() => {
+    if (demoParams.isDemo) return;
+    const api = window.electronAPI;
+    if (!api?.setShortcutBindings) return;
+    api.setShortcutBindings(customizedBindings(settings.shortcuts, isMac)).catch(() => {});
+  }, [settings.shortcuts, demoParams.isDemo]);
+
   const handleAgentPillHiddenChange = useCallback((hidden: boolean) => {
     handleUpdateSettings({ agentPillHidden: hidden });
   }, [handleUpdateSettings]);
@@ -1363,6 +1373,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Compute stable primary (left) and secondary (right) tabs for split view.
   // Their physical positions remain stable based on tab order, even when activeTabId changes upon focus.
+  const tabIds = useMemo(() => tabs.map(tab => tab.id), [tabs]);
+  const agentTabId = useAgentTabId(tabIds);
+
   const { primarySplitTab, secondarySplitTab } = useMemo(() => {
     if (!activeTab || !activeTab.splitWith) return { primarySplitTab: activeTab, secondarySplitTab: null };
     const partner = tabs.find(t => t.id === activeTab.splitWith);
@@ -2026,6 +2039,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               }}
             />
           )}
+
+          {/* Frame the page while the agent works in a visible tab, so the human
+              always sees which page is under agent control. */}
+          {agentTabId !== null && (agentTabId === primarySplitTab?.id || agentTabId === secondarySplitTab?.id) && (
+            <div className="pointer-events-none absolute inset-0 z-30 ring-2 ring-inset ring-amber-400/80" data-agent-frame="true">
+              <div className="absolute top-2 inset-x-0 flex justify-center">
+                <span className="flex items-center gap-1.5 rounded-full bg-amber-400 text-slate-900 text-[11px] font-semibold px-2.5 py-0.5 shadow-md">
+                  <Bot className="w-3 h-3" />
+                  {t('agentPanel.pageMarker')}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* AI Assistant Side Panel */}
@@ -2149,6 +2175,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             isOpen={isHelpOpen}
             onClose={handleCloseHelp}
             initialTab={helpInitialTab}
+            shortcuts={settings.shortcuts}
           />
         )}
       </React.Suspense>

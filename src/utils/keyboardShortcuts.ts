@@ -143,16 +143,21 @@ const KEY_LABELS: Record<string, string> = {
   delete: 'Delete',
 };
 
-/** Human label for a binding, using the platform's modifier names. */
-export function formatBinding(binding: ShortcutBindingLike | undefined, isMac = true): string {
-  if (!binding || !binding.key) return '';
+/** The keys of a binding as separate labels, using the platform's modifier names. */
+export function bindingParts(binding: ShortcutBindingLike | undefined, isMac = true): string[] {
+  if (!binding || !binding.key) return [];
   const parts: string[] = [];
   if (binding.meta) parts.push(isMac ? 'Cmd' : 'Ctrl');
   if (binding.alt) parts.push(isMac ? 'Option' : 'Alt');
   if (binding.shift) parts.push('Shift');
   const key = binding.key.toLowerCase();
   parts.push(KEY_LABELS[key] ?? (key.length === 1 ? key.toUpperCase() : key.charAt(0).toUpperCase() + key.slice(1)));
-  return parts.join('+');
+  return parts;
+}
+
+/** Human label for a binding, using the platform's modifier names. */
+export function formatBinding(binding: ShortcutBindingLike | undefined, isMac = true): string {
+  return bindingParts(binding, isMac).join('+');
 }
 
 export function sameBinding(a: ShortcutBindingLike | undefined, b: ShortcutBindingLike | undefined): boolean {

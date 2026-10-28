@@ -103,3 +103,32 @@ assert.strictEqual(matchesShortcut({ key: '.', meta: true, shift: true }, { key:
 assert.strictEqual(matchesShortcut(winShortcuts.closeTab, { key: 'z', code: 'KeyW', ctrlKey: true }, false), false, 'AZERTY Ctrl+Z is undo, not close tab');
 
 console.log('[PASS] [Keyboard Shortcuts] Arabic-layout and shifted-punctuation fallback verified.');
+
+// 6. Only changed bindings are sent to the main process for the menu.
+import { buildDefaultShortcuts, customizedBindings } from '../src/utils/shortcutCatalog';
+{
+  const defaults = buildDefaultShortcuts(false);
+  assert.deepStrictEqual(customizedBindings(defaults, false), {}, 'defaults send nothing');
+  assert.deepStrictEqual(customizedBindings(undefined, false), {});
+  const changed = customizedBindings({ ...defaults, newTab: { key: 'Y', shift: true, meta: true }, settings: { key: 'q', meta: true } }, false);
+  assert.deepStrictEqual(changed, { newTab: { key: 'y', shift: true, meta: true, alt: false } }, 'only changed catalog actions are sent');
+  console.log('[PASS] [Keyboard Shortcuts] only customized bindings reach the menu.');
+}
+
+// 7. Reserved combinations: a custom binding must not take copy/paste or fixed browser keys.
+import { reservedOwner } from '../src/utils/shortcutCatalog';
+{
+  assert.strictEqual(reservedOwner({ key: 'c', meta: true }, false), 'copy', 'binding Ctrl+C would break copy');
+  assert.strictEqual(reservedOwner({ key: 'z', meta: true, shift: true }, false), 'redo');
+  assert.strictEqual(reservedOwner({ key: '3', meta: true }, false), 'switchTab');
+  assert.strictEqual(reservedOwner({ key: 'f5' }, false), 'reload');
+  assert.strictEqual(reservedOwner({ key: 'arrowleft', alt: true }, false), 'goBack');
+  assert.strictEqual(reservedOwner({ key: 'q', meta: true }, true), 'quit');
+  assert.strictEqual(reservedOwner({ key: 'q', meta: true }, false), null);
+  assert.strictEqual(reservedOwner({ key: 'y', meta: true, shift: true }, false), null);
+  // Every default binding is allowed (defaults may equal a reserved key, e.g. none today).
+  for (const [id, binding] of Object.entries(buildDefaultShortcuts(false))) {
+    assert.strictEqual(reservedOwner(binding, false), null, `default ${id} must not be reserved`);
+  }
+  console.log('[PASS] [Keyboard Shortcuts] reserved combinations are refused.');
+}

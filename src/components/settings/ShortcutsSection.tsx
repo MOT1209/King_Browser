@@ -14,7 +14,9 @@ import {
   FIXED_SHORTCUTS,
   SHORTCUT_ACTIONS,
   SHORTCUT_GROUPS,
-  buildDefaultShortcuts
+  buildDefaultShortcuts,
+  fixedShortcutParts,
+  reservedOwner
 } from '../../utils/shortcutCatalog';
 
 export interface ShortcutsSectionProps {
@@ -64,6 +66,11 @@ export const ShortcutsSection: React.FC<ShortcutsSectionProps> = ({
       if (!['Control', 'Shift', 'Alt', 'Meta', 'AltGraph'].includes(event.key)) {
         setRecordError(t('shortcuts.needsModifier'));
       }
+      return;
+    }
+    const reserved = reservedOwner(binding, isMac);
+    if (reserved && !sameBinding(binding, defaults[id])) {
+      setRecordError(t('shortcuts.reserved', { action: actionLabel(reserved) }));
       return;
     }
     const merged = { ...defaults, ...shortcuts };
@@ -203,10 +210,10 @@ export const ShortcutsSection: React.FC<ShortcutsSectionProps> = ({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">{t('shortcuts.fixedTitle')}</h3>
           <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 divide-y divide-slate-100 dark:divide-slate-700/50">
             {FIXED_SHORTCUTS.map(fixed => (
-              <div key={`${fixed.id}-${fixed.keys}`} className="flex items-center justify-between gap-3 p-3">
+              <div key={`${fixed.id}-${fixed.keys.join('+')}`} className="flex items-center justify-between gap-3 p-3">
                 <p className="text-sm text-slate-700 dark:text-slate-300 truncate">{actionLabel(fixed.id)}</p>
                 <span dir="ltr" className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
-                  {fixed.mod ? `${isMac ? 'Cmd' : 'Ctrl'}+${fixed.keys}` : fixed.keys}
+                  {fixedShortcutParts(fixed, isMac).join('+')}
                 </span>
               </div>
             ))}

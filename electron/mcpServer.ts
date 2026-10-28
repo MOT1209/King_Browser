@@ -948,6 +948,9 @@ export class BrowserMCPServer {
   // §10: engine events are pushed to the renderer so the control panel can show
   // a live status line without polling.
   private forwardEngineEvent(event: EngineEvent): void {
+    try {
+      this.engineEventObserver?.(event);
+    } catch (_) {}
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
     try {
       this.mainWindow.webContents.send('mcp-engine-event', event);
@@ -1010,6 +1013,13 @@ export class BrowserMCPServer {
       console.warn('[MCP Server] Error prompting for action approval:', err);
       return false;
     }
+  }
+
+  private engineEventObserver: ((event: EngineEvent) => void) | null = null;
+
+  /** Main-process listener for engine events (for example the approval notification). */
+  public setEngineEventObserver(observer: ((event: EngineEvent) => void) | null): void {
+    this.engineEventObserver = observer;
   }
 
   public setMainWindow(window: BrowserWindow | null) {

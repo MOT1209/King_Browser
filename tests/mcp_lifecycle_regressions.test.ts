@@ -57,6 +57,7 @@ async function run() {
   }, {
     react: { useEffect: (fn: Function) => fn(), useRef: (current: unknown) => ({ current }) },
     '../services/aiActionContext': { publishActionContext: () => {} },
+    '../services/agentTabStore': { markAgentTab: () => {} },
     '../services/agentOrchestrator': { orchestrator: {
       enqueueAction: () => ({ id: 'approval', done: new Promise<boolean>(resolve => { approve = resolve; }) }),
       denyAction: () => { denied++; approve(false); }, updateActionState: () => {}
