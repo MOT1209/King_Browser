@@ -26,7 +26,15 @@ import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS, MCP_POLICY_CONTEXT_ACTIO
  * not connection pinning; it does not prove the address Chromium connected to.
  */
 async function agentNavigationAllowed(url: string): Promise<{ ok: boolean; reason?: string }> {
-  if (!isSafeAgentNavigationUrl(url)) return { ok: false, reason: 'destination is not a public address' };
+  if (!isSafeAgentNavigationUrl(url)) {
+    let scheme = '';
+    try { scheme = new URL(url).protocol; } catch { /* unparseable: keep the generic reason */ }
+    const webScheme = scheme === 'http:' || scheme === 'https:';
+    return {
+      ok: false,
+      reason: scheme && !webScheme ? `only http and https destinations are allowed (got ${scheme})` : 'destination is not a public address'
+    };
+  }
   // The synchronous policy already validates internal renderer routes. They
   // have no network host; sending them to the HTTP-only DNS guard rejects them.
   const protocol = new URL(url).protocol;
