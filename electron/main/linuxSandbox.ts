@@ -62,10 +62,14 @@ export function decideLinuxSandbox(input: LinuxSandboxInput): LinuxSandboxDecisi
 
 const USERNS_CLONE_SYSCTL = '/proc/sys/kernel/unprivileged_userns_clone';
 
-/** Where Chromium looks for the helper: CHROME_DEVEL_SANDBOX first, else next to the executable. */
+/**
+ * Where Chromium looks for the helper: CHROME_DEVEL_SANDBOX first, else next to
+ * the executable. Always a Linux path, so POSIX joining on every host (the
+ * tests also run on Windows).
+ */
 export function setuidHelperPath(execPath: string, env: NodeJS.ProcessEnv = process.env): string {
   const override = env.CHROME_DEVEL_SANDBOX;
-  return override ? override : path.join(path.dirname(execPath), 'chrome-sandbox');
+  return override ? override : path.posix.join(path.posix.dirname(execPath), 'chrome-sandbox');
 }
 
 /** Reads the real system state; any read error counts as "not available". */
