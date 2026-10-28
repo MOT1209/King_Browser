@@ -346,6 +346,9 @@ const MemoizedTabItem = React.memo(
 
   return (
     <Reorder.Item
+      // The group renders as a div, so the default <li> would be a list item
+      // with no list parent (axe `listitem`, reported by tests/electron).
+      as="div"
       ref={ref}
       key={tab.id}
       value={tab}
