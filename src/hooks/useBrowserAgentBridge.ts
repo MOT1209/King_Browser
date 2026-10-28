@@ -3,6 +3,7 @@ import { resolveLoginCredential, buildLoginFillScript, describeLoginResult, LOGI
 import { useEffect, useRef, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import type { Bookmark, HistoryItem, Tab, UserSettings } from '../types/browser';
 import { publishActionContext } from '../services/aiActionContext';
+import { markAgentTab } from '../services/agentTabStore';
 import { orchestrator } from '../services/agentOrchestrator';
 // The agent boundary uses the strict destination policy, not the general
 // navigation one: agent-supplied URLs are untrusted, and the general predicate
@@ -221,6 +222,8 @@ export function useBrowserAgentBridge({
       if (isolated && !AGENT_TAB_INDEPENDENT_TOOLS.has(toolName) && activeTabId === null) {
         return "Error: Isolated agent profile is on and the active tab is not one the agent opened. Use browser_new_tab to open a tab for the agent.";
       }
+      // The tab strip and page frame mark the tab the agent works in.
+      markAgentTab(activeTabId);
       const activeWebview = guardedGuest(canExecute);
 
       // Show the human where the agent is about to act, then give them a beat to

@@ -57,6 +57,8 @@ import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../uti
 import { getLanguage, getLocale, useTranslation, displayTabTitle, displayWorkspaceName } from '../services/i18n';
 import { ADBLOCK_WHITELIST_EVENT } from '../utils/adblockWhitelist';
 import { KingAssistantIcon } from './ui/KingAssistantIcon';
+import { AgentTabMarker } from './ui/AgentTabMarker';
+import { useAgentTabId } from '../services/agentTabStore';
 import { logger } from '../utils/logger';
 import { syncService, SyncStatus } from '../services/syncService';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
@@ -177,7 +179,8 @@ const MemoizedTabItem = React.memo(
     wasJustUnsplit,
     onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
     onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
-    tabsLength, onUpdateGhost, onOpenContextMenu, onTabHover, onTabLeave
+    tabsLength, onUpdateGhost, onOpenContextMenu, onTabHover, onTabLeave,
+    isAgentTab
   }: any, ref: any) => {
     const { l } = useTranslation();
   // No early return before the first hook. A `isSplitChild` bail-out used to sit
@@ -661,6 +664,7 @@ const MemoizedTabItem = React.memo(
           className={`absolute -bottom-px left-0 right-0 h-px z-20 ${isIncognito ? 'bg-slate-800' : 'bg-white dark:bg-slate-800'}`}
         />
       )}
+      {isAgentTab && <AgentTabMarker compact={isPinned} />}
     </Reorder.Item>
   );
   }), (prevProps: any, nextProps: any) => {
@@ -668,6 +672,7 @@ const MemoizedTabItem = React.memo(
     prevProps.index === nextProps.index &&
     prevProps.wasJustUnsplit === nextProps.wasJustUnsplit &&
     prevProps.isActive === nextProps.isActive &&
+    prevProps.isAgentTab === nextProps.isAgentTab &&
     // For non-split tabs, activeTabId doesn't affect rendering because isActive captures whether this tab is active.
     // For split tabs, we only care whether this tab or the split partner is the active one.
     (
@@ -769,7 +774,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onRespondPermission,
   onDismissPermission
 }) => {
-  const { l } = useTranslation();
+  const { l, t } = useTranslation();
+  const tabIds = useMemo(() => tabs.map(tab => tab.id), [tabs]);
+  const agentTabId = useAgentTabId(tabIds);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
 
   useEffect(() => {
@@ -1304,6 +1311,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   onTogglePip={onTogglePip}
                   onCloseTab={onCloseTab}
                   tabsLength={tabs.length}
+                  isAgentTab={agentTabId !== null && (agentTabId === tab.id || agentTabId === splitTab?.id)}
                   onUpdateGhost={handleUpdateGhost}
                   onTabHover={handleTabHover}
                   onTabLeave={handleTabLeave}
@@ -1341,7 +1349,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     ? 'text-slate-400 hover:bg-slate-700/80 hover:text-slate-200'
                     : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
                 }`}
-                title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
+                title={t('tabs.newTabWithShortcut', { shortcut: isMac ? 'Cmd+T' : 'Ctrl+T' })}
               >
                 <Plus className="w-4 h-4" />
               </motion.button>

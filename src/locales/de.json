@@ -44,7 +44,8 @@
     "wake": "Tab reaktivieren",
     "sleeping": "Tab schläft",
     "sleepingDesc": "Dieser Tab wurde in den Ruhezustand versetzt, um Speicher zu sparen.",
-    "wakeUp": "Tab reaktivieren"
+    "wakeUp": "Tab reaktivieren",
+    "newTabWithShortcut": "Neuer Tab ({shortcut})"
   },
   "settings": {
     "title": "Einstellungen",
@@ -292,7 +293,6 @@
   "agentPanel": {
     "title": "Agent-Steuerung",
     "expand": "Agent-Steuerung",
-    "shortcutHint": "Strg+Umschalt+.",
     "states": {
       "idle": "Leerlauf",
       "running": "Läuft",
@@ -341,7 +341,20 @@
     "statusCancelled": "abgebrochen",
     "statusRejected": "abgelehnt",
     "statusRunning": "läuft",
-    "statusRequested": "in Warteschlange"
+    "statusRequested": "in Warteschlange",
+    "ageSeconds": "vor {count} s",
+    "ageMinutes": "vor {count} min",
+    "ageHours": "vor {count} h",
+    "moveHint": "Zum Verschieben ziehen. Pfeiltasten verschieben, Doppelklick setzt zurück.",
+    "hidePill": "Agentenstatus ausblenden",
+    "hidePillHint": "Agentenstatus ausblenden ({shortcut} zeigt ihn wieder)",
+    "pillHideWhenIdle": "Agentenstatus im Leerlauf ausblenden",
+    "pillHideWhenIdleHint": "Die Schaltfläche erscheint nur, während der Agent arbeitet oder Ihre Freigabe braucht.",
+    "pillShow": "Agentenstatus-Schaltfläche anzeigen",
+    "pillShowHint": "Ausschalten schließt die schwebende Schaltfläche. Eine Freigabeanfrage holt sie immer zurück.",
+    "pillSettingsTitle": "Agentenstatus-Schaltfläche",
+    "tabMarker": "Der Agent arbeitet in diesem Tab",
+    "pageMarker": "Der Agent arbeitet auf dieser Seite"
   },
   "appearance": {
     "wallpaper": {
@@ -465,5 +478,68 @@
         "badge": "Eigene"
       }
     }
+  },
+  "shortcuts": {
+    "title": "Tastenkürzel",
+    "subtitle": "Kürzel anklicken, dann die neue Tastenkombination drücken. Esc bricht ab.",
+    "search": "Tastenkürzel suchen",
+    "resetAll": "Alle zurücksetzen",
+    "resetOne": "Auf Standard zurücksetzen",
+    "edit": "Kürzel ändern",
+    "pressKeys": "Tasten drücken...",
+    "needsModifier": "Strg, Cmd oder Alt zusammen mit der Taste verwenden (oder eine F-Taste).",
+    "conflict": "Bereits belegt durch \"{action}\". Andere Kombination wählen.",
+    "customized": "Geändert",
+    "fixedTitle": "Immer verfügbar",
+    "noResults": "Kein Tastenkürzel passt zur Suche.",
+    "groups": {
+      "tabs": "Tabs",
+      "navigation": "Navigation",
+      "page": "Seite",
+      "panels": "Bereiche",
+      "agent": "Agentensteuerung"
+    },
+    "actions": {
+      "newTab": "Neuer Tab",
+      "closeTab": "Tab schließen",
+      "reopenTab": "Geschlossenen Tab wieder öffnen",
+      "newIncognito": "Neues privates Fenster",
+      "nextTab": "Nächster Tab",
+      "prevTab": "Vorheriger Tab",
+      "omnibox": "Schnellsuche (Spotlight)",
+      "focusAddress": "Adressleiste fokussieren",
+      "goBack": "Zurück",
+      "goForward": "Vorwärts",
+      "reload": "Seite neu laden",
+      "bookmark": "Lesezeichen setzen",
+      "history": "Verlauf öffnen",
+      "downloads": "Downloads öffnen",
+      "findInPage": "Auf Seite suchen",
+      "zoomIn": "Vergrößern",
+      "zoomOut": "Verkleinern",
+      "resetZoom": "Zoom zurücksetzen",
+      "print": "Seite drucken",
+      "screenshot": "Screenshot aufnehmen",
+      "devtools": "Entwicklertools",
+      "toggleSidebar": "Seitenleiste ein- oder ausblenden",
+      "toggleAiPanel": "King-Assistent ein- oder ausblenden",
+      "toggleAgentPanel": "Agentensteuerung öffnen oder schließen",
+      "toggleAgentPill": "Agentenstatus-Schaltfläche ein- oder ausblenden",
+      "agentStopNow": "Agent SOFORT stoppen",
+      "switchTab": "Zu Tab 1-9 wechseln",
+      "help": "Hilfe-Center",
+      "shortcutsHelp": "Tastenkürzel-Übersicht",
+      "newWindow": "Neues Fenster",
+      "forceReload": "Ohne Cache neu laden",
+      "settings": "Einstellungen öffnen",
+      "copy": "Kopieren",
+      "paste": "Einfügen",
+      "cut": "Ausschneiden",
+      "selectAll": "Alles auswählen",
+      "undo": "Rückgängig",
+      "redo": "Wiederholen",
+      "quit": "Beenden"
+    },
+    "reserved": "Reserviert für „{action}“. Andere Kombination wählen."
   }
 }

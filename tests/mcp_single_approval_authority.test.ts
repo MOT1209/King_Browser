@@ -46,6 +46,7 @@ async function run() {
   const imports: Record<string, any> = {
     react: { useEffect: (fn: Function) => fn(), useRef: (current: any) => ({ current }) },
     '../services/aiActionContext': { publishActionContext: () => {} },
+    '../services/agentTabStore': { markAgentTab: () => {} },
     '../services/agentOrchestrator': { orchestrator },
     '../utils/safeNavigation': { isSafeAgentNavigationUrl },
     '../utils/mcpActionTiming': mcpActionTiming,

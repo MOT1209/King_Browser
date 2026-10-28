@@ -4,6 +4,8 @@
  * language through the `set-app-language` IPC.
  */
 
+import type { ApprovalNotificationStrings } from './approvalAttention.js';
+
 export type UiLanguage = 'en' | 'ar' | 'de';
 
 export function normalizeUiLanguage(lang: unknown): UiLanguage {
@@ -224,4 +226,29 @@ const GOOGLE_SIGNIN_DIALOG: Record<UiLanguage, GoogleSigninDialogStrings> = {
 
 export function googleSigninDialogStrings(lang: UiLanguage): GoogleSigninDialogStrings {
   return GOOGLE_SIGNIN_DIALOG[lang] ?? GOOGLE_SIGNIN_DIALOG.en;
+}
+
+const APPROVAL_NOTIFICATION: Record<UiLanguage, ApprovalNotificationStrings> = {
+  en: {
+    title: 'King Browser: approval needed',
+    body: (tool, domain) => domain
+      ? `The agent is waiting for your decision: ${tool} on ${domain}.`
+      : `The agent is waiting for your decision: ${tool}.`,
+  },
+  ar: {
+    title: 'King Browser: مطلوب موافقتك',
+    body: (tool, domain) => domain
+      ? `الوكيل ينتظر قرارك: ${tool} على ${domain}.`
+      : `الوكيل ينتظر قرارك: ${tool}.`,
+  },
+  de: {
+    title: 'King Browser: Freigabe erforderlich',
+    body: (tool, domain) => domain
+      ? `Der Agent wartet auf Ihre Entscheidung: ${tool} auf ${domain}.`
+      : `Der Agent wartet auf Ihre Entscheidung: ${tool}.`,
+  },
+};
+
+export function approvalNotificationStrings(lang: UiLanguage): ApprovalNotificationStrings {
+  return APPROVAL_NOTIFICATION[lang] ?? APPROVAL_NOTIFICATION.en;
 }

@@ -871,28 +871,28 @@ export const SidePanel = React.memo(({
               <button
                 type="button"
                 onClick={() => handleSendPrompt('Open new tab')}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
+                className="w-full min-w-0 flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-start border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
-                <span className="truncate">{l({ en: 'Open new tab', ar: 'فتح تبويب جديد', de: 'Neuen Tab öffnen' })}</span>
+                <span className="min-w-0 truncate">{l({ en: 'Open new tab', ar: 'فتح تبويب جديد', de: 'Neuen Tab öffnen' })}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSendPrompt('List open tabs')}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
+                className="w-full min-w-0 flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-start border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
               >
                 <Layers className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
-                <span className="truncate">{l({ en: 'List open tabs', ar: 'عرض التبويبات المفتوحة', de: 'Offene Tabs auflisten' })}</span>
+                <span className="min-w-0 truncate">{l({ en: 'List open tabs', ar: 'عرض التبويبات المفتوحة', de: 'Offene Tabs auflisten' })}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSendPrompt('Search latest news on web')}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
+                className="w-full min-w-0 flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-start border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
               >
                 <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
-                <span className="truncate">{l({ en: 'Search latest news', ar: 'البحث عن آخر الأخبار', de: 'Aktuelle Nachrichten suchen' })}</span>
+                <span className="min-w-0 truncate">{l({ en: 'Search latest news', ar: 'البحث عن آخر الأخبار', de: 'Aktuelle Nachrichten suchen' })}</span>
               </button>
             </div>
           </div>

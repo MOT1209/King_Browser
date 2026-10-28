@@ -23,6 +23,15 @@ import {
 } from 'lucide-react';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useTranslation } from '../services/i18n';
+import type { ShortcutConfig } from '../types/browser';
+import { bindingParts } from '../utils/keyboardShortcuts';
+import {
+  FIXED_SHORTCUTS,
+  SHORTCUT_ACTIONS,
+  SHORTCUT_GROUPS as SHORTCUT_GROUP_IDS,
+  buildDefaultShortcuts,
+  fixedShortcutParts
+} from '../utils/shortcutCatalog';
 
 const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -35,75 +44,29 @@ export interface HelpModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: 'help' | 'shortcuts' | 'ai' | 'privacy' | 'about';
+  /** The user's bindings, so the guide shows what Settings > Shortcuts set. */
+  shortcuts?: Record<string, ShortcutConfig>;
 }
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-function formatKeyForPlatform(key: string, mac: boolean): string {
-  if (mac) return key;
-  if (key === '⌘') return 'Ctrl';
-  if (key === '⌥') return 'Alt';
-  if (key === '⇧') return 'Shift';
-  if (key === '^') return 'Ctrl';
-  return key;
+interface ShortcutRow {
+  keys: string[];
+  desc: string;
 }
 
-const SHORTCUT_GROUPS = [
-  {
-    title: { en: 'Tabs & Windows', ar: 'التبويبات والنوافذ', de: 'Tabs & Fenster' },
-    shortcuts: [
-      { keys: ['⌘', 'T'], desc: { en: 'New tab', ar: 'تبويب جديد', de: 'Neuer Tab' } },
-      { keys: ['⌘', 'N'], desc: { en: 'New window', ar: 'نافذة جديدة', de: 'Neues Fenster' } },
-      { keys: ['⇧', '⌘', 'N'], desc: { en: 'New Incognito tab', ar: 'تبويب تصفح خفي جديد', de: 'Neuer Inkognito-Tab' } },
-      { keys: ['⌘', 'W'], desc: { en: 'Close active tab', ar: 'إغلاق التبويب الحالي', de: 'Aktiven Tab schließen' } },
-      { keys: ['⇧', '⌘', 'T'], desc: { en: 'Reopen closed tab', ar: 'إعادة فتح التبويب المغلق', de: 'Geschlossenen Tab wieder öffnen' } },
-      { keys: ['^', 'Tab'], desc: { en: 'Next tab', ar: 'التبويب التالي', de: 'Nächster Tab' } },
-      { keys: ['^', '⇧', 'Tab'], desc: { en: 'Previous tab', ar: 'التبويب السابق', de: 'Vorheriger Tab' } },
-      { keys: ['⌘', '1-9'], desc: { en: 'Switch to tab 1-9', ar: 'الانتقال إلى التبويب 1-9', de: 'Zu Tab 1–9 wechseln' } },
-    ]
-  },
-  {
-    title: { en: 'Navigation & Search', ar: 'التنقل والبحث', de: 'Navigation & Suche' },
-    shortcuts: [
-      { keys: ['⌘', 'L'], desc: { en: 'Focus address / search bar', ar: 'التركيز على شريط العنوان والبحث', de: 'Adress-/Suchleiste fokussieren' } },
-      { keys: ['⌘', 'K'], desc: { en: 'Open Quick Search / Spotlight', ar: 'فتح البحث السريع', de: 'Schnellsuche öffnen' } },
-      { keys: ['⌘', 'R'], desc: { en: 'Reload page', ar: 'إعادة تحميل الصفحة', de: 'Seite neu laden' } },
-      { keys: ['⇧', '⌘', 'R'], desc: { en: 'Force reload (ignore cache)', ar: 'إعادة تحميل كاملة (تجاهل الذاكرة المؤقتة)', de: 'Neu laden ohne Cache' } },
-      { keys: ['⌘', '['], desc: { en: 'Go back', ar: 'رجوع', de: 'Zurück' } },
-      { keys: ['⌘', ']'], desc: { en: 'Go forward', ar: 'تقدّم', de: 'Vorwärts' } },
-      { keys: ['⌘', 'F'], desc: { en: 'Find in page', ar: 'البحث في الصفحة', de: 'Auf Seite suchen' } },
-      { keys: ['⌘', 'P'], desc: { en: 'Print / Save as PDF', ar: 'طباعة / حفظ بصيغة PDF', de: 'Drucken / Als PDF speichern' } },
-    ]
-  },
-  {
-    title: { en: 'Zoom & Display', ar: 'التكبير والعرض', de: 'Zoom & Anzeige' },
-    shortcuts: [
-      { keys: ['⌘', '+'], desc: { en: 'Zoom in', ar: 'تكبير', de: 'Vergrößern' } },
-      { keys: ['⌘', '-'], desc: { en: 'Zoom out', ar: 'تصغير', de: 'Verkleinern' } },
-      { keys: ['⌘', '0'], desc: { en: 'Reset zoom to 100%', ar: 'إعادة التكبير إلى 100%', de: 'Zoom auf 100 % zurücksetzen' } },
-      { keys: ['^', '⌘', 'F'], desc: { en: 'Toggle full screen', ar: 'تبديل ملء الشاشة', de: 'Vollbild umschalten' } },
-      { keys: ['⌘', 'S'], desc: { en: 'Toggle vertical sidebar', ar: 'تبديل الشريط الجانبي العمودي', de: 'Vertikale Seitenleiste umschalten' } },
-      { keys: ['⌥', '⌘', 'I'], desc: { en: 'Toggle Developer Tools', ar: 'تبديل أدوات المطوّر', de: 'Entwicklertools umschalten' } },
-    ]
-  },
-  {
-    title: { en: 'Features & Tools', ar: 'الميزات والأدوات', de: 'Funktionen & Werkzeuge' },
-    shortcuts: [
-      { keys: ['⌘', 'D'], desc: { en: 'Bookmark current tab', ar: 'إضافة التبويب الحالي إلى الإشارات المرجعية', de: 'Aktuellen Tab als Lesezeichen speichern' } },
-      { keys: ['⌘', 'Y'], desc: { en: 'Open History page', ar: 'فتح صفحة السجل', de: 'Verlauf öffnen' } },
-      { keys: isMac ? ['⇧', '⌘', 'J'] : ['Ctrl', 'J'], desc: { en: 'Open Downloads page', ar: 'فتح صفحة التنزيلات', de: 'Downloads öffnen' } },
-      { keys: ['⌘', ','], desc: { en: 'Open Settings', ar: 'فتح الإعدادات', de: 'Einstellungen öffnen' } },
-      { keys: ['F1'], desc: { en: 'Open Help Center', ar: 'فتح مركز المساعدة', de: 'Hilfecenter öffnen' } },
-    ]
-  }
-];
+interface ShortcutRowGroup {
+  title: string;
+  shortcuts: ShortcutRow[];
+}
 
 export const HelpModal: React.FC<HelpModalProps> = React.memo(({
   isOpen,
   onClose,
-  initialTab = 'help'
+  initialTab = 'help',
+  shortcuts
 }) => {
-  const { l, language } = useTranslation();
+  const { l, t, language } = useTranslation();
   const [activeTab, setActiveTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>(initialTab);
   const [shortcutSearch, setShortcutSearch] = useState('');
   const [appVersion, setAppVersion] = useState<string>(() => {
@@ -135,18 +98,36 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
   const containerRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
 
+  // Built from the same table as Settings > Shortcuts, so the guide always
+  // shows the keys the user actually configured.
+  const shortcutGroups = useMemo<ShortcutRowGroup[]>(() => {
+    const bindings = { ...buildDefaultShortcuts(isMac), ...shortcuts };
+    const groups: ShortcutRowGroup[] = SHORTCUT_GROUP_IDS.map(group => ({
+      title: t(`shortcuts.groups.${group}`),
+      shortcuts: SHORTCUT_ACTIONS
+        .filter(action => action.group === group)
+        .map(action => ({ keys: bindingParts(bindings[action.id], isMac), desc: t(`shortcuts.actions.${action.id}`) }))
+        .filter(row => row.keys.length > 0),
+    }));
+    groups.push({
+      title: t('shortcuts.fixedTitle'),
+      shortcuts: FIXED_SHORTCUTS.map(fixed => ({ keys: fixedShortcutParts(fixed, isMac), desc: t(`shortcuts.actions.${fixed.id}`) })),
+    });
+    return groups;
+  }, [shortcuts, language, t]);
+
   // Filter shortcuts based on query
   const filteredShortcutGroups = useMemo(() => {
-    if (!shortcutSearch.trim()) return SHORTCUT_GROUPS;
+    if (!shortcutSearch.trim()) return shortcutGroups;
     const q = shortcutSearch.toLowerCase();
-    return SHORTCUT_GROUPS.map(group => ({
+    return shortcutGroups.map(group => ({
       ...group,
-      shortcuts: group.shortcuts.filter(sc => 
-        l(sc.desc).toLowerCase().includes(q) || 
+      shortcuts: group.shortcuts.filter(sc =>
+        sc.desc.toLowerCase().includes(q) ||
         sc.keys.some(k => k.toLowerCase().includes(q))
       )
     })).filter(group => group.shortcuts.length > 0);
-  }, [shortcutSearch, language, l]);
+  }, [shortcutSearch, shortcutGroups]);
 
   return (
     <AnimatePresence>
@@ -354,7 +335,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                     filteredShortcutGroups.map((group, idx) => (
                       <div key={idx} className="space-y-2">
                         <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          {l(group.title)}
+                          {group.title}
                         </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {group.shortcuts.map((sc, sIdx) => (
@@ -363,15 +344,15 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                               className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10"
                             >
                               <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                {l(sc.desc)}
+                                {sc.desc}
                               </span>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1" dir="ltr">
                                 {sc.keys.map((k, kIdx) => (
                                   <kbd 
                                     key={kIdx} 
                                     className="px-2 py-0.5 text-[11px] font-semibold bg-white dark:bg-[#1a202c] border border-slate-300 dark:border-white/15 rounded-lg shadow-xs text-slate-800 dark:text-slate-200 min-w-[22px] text-center font-mono"
                                   >
-                                    {formatKeyForPlatform(k, isMac)}
+                                    {k}
                                   </kbd>
                                 ))}
                               </div>

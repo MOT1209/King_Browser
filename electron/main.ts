@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu, MenuItem, clipboard, systemPreferences } from 'electron';
+import { Notification, app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu, MenuItem, clipboard, systemPreferences } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createTrustedSenderPolicy } from './security/trustedSender';
@@ -137,7 +137,9 @@ import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, getGoogleSigninCompatUserAgent, isGoogleAccountsUrl, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
-import { contextMenuLabels, googleSigninDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
+import { approvalNotificationStrings, contextMenuLabels, googleSigninDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
+import { createApprovalAttention } from './main/approvalAttention.js';
+import { resolveMenuAccelerators, sanitizeMenuBindings, type ShortcutBinding as MenuShortcutBinding } from './main/shortcutAccelerators.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
@@ -936,8 +938,13 @@ function hasUpgradedUrl(url: string): boolean {
   return true;
 }
 
+// Bindings the user changed in Settings > Shortcuts (validated); the menu is
+// rebuilt when they change so the menu keys match the configured ones.
+let menuShortcutBindings: Record<string, MenuShortcutBinding> = {};
+
 function setupApplicationMenu() {
   const isMac = process.platform === 'darwin';
+  const menuAccelerators = resolveMenuAccelerators(menuShortcutBindings);
 
   if (isMac) {
     try {
@@ -1004,7 +1011,7 @@ function setupApplicationMenu() {
       submenu: [
         {
           label: 'New Tab',
-          accelerator: 'CmdOrCtrl+T',
+          accelerator: menuAccelerators.newTab || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'new-tab');
           }
@@ -1018,14 +1025,14 @@ function setupApplicationMenu() {
         },
         {
           label: 'New Incognito Tab',
-          accelerator: 'Shift+CmdOrCtrl+N',
+          accelerator: menuAccelerators.newIncognito || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'new-incognito');
           }
         },
         {
           label: 'Open Location / Search...',
-          accelerator: 'CmdOrCtrl+L',
+          accelerator: menuAccelerators.focusAddress || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'focus-url');
           }
@@ -1033,14 +1040,14 @@ function setupApplicationMenu() {
         { type: 'separator' as const },
         {
           label: 'Close Tab',
-          accelerator: 'CmdOrCtrl+W',
+          accelerator: menuAccelerators.closeTab || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'close-tab');
           }
         },
         {
           label: 'Reopen Closed Tab',
-          accelerator: 'Shift+CmdOrCtrl+T',
+          accelerator: menuAccelerators.reopenTab || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'reopen-tab');
           }
@@ -1048,7 +1055,7 @@ function setupApplicationMenu() {
         { type: 'separator' as const },
         {
           label: 'Print...',
-          accelerator: 'CmdOrCtrl+P',
+          accelerator: menuAccelerators.print || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'print');
           }
@@ -1072,7 +1079,7 @@ function setupApplicationMenu() {
         { type: 'separator' as const },
         {
           label: 'Find in Page...',
-          accelerator: 'CmdOrCtrl+F',
+          accelerator: menuAccelerators.findInPage || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'find');
           }
@@ -1085,7 +1092,7 @@ function setupApplicationMenu() {
       submenu: [
         {
           label: 'Reload This Page',
-          accelerator: 'CmdOrCtrl+R',
+          accelerator: menuAccelerators.reload || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'reload');
           }
@@ -1100,21 +1107,21 @@ function setupApplicationMenu() {
         { type: 'separator' as const },
         {
           label: 'Actual Size (100%)',
-          accelerator: 'CmdOrCtrl+0',
+          accelerator: menuAccelerators.resetZoom || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'zoom-reset');
           }
         },
         {
           label: 'Zoom In',
-          accelerator: 'CmdOrCtrl+Plus',
+          accelerator: menuAccelerators.zoomIn || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'zoom-in');
           }
         },
         {
           label: 'Zoom Out',
-          accelerator: 'CmdOrCtrl+-',
+          accelerator: menuAccelerators.zoomOut || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'zoom-out');
           }
@@ -1136,14 +1143,14 @@ function setupApplicationMenu() {
       submenu: [
         {
           label: 'Back',
-          accelerator: 'CmdOrCtrl+[',
+          accelerator: menuAccelerators.goBack || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'go-back');
           }
         },
         {
           label: 'Forward',
-          accelerator: 'CmdOrCtrl+]',
+          accelerator: menuAccelerators.goForward || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'go-forward');
           }
@@ -1151,14 +1158,14 @@ function setupApplicationMenu() {
         { type: 'separator' as const },
         {
           label: 'Show Full History',
-          accelerator: 'CmdOrCtrl+Y',
+          accelerator: menuAccelerators.history || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'history');
           }
         },
         {
           label: 'Show Downloads',
-          accelerator: 'Shift+CmdOrCtrl+J',
+          accelerator: menuAccelerators.downloads || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'downloads');
           }
@@ -1171,7 +1178,7 @@ function setupApplicationMenu() {
       submenu: [
         {
           label: 'Bookmark This Tab...',
-          accelerator: 'CmdOrCtrl+D',
+          accelerator: menuAccelerators.bookmark || undefined,
           click: () => {
             sendToMainWindow('shortcut', 'bookmark');
           }
@@ -2062,6 +2069,29 @@ app.whenReady().then(async () => {
   // §11/§12: forwarded agent actions go through the policy classifier and the
   // execution engine (approval dialog for sensitive decisions, STOP NOW support).
   mcpServer.setPolicyEnforcement(true);
+  // Approvals requested while King is in the background notify the human and
+  // flash the taskbar entry, so an unseen dialog does not silently time out.
+  const approvalAttention = createApprovalAttention({
+    isWindowFocused: () => Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()),
+    flashWindow: (on) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.flashFrame(on);
+    },
+    focusWindow: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    },
+    showNotification: (title, body, onClick) => {
+      if (!Notification.isSupported()) return;
+      const notification = new Notification({ title, body });
+      notification.on('click', onClick);
+      notification.show();
+    },
+    strings: () => approvalNotificationStrings(currentUiLanguage)
+  });
+  mcpServer.setEngineEventObserver((event) => approvalAttention.handleEngineEvent(event));
+  mainWindow?.on('focus', () => approvalAttention.handleWindowFocus());
   // §10: expose the engine to the renderer control panel (status, controls,
   // STOP NOW, approvals). Renderer-facing channel names live in engineIpc.ts.
   registerEngineIpc({
@@ -3734,6 +3764,20 @@ ipcMain.handle('set-google-signin-compat', (event, enabled: unknown) => {
 });
 
 // IPC Handler to dynamically update Accept-Language across all Electron sessions
+// Settings > Shortcuts reports the bindings the user changed; the menu is
+// rebuilt so its accelerators follow them. Validated in shortcutAccelerators.
+ipcMain.handle('set-shortcut-bindings', (event, bindings: unknown) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
+  menuShortcutBindings = sanitizeMenuBindings(bindings);
+  try {
+    setupApplicationMenu();
+  } catch (e) {
+    console.error('[Menu] Failed to rebuild menu after shortcut change:', e);
+    return { success: false, error: 'Menu rebuild failed' };
+  }
+  return { success: true };
+});
+
 ipcMain.handle('set-app-language', async (event, lang: unknown) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
   if (typeof lang !== 'string' || !lang.trim()) return { success: false, error: 'Invalid language' };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
-import { PanelRight, PanelLeft, Columns2, ArrowLeftRight, X, Globe } from 'lucide-react';
+import { PanelRight, PanelLeft, Columns2, ArrowLeftRight, X, Globe, Bot } from 'lucide-react';
 import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
 // Downloads / history / permission domains were extracted into hooks under
@@ -34,7 +34,7 @@ import { safeParseArrayWithBackup, safeParseObjectWithBackup } from './utils/saf
 import { showConfirm, showAlert } from './utils/confirmDialog';
 import { isSafeNavigationUrl } from './utils/safeNavigation';
 import { syncMcpServerWithSetting } from './utils/mcpServerSync';
-import { matchesShortcut } from './utils/keyboardShortcuts';
+import { matchesShortcut, shortcutKey } from './utils/keyboardShortcuts';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useVpn } from './hooks/useVpn';
 import { useWorkspaces } from './hooks/useWorkspaces';
@@ -108,7 +108,9 @@ const UpdateToast = lazyWithRetry(() => import('./components/UpdateToast').then(
 const VPN_ANCHOR_REF: React.RefObject<HTMLButtonElement> = { current: null };
 
 import { isTombstonedRow } from './services/syncService';
-import { l } from './services/i18n';
+import { l, t } from './services/i18n';
+import { useAgentTabId } from './services/agentTabStore';
+import { customizedBindings } from './utils/shortcutCatalog';
 import { logger } from './utils/logger';
 import {
   EMPTY_ARRAY,
@@ -472,6 +474,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     demoBg: demoParams.bg,
     isMac,
   });
+  // The application menu's accelerators follow the shortcuts the user changed.
+  useEffect(() => {
+    if (demoParams.isDemo) return;
+    const api = window.electronAPI;
+    if (!api?.setShortcutBindings) return;
+    api.setShortcutBindings(customizedBindings(settings.shortcuts, isMac)).catch(() => {});
+  }, [settings.shortcuts, demoParams.isDemo]);
+
+  const handleAgentPillHiddenChange = useCallback((hidden: boolean) => {
+    handleUpdateSettings({ agentPillHidden: hidden });
+  }, [handleUpdateSettings]);
 
   // The MCP setting is the source of truth for the server: main auto-starts it
   // from a disk mirror that can disagree with these settings (see mcpServerSync).
@@ -1125,7 +1138,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       const s = settings.shortcuts;
       if (!s) return;
 
-      const key = e.key.toLowerCase();
+      const key = shortcutKey(e);
       const shift = e.shiftKey;
       const meta = e.metaKey || e.ctrlKey; // Accept either Meta (Mac) or Ctrl (Windows)
 
@@ -1179,7 +1192,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
 
       // Focus Address / Search bar (⌘L / Ctrl+L)
-      if (meta && key === 'l') {
+      if (matches('focusAddress')) {
         e.preventDefault();
         const searchInput = document.querySelector<HTMLInputElement>('input[data-omnibox-input]');
         if (searchInput) {
@@ -1189,8 +1202,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
-      // Next / Previous Tab (Ctrl+Tab / Ctrl+Shift+Tab) within current workspace
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
+      // Next / Previous Tab within current workspace. Ctrl+Tab also works on
+      // macOS, where the configurable default is Cmd+Option+arrows.
+      const macCtrlTab = isMac && e.ctrlKey && !e.metaKey && e.key === 'Tab';
+      const wantsNextTab = matches('nextTab') || (macCtrlTab && !shift);
+      const wantsPrevTab = matches('prevTab') || (macCtrlTab && shift);
+      if (wantsNextTab || wantsPrevTab) {
         e.preventDefault();
         // Compute from refs OUTSIDE the updater (StrictMode-safe). Tabs are
         // unchanged here — only the selection moves within the active workspace.
@@ -1199,7 +1216,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         if (currentTabs.length > 1) {
           const currentIndex = currentTabs.findIndex(t => t.id === activeTabIdRef.current);
           let nextIndex = 0;
-          if (e.shiftKey) {
+          if (wantsPrevTab) {
             nextIndex = currentIndex <= 0 ? currentTabs.length - 1 : currentIndex - 1;
           } else {
             nextIndex = currentIndex >= currentTabs.length - 1 ? 0 : currentIndex + 1;
@@ -1210,14 +1227,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
 
       // Capture Screenshot (Cmd + Shift + S / Ctrl + Shift + S)
-      if (meta && shift && key === 's') {
+      if (matches('screenshot')) {
         e.preventDefault();
         void handleTakeScreenshot();
         return;
       }
 
-      // Toggle Sidebar in Vertical Tabs Mode (⌘B / ⌘S / Ctrl+B / Ctrl+S)
-      if (matches('toggleSidebar') || ((e.metaKey || e.ctrlKey) && !shift && (key === 'b' || key === 's'))) {
+      // Toggle Sidebar in Vertical Tabs Mode (default ⌘S / Ctrl+S, plus fixed ⌘B / Ctrl+B)
+      if (matches('toggleSidebar') || (meta && !shift && !e.altKey && key === 'b')) {
         e.preventDefault();
         setIsSidebarCollapsed(prev => !prev);
         return;
@@ -1247,8 +1264,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
-      // Toggle AI Assistant (Cmd + I / Cmd + Shift + A)
-      if ((meta && key === 'i' && !e.altKey && !shift) || (meta && shift && key === 'a')) {
+      // Toggle AI Assistant (default Cmd + I, plus fixed Cmd + Shift + A)
+      if (matches('toggleAiPanel') || (meta && shift && !e.altKey && key === 'a')) {
         e.preventDefault();
         handleToggleAIAssistant();
         return;
@@ -1276,48 +1293,48 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
-      // Zoom In (Cmd + + / Cmd + =)
-      if (meta && (key === '+' || key === '=')) {
+      // Zoom In (default Cmd + =, plus fixed Cmd + +)
+      if (matches('zoomIn') || (meta && key === '+')) {
         e.preventDefault();
         handleZoomIn();
         return;
       }
 
       // Zoom Out (Cmd + -)
-      if (meta && key === '-') {
+      if (matches('zoomOut')) {
         e.preventDefault();
         handleZoomOut();
         return;
       }
 
       // Reset Zoom (Cmd + 0)
-      if (meta && key === '0') {
+      if (matches('resetZoom')) {
         e.preventDefault();
         handleResetZoom();
         return;
       }
 
-      // History navigation (Cmd + [ / Cmd + ], Alt + Left / Alt + Right)
-      if ((meta && key === '[') || (e.altKey && key === 'ArrowLeft')) {
+      // History navigation (Cmd + [ / Cmd + ], plus fixed Alt + Left / Alt + Right)
+      if (matches('goBack') || (e.altKey && !meta && key === 'arrowleft')) {
         e.preventDefault();
         handleGoBack();
         return;
       }
-      if ((meta && key === ']') || (e.altKey && key === 'ArrowRight')) {
+      if (matches('goForward') || (e.altKey && !meta && key === 'arrowright')) {
         e.preventDefault();
         handleGoForward();
         return;
       }
 
       // Print Page (Cmd + P / Ctrl + P)
-      if (meta && key === 'p') {
+      if (matches('print')) {
         e.preventDefault();
         handlePrintPage();
         return;
       }
 
-      // Open DevTools (F12 or Cmd+Option+I / Ctrl+Shift+I)
-      if (key === 'f12' || (meta && e.altKey && key === 'i') || (e.ctrlKey && e.shiftKey && key === 'i')) {
+      // Open DevTools (fixed F12, default Cmd+Option+I / Ctrl+Shift+I)
+      if (key === 'f12' || matches('devtools')) {
         e.preventDefault();
         handleOpenDevTools();
         return;
@@ -1356,6 +1373,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Compute stable primary (left) and secondary (right) tabs for split view.
   // Their physical positions remain stable based on tab order, even when activeTabId changes upon focus.
+  const tabIds = useMemo(() => tabs.map(tab => tab.id), [tabs]);
+  const agentTabId = useAgentTabId(tabIds);
+
   const { primarySplitTab, secondarySplitTab } = useMemo(() => {
     if (!activeTab || !activeTab.splitWith) return { primarySplitTab: activeTab, secondarySplitTab: null };
     const partner = tabs.find(t => t.id === activeTab.splitWith);
@@ -1751,7 +1771,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         </React.Suspense>
 
         {/* §10 agent control panel (engine status, approvals, STOP NOW) */}
-        <AgentControlPanel />
+        <AgentControlPanel
+          shortcuts={settings.shortcuts}
+          hideWhenIdle={settings.agentPillHideWhenIdle !== false}
+          hidden={!!settings.agentPillHidden}
+          onHiddenChange={handleAgentPillHiddenChange}
+        />
 
         {/* Unified Browser Views Container (Single persistent container for primary, secondary split, and background tabs) */}
         <div
@@ -2014,6 +2039,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               }}
             />
           )}
+
+          {/* Frame the page while the agent works in a visible tab, so the human
+              always sees which page is under agent control. */}
+          {agentTabId !== null && (agentTabId === primarySplitTab?.id || agentTabId === secondarySplitTab?.id) && (
+            <div className="pointer-events-none absolute inset-0 z-30 ring-2 ring-inset ring-amber-400/80" data-agent-frame="true">
+              <div className="absolute top-2 inset-x-0 flex justify-center">
+                <span className="flex items-center gap-1.5 rounded-full bg-amber-400 text-slate-900 text-[11px] font-semibold px-2.5 py-0.5 shadow-md">
+                  <Bot className="w-3 h-3" />
+                  {t('agentPanel.pageMarker')}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* AI Assistant Side Panel */}
@@ -2137,6 +2175,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             isOpen={isHelpOpen}
             onClose={handleCloseHelp}
             initialTab={helpInitialTab}
+            shortcuts={settings.shortcuts}
           />
         )}
       </React.Suspense>
