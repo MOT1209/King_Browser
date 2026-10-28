@@ -339,6 +339,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               e.stopPropagation();
               setIsSiteInfoOpen(prev => !prev);
             }}
+            // Physical on purpose: the address bar reads left to right in every language and
+            // its input padding (pl-11, pr-24) is physical too, so the badge stays on the left.
             className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer h-7 px-1 rounded-md"
           >
             {isIncognito ? (
@@ -507,7 +509,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               <button
                 type="button"
                 onClick={onResetZoom}
-                className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-colors hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-cyan-400' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-cyan-400'}`}
+                className={`px-1.5 py-0.5 me-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-colors hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-cyan-400' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-cyan-400'}`}
                 title={l({ en: 'Zoom Level (Click to reset 100%)', ar: 'مستوى التكبير (انقر للعودة إلى 100%)', de: 'Zoomstufe (klicken für 100 %)' })}
               >
                 {Math.round(activeTab.zoomFactor * 100)}%
@@ -594,7 +596,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                     onNavigate(formatSearchUrl(searchValue, searchEngine, getLanguage()));
                     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-start transition-colors group ${
                     selectedIndex === -1
                       ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold'
                       : isIncognito
@@ -635,7 +637,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                           onNavigate(formatSearchUrl(suggestion, searchEngine, getLanguage()));
                           if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
+                        className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-start transition-colors ${
                           selectedIndex === idx
                             ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
                             : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'
@@ -668,7 +670,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                             onNavigate(bookmark.url);
                             if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                           }}
-                          className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
+                          className={`w-full flex items-center justify-between px-4 py-2 text-sm text-start transition-colors ${
                             selectedIndex === bookmarkIdx
                               ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
                               : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'

@@ -678,7 +678,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
           <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full relative group">
             <form onSubmit={handleSearch} className="w-full">
-              <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 start-0 pl-5 flex items-center pointer-events-none">
                 <Search className="h-5 w-5 text-slate-500" />
               </div>
               <input
@@ -691,7 +691,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               <button
                 type="submit"
                 aria-label={t('newtab.search')}
-                className="absolute inset-y-0 right-2 flex items-center justify-center w-10 my-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer"
+                className="absolute inset-y-0 end-2 flex items-center justify-center w-10 my-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer"
               >
                 <ArrowRight className="h-5 w-5" />
               </button>
@@ -866,7 +866,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               x: ['0%', '-33.33%', '0%'],
             } : false}
             transition={{ duration: 24, repeat: Infinity, ease: 'linear' }}
-            className={`absolute top-[-30%] bottom-[-30%] left-0 w-[300%] blur-[48px] ${isDarkTheme ? 'opacity-60' : 'opacity-30'}`}
+            className={`absolute top-[-30%] bottom-[-30%] start-0 w-[300%] blur-[48px] ${isDarkTheme ? 'opacity-60' : 'opacity-30'}`}
             style={{
               background: isDarkTheme
                 ? 'linear-gradient(-45deg, #4338ca, #ec4899, #7c3aed, #06b6d4, #4338ca)'
@@ -1174,7 +1174,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     buttons were focusable but stayed at opacity 0, so the controls
                     existed and could not be seen. group-focus-within reveals the
                     group as soon as focus lands inside it. */}
-                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 z-10">
+                <div className="absolute top-1 end-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 z-10">
                   <button
                     type="button"
                     aria-label={t('newtab.editSpeedDial', { name: dial.name })}
@@ -1246,7 +1246,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             {todos.some(t => t.completed) && (
               <button
                 onClick={clearCompletedTodos}
-                className="text-xs font-semibold text-red-500 hover:text-red-400 transition-colors opacity-80 hover:opacity-100 ml-1 cursor-pointer"
+                className="text-xs font-semibold text-red-500 hover:text-red-400 transition-colors opacity-80 hover:opacity-100 ms-1 cursor-pointer"
                 title={t('newtab.clearTasksTitle')}
               >
                 {t('newtab.clearCompletedTasks')}

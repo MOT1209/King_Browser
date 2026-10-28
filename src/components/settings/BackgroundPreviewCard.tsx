@@ -28,7 +28,7 @@ export const renderBackgroundAnimation = (id: string, isHovered: boolean, isSele
           <motion.div
             animate={active ? { x: ['0%', '-50%', '0%'] } : { x: '0%' }}
             transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
-            className="absolute top-[-50%] bottom-[-50%] left-0 w-[300%] blur-xl opacity-85"
+            className="absolute top-[-50%] bottom-[-50%] start-0 w-[300%] blur-xl opacity-85"
             style={{
               background: 'linear-gradient(-45deg, #4338ca, #ec4899, #7c3aed, #06b6d4, #4338ca)',
               willChange: 'transform'
@@ -210,8 +210,8 @@ export const renderBackgroundAnimation = (id: string, isHovered: boolean, isSele
     case 'glass':
       return (
         <div className="absolute inset-0 bg-[#0a0d16] overflow-hidden">
-          <div className="absolute -top-10 left-4 w-28 h-28 rounded-full bg-blue-600/25 blur-2xl" />
-          <div className="absolute -bottom-10 right-4 w-28 h-28 rounded-full bg-violet-600/25 blur-2xl" />
+          <div className="absolute -top-10 start-4 w-28 h-28 rounded-full bg-blue-600/25 blur-2xl" />
+          <div className="absolute -bottom-10 end-4 w-28 h-28 rounded-full bg-violet-600/25 blur-2xl" />
           <div className="absolute inset-0 bg-[radial-gradient(#ffffff0f_1px,transparent_1px)] [background-size:12px_12px]" />
           <motion.div
             animate={active ? { x: ['-100%', '250%'] } : { x: '-100%' }}
@@ -243,7 +243,7 @@ export const renderBackgroundAnimation = (id: string, isHovered: boolean, isSele
             transition={{ duration: 1.5, repeat: Infinity }}
             className="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-lg shadow-cyan-500/20"
           >
-            <Play size={18} className="ml-0.5" />
+            <Play size={18} className="ms-0.5" />
           </motion.div>
         </div>
       );
@@ -272,7 +272,7 @@ export const BackgroundPreviewCard: React.FC<{
       onClick={onSelect}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`group relative h-36 rounded-2xl overflow-hidden border-2 text-left transition-all duration-300 cursor-pointer ${
+      className={`group relative h-36 rounded-2xl overflow-hidden border-2 text-start transition-all duration-300 cursor-pointer ${
         isSelected
           ? 'border-cyan-500 ring-2 ring-cyan-500/30 shadow-xl shadow-cyan-500/15 scale-[1.02] z-10'
           : 'border-slate-200 dark:border-slate-800 hover:border-cyan-400/60 dark:hover:border-cyan-500/40 hover:shadow-lg'

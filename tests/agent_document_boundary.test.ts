@@ -51,6 +51,7 @@ async function run() {
   const imports: Record<string, any> = {
     react: { useEffect: (fn: Function) => fn(), useRef: (current: any) => { const ref = { current }; refs.push(ref); return ref; } },
     '../services/aiActionContext': { publishActionContext: (value: any) => { context = value; } },
+    '../services/agentTabStore': { markAgentTab: () => {} },
     '../services/agentOrchestrator': { orchestrator: { enqueueAction: () => ({ id: 'approval', done: new Promise<boolean>(resolve => { approve = resolve; }) }), updateActionState: () => {}, denyAction: () => approve(false) } },
     '../utils/safeNavigation': { isSafeAgentNavigationUrl },
     '../utils/mcpActionTiming': mcpActionTiming,

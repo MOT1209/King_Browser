@@ -176,7 +176,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
               <button
                 key={engine.id}
                 onClick={() => onUpdateSettings({ searchEngine: engine.id as any })}
-                className={`p-4 rounded-xl text-left transition-all ${
+                className={`p-4 rounded-xl text-start transition-all ${
                   settings.searchEngine === engine.id
                     ? 'bg-blue-50 dark:bg-blue-500/10 ring-1 ring-blue-500 text-blue-900 dark:text-blue-100'
                     : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'

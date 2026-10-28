@@ -23,6 +23,9 @@ import { createSiteRuleStore, matchSiteRule, type SiteRule, type SiteRuleStore }
 import { createActivityStore, type ActivityStore } from './main/activityStore.js';
 import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from './main/executionEngine.js';
 import { classifyAction, buildApprovalSummary, redactArgs } from './main/policyEngine.js';
+import { describeApprovalArgs, previewSelectorFor } from './main/approvalDetails.js';
+import { formatHandoffMessage } from './main/handoffNote.js';
+import { approvalDialogStrings, buildApprovalDialogDetail, type UiLanguage } from './main/uiStrings.js';
 
 // Security: Screen-lock tracking prevents MCP execution while user is away
 let isScreenLocked = false;
@@ -948,6 +951,9 @@ export class BrowserMCPServer {
   // §10: engine events are pushed to the renderer so the control panel can show
   // a live status line without polling.
   private forwardEngineEvent(event: EngineEvent): void {
+    try {
+      this.engineEventObserver?.(event);
+    } catch (_) {}
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
     try {
       this.mainWindow.webContents.send('mcp-engine-event', event);
@@ -979,19 +985,15 @@ export class BrowserMCPServer {
     const authorizationGeneration = this.authorizationGeneration;
     const lockGeneration = screenLockGeneration;
     try {
-      const detailLines = [
-        approval.domain ? `Site: ${approval.domain}` : null,
-        approval.summary ? `Action: ${approval.summary}` : null,
-        `Tool: ${approval.toolName}`
-      ].filter(Boolean).join('\n');
+      const strings = approvalDialogStrings(this.uiLanguageProvider?.() ?? 'en');
       const dialogPromise = dialog.showMessageBox(this.mainWindow, {
         type: 'warning',
-        buttons: ['Approve', 'Reject'],
+        buttons: [strings.approve, strings.reject],
         defaultId: 1,
         cancelId: 1,
-        title: 'King Browser - Action Approval',
-        message: 'The agent is requesting approval for a sensitive action.',
-        detail: detailLines,
+        title: strings.title,
+        message: strings.message,
+        detail: buildApprovalDialogDetail(approval, strings),
         noLink: true
       });
 
@@ -1010,6 +1012,20 @@ export class BrowserMCPServer {
       console.warn('[MCP Server] Error prompting for action approval:', err);
       return false;
     }
+  }
+
+  private uiLanguageProvider: (() => UiLanguage) | null = null;
+
+  /** The interface language, so native dialogs match the rest of the UI. */
+  public setUiLanguageProvider(provider: () => UiLanguage): void {
+    this.uiLanguageProvider = provider;
+  }
+
+  private engineEventObserver: ((event: EngineEvent) => void) | null = null;
+
+  /** Main-process listener for engine events (for example the approval notification). */
+  public setEngineEventObserver(observer: ((event: EngineEvent) => void) | null): void {
+    this.engineEventObserver = observer;
   }
 
   public setMainWindow(window: BrowserWindow | null) {
@@ -1119,6 +1135,22 @@ export class BrowserMCPServer {
    * Runs one tool call, then lets the recorder note it. Recording happens after
    * the call succeeded, so refused or failed actions never enter a recording.
    */
+  /**
+   * Entry point for MCP clients. After the human hands the browser back, the
+   * first successful tool result carries one note naming the page they left
+   * (see handoffNote.ts), so the agent re-checks before acting. Internal calls
+   * such as recording replay use executeTool directly and never consume it.
+   */
+  private async executeToolForClient(toolName: string, args: Record<string, any>): Promise<string> {
+    const note = this.engineInstance?.peekHandoffNote() ?? null;
+    const result = await this.executeTool(toolName, args);
+    if (note && this.engineInstance?.peekHandoffNote() === note) {
+      this.engineInstance.consumeHandoffNote();
+      return formatHandoffMessage(note) + result;
+    }
+    return result;
+  }
+
   private async executeTool(toolName: string, args: Record<string, any>): Promise<string> {
     const result = await this.executeToolCore(toolName, args);
     try {
@@ -1271,10 +1303,16 @@ export class BrowserMCPServer {
       return `Pause requested. State: ${this.engine().getState()}`;
     }
     if (toolName === 'browser_resume') {
+      if (this.engine().isTakenOver()) {
+        return 'The human has taken over the browser, so you cannot resume. Wait until they hand control back; do not retry in a loop.';
+      }
       this.engine().resume();
       return `Resume requested. State: ${this.engine().getState()}`;
     }
     if (toolName === 'browser_next_step') {
+      if (this.engine().isTakenOver()) {
+        return 'The human has taken over the browser, so you cannot continue. Wait until they hand control back; do not retry in a loop.';
+      }
       this.engine().nextStep();
       return 'Step mode enabled: exactly one action will run, then execution pauses again.';
     }
@@ -1441,7 +1479,10 @@ export class BrowserMCPServer {
           ]
             .filter((part): part is string => Boolean(part))
             .join(' — ')
-        : undefined
+        : undefined,
+      // Built from the policy engine's redacted args, never the raw request.
+      details: approvalSummary ? describeApprovalArgs(canonicalTool, approvalSummary.details) : undefined,
+      previewSelector: approvalSummary ? previewSelectorFor(args) : undefined
     };
 
     const record: ActionRecord = await this.engine().submit(actionRequest);
@@ -1465,7 +1506,7 @@ export class BrowserMCPServer {
     return {
       get serverVersion() { return electronApp?.getVersion?.() || '1.5.0'; },
       listTools: () => TOOLS.filter((tool) => this.isToolAllowed(tool.name)),
-      callTool: (name, args) => this.executeTool(name, args as Record<string, any>)
+      callTool: (name, args) => this.executeToolForClient(name, args as Record<string, any>)
     };
   }
 
@@ -1688,7 +1729,7 @@ export class BrowserMCPServer {
       if (!tool) return res.status(400).json({ error: 'Missing tool name' });
 
       try {
-        const result = await this.executeTool(tool, args);
+        const result = await this.executeToolForClient(tool, args);
         res.json({ success: true, result });
       } catch (err: any) {
         const homeDir = process.env.HOME || process.env.USERPROFILE || '';

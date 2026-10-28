@@ -181,7 +181,7 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
                 </button>
                 <button
                   onClick={onClose}
-                  className="p-1 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-1"
+                  className="p-1 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ms-1"
                   title={l({ en: 'Close', ar: 'إغلاق', de: 'Schließen' })}
                 >
                   <X className="w-4 h-4" />

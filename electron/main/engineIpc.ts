@@ -10,6 +10,7 @@
 
 import type { ExecutionEngine } from './executionEngine.js';
 import { exportActivityLog } from './activityLog.js';
+import { sanitizeHandoffUrl } from './handoffNote.js';
 import { mergeHistory } from './activityStore.js';
 import type { ActionRecord } from './executionEngine.js';
 
@@ -39,6 +40,8 @@ export type EngineCommand =
   | 'next_step'
   | 'pause'
   | 'resume'
+  | 'take_over'
+  | 'hand_back'
   | 'stop'
   | 'emergency_close'
   | 'cancel_phase';
@@ -48,6 +51,8 @@ const ENGINE_COMMANDS: readonly EngineCommand[] = [
   'next_step',
   'pause',
   'resume',
+  'take_over',
+  'hand_back',
   'stop',
   'emergency_close',
   'cancel_phase'
@@ -117,6 +122,16 @@ export function registerEngineIpc(host: EngineIpcHost): void {
       case 'resume':
         engine.resume();
         break;
+      case 'take_over':
+        detail = { takenOver: engine.takeOver() };
+        break;
+      case 'hand_back': {
+        // The payload is the active page's address; only scheme, host and path
+        // survive, and an unusable value just means the agent gets no page name.
+        const url = payload && typeof payload === 'object' ? (payload as { url?: unknown }).url : undefined;
+        detail = { handedBack: engine.handBack(sanitizeHandoffUrl(url)) };
+        break;
+      }
       case 'stop':
         detail = { ...engine.stop(reason) };
         break;

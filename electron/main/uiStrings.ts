@@ -4,6 +4,8 @@
  * language through the `set-app-language` IPC.
  */
 
+import type { ApprovalNotificationStrings } from './approvalAttention.js';
+
 export type UiLanguage = 'en' | 'ar' | 'de';
 
 export function normalizeUiLanguage(lang: unknown): UiLanguage {
@@ -224,4 +226,103 @@ const GOOGLE_SIGNIN_DIALOG: Record<UiLanguage, GoogleSigninDialogStrings> = {
 
 export function googleSigninDialogStrings(lang: UiLanguage): GoogleSigninDialogStrings {
   return GOOGLE_SIGNIN_DIALOG[lang] ?? GOOGLE_SIGNIN_DIALOG.en;
+}
+
+const APPROVAL_NOTIFICATION: Record<UiLanguage, ApprovalNotificationStrings> = {
+  en: {
+    title: 'King Browser: approval needed',
+    body: (tool, domain) => domain
+      ? `The agent is waiting for your decision: ${tool} on ${domain}.`
+      : `The agent is waiting for your decision: ${tool}.`,
+  },
+  ar: {
+    title: 'King Browser: مطلوب موافقتك',
+    body: (tool, domain) => domain
+      ? `الوكيل ينتظر قرارك: ${tool} على ${domain}.`
+      : `الوكيل ينتظر قرارك: ${tool}.`,
+  },
+  de: {
+    title: 'King Browser: Freigabe erforderlich',
+    body: (tool, domain) => domain
+      ? `Der Agent wartet auf Ihre Entscheidung: ${tool} auf ${domain}.`
+      : `Der Agent wartet auf Ihre Entscheidung: ${tool}.`,
+  },
+};
+
+export function approvalNotificationStrings(lang: UiLanguage): ApprovalNotificationStrings {
+  return APPROVAL_NOTIFICATION[lang] ?? APPROVAL_NOTIFICATION.en;
+}
+
+export interface ApprovalDialogStrings {
+  title: string;
+  message: string;
+  site: string;
+  action: string;
+  tool: string;
+  approve: string;
+  reject: string;
+  details: string;
+  kinds: { type: string; value: string; url: string; key: string; option: string };
+}
+
+const APPROVAL_DIALOG: Record<UiLanguage, ApprovalDialogStrings> = {
+  en: {
+    title: 'King Browser - Action Approval',
+    message: 'The agent is requesting approval for a sensitive action.',
+    site: 'Site',
+    action: 'Action',
+    tool: 'Tool',
+    approve: 'Approve',
+    reject: 'Reject',
+    details: 'Details',
+    kinds: { type: 'Will type', value: 'Value', url: 'Will open', key: 'Will press', option: 'Will choose' },
+  },
+  ar: {
+    title: 'King Browser - الموافقة على إجراء',
+    message: 'الوكيل يطلب موافقتك على إجراء حساس.',
+    site: 'الموقع',
+    action: 'الإجراء',
+    tool: 'الأداة',
+    approve: 'موافقة',
+    reject: 'رفض',
+    details: 'التفاصيل',
+    kinds: { type: 'سيكتب', value: 'القيمة', url: 'سيفتح', key: 'سيضغط', option: 'سيختار' },
+  },
+  de: {
+    title: 'King Browser - Aktion freigeben',
+    message: 'Der Agent bittet um Freigabe für eine sensible Aktion.',
+    site: 'Website',
+    action: 'Aktion',
+    tool: 'Werkzeug',
+    approve: 'Freigeben',
+    reject: 'Ablehnen',
+    details: 'Details',
+    kinds: { type: 'Wird eingeben', value: 'Wert', url: 'Wird öffnen', key: 'Wird drücken', option: 'Wird wählen' },
+  },
+};
+
+export function approvalDialogStrings(lang: UiLanguage): ApprovalDialogStrings {
+  return APPROVAL_DIALOG[lang] ?? APPROVAL_DIALOG.en;
+}
+
+export interface ApprovalDialogInput {
+  domain?: string;
+  summary?: string;
+  toolName: string;
+  details?: Array<{ kind: 'type' | 'value' | 'url' | 'key' | 'option' | 'other'; text: string }>;
+}
+
+/** The multi-line body of the native approval dialog, in the interface language. */
+export function buildApprovalDialogDetail(input: ApprovalDialogInput, strings: ApprovalDialogStrings): string {
+  const lines: string[] = [];
+  if (input.domain) lines.push(`${strings.site}: ${input.domain}`);
+  if (input.summary) lines.push(`${strings.action}: ${input.summary}`);
+  lines.push(`${strings.tool}: ${input.toolName}`);
+  if (input.details && input.details.length > 0) {
+    lines.push('', `${strings.details}:`);
+    for (const line of input.details) {
+      lines.push(line.kind === 'other' ? `- ${line.text}` : `- ${strings.kinds[line.kind]}: ${line.text}`);
+    }
+  }
+  return lines.join('\n');
 }

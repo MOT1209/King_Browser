@@ -185,7 +185,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
             {l({ en: 'Email', ar: 'البريد الإلكتروني', de: 'E-Mail' })}
           </label>
           <div className="relative">
-            <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Mail className="w-3.5 h-3.5 text-slate-400 absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               id="king-cloud-email"
               type="email"
@@ -205,7 +205,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
               {l({ en: 'Display name', ar: 'الاسم الظاهر', de: 'Anzeigename' })}
             </label>
             <div className="relative">
-              <User className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <User className="w-3.5 h-3.5 text-slate-400 absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 id="king-cloud-name"
                 type="text"
@@ -225,7 +225,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
             {l({ en: 'Password', ar: 'كلمة المرور', de: 'Passwort' })}
           </label>
           <div className="relative">
-            <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Lock className="w-3.5 h-3.5 text-slate-400 absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               id="king-cloud-password"
               type="password"
@@ -241,7 +241,7 @@ export const KingCloudAuthForm: React.FC<KingCloudAuthFormProps> = ({
           {mode === 'signup' && (
             <p
               id="king-cloud-password-hint"
-              className={`mt-1.5 pl-1 text-[11px] ${
+              className={`mt-1.5 ps-1 text-[11px] ${
                 passwordTooShort ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'
               }`}
             >

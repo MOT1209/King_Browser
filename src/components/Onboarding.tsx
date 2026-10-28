@@ -294,7 +294,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <button
             key={engine.id}
             onClick={() => setSearchEngine(engine.id)}
-            className={`flex items-center gap-4 p-3.5 rounded-2xl border text-left transition-all backdrop-blur-xl no-drag cursor-pointer ${
+            className={`flex items-center gap-4 p-3.5 rounded-2xl border text-start transition-all backdrop-blur-xl no-drag cursor-pointer ${
               searchEngine === engine.id
                 ? 'border-cyan-500 bg-cyan-500/15  scale-[1.02]'
                 : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 hover:shadow-md'
@@ -304,7 +304,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             <div className="w-9 h-9 flex items-center justify-center shrink-0">
               {engine.icon}
             </div>
-            <div className="flex-1 text-left">
+            <div className="flex-1 text-start">
               <div className="text-white font-semibold text-sm">{engine.name}</div>
               <div className="text-slate-400 text-xs">{l(engine.desc)}</div>
             </div>

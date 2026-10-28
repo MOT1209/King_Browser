@@ -1,4 +1,5 @@
 import { normalizeLanguage } from '../services/language';
+import { buildDefaultShortcuts } from '../utils/shortcutCatalog';
 
 export interface Tab {
   id: string;
@@ -46,6 +47,8 @@ export interface Folder extends Tombstoneable {
   name: string;
   isExpanded: boolean;
   workspaceId: string;
+  /** A palette key from utils/folderColors.ts; absent on folders saved before colors existed. */
+  color?: string;
 }
 
 export interface Workspace extends Tombstoneable {
@@ -98,6 +101,7 @@ export interface ShortcutConfig {
   key: string;
   shift?: boolean;
   meta?: boolean;
+  alt?: boolean;
 }
 
 export interface UserSettings {
@@ -131,6 +135,10 @@ export interface UserSettings {
   tabHibernationEnabled?: boolean;
   hibernationTimeoutMinutes?: number;
   shortcuts?: Record<string, ShortcutConfig>;
+  /** Hide the floating agent status pill while the agent is idle. */
+  agentPillHideWhenIdle?: boolean;
+  /** The user closed the agent status pill. A pending approval still shows it. */
+  agentPillHidden?: boolean;
   aiLinkPreviewEnabled?: boolean;
   energySaverMode?: boolean;
   preloadDnsEnabled?: boolean;
@@ -197,18 +205,11 @@ export const defaultSettings: UserSettings = {
   passwordManagerEnabled: false,
   defaultTranslationLanguage: 'en',
   language: detectSystemLanguage(),
+  agentPillHideWhenIdle: true,
+  agentPillHidden: false,
   shortcuts: {
-    newTab: { key: 't', shift: false, meta: true },
-    reopenTab: { key: 't', shift: true, meta: true },
-    closeTab: { key: 'w', shift: false, meta: true },
-    newIncognito: { key: 'n', shift: true, meta: true },
-    reload: { key: 'r', shift: false, meta: true },
-    omnibox: { key: 'k', shift: false, meta: true },
-    bookmark: { key: 'd', shift: false, meta: true },
-    history: { key: (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' && navigator.userAgent.includes('Mac')) ? 'y' : 'h', shift: false, meta: true },
+    ...buildDefaultShortcuts(typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' && navigator.userAgent.includes('Mac')),
     settings: { key: ',', shift: false, meta: true },
-    toggleSidebar: { key: 's', shift: false, meta: true },
-    downloads: { key: 'j', shift: (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' && navigator.userAgent.includes('Mac')), meta: true },
   }
 };
 

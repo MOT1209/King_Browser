@@ -345,7 +345,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                             aria-checked={isEnabled}
                             aria-label={item.label}
                             onClick={() => handleTogglePreference(item.key as keyof SyncPreferences)}
-                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50/60 dark:bg-white/[0.02] hover:bg-slate-100/80 dark:hover:bg-white/[0.05] border border-slate-200/60 dark:border-white/5 transition-colors cursor-pointer text-left"
+                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50/60 dark:bg-white/[0.02] hover:bg-slate-100/80 dark:hover:bg-white/[0.05] border border-slate-200/60 dark:border-white/5 transition-colors cursor-pointer text-start"
                           >
                             <div className="flex items-center gap-3">
                               <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">

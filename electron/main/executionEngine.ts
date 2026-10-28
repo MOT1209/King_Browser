@@ -23,6 +23,8 @@
  * Side effects are injected: executor, abortInFlight, askApproval, persist.
  */
 
+import type { ApprovalDetailLine } from './approvalDetails.js';
+
 export type EngineState =
   | 'idle'
   | 'running'
@@ -48,6 +50,10 @@ export interface ActionRequest {
   risk: ActionRisk;
   summary?: string;
   domain?: string;
+  /** Redacted lines for the approval screen (what will be typed, opened, pressed). Not persisted. */
+  details?: ApprovalDetailLine[];
+  /** Selector of the element to highlight while the approval is pending. Not persisted. */
+  previewSelector?: string;
 }
 
 export interface ActionRecord {
@@ -71,6 +77,8 @@ export interface PendingApproval {
   args: Record<string, unknown>;
   summary?: string;
   domain?: string;
+  details?: ApprovalDetailLine[];
+  previewSelector?: string;
 }
 
 export type PhaseCondition =
@@ -93,6 +101,7 @@ export type EngineEvent =
   | { type: 'action_updated'; record: ActionRecord }
   | { type: 'approval_needed'; approval: PendingApproval }
   | { type: 'approval_resolved'; actionId: string; approved: boolean }
+  | { type: 'takeover_changed'; takenOver: boolean }
   | { type: 'phase_updated'; phase: PhaseDefinition | null; actionsUsed: number; status: 'running' | 'completed' | 'boundary' | 'failed' };
 
 export interface EngineRunContext {
@@ -137,6 +146,8 @@ export class ExecutionEngine {
   private mode: 'auto' | 'step' = 'auto';
   private pauseOnBoundary = false;
   private pendingApproval: PendingApproval | null = null;
+  private takenOver = false;
+  private handoffNote: string | null = null;
   private phase: PhaseDefinition | null = null;
   private phaseActionsUsed = 0;
   private stopReason: string | null = null;
@@ -169,6 +180,7 @@ export class ExecutionEngine {
     return this.phase ? { phase: { ...this.phase }, actionsUsed: this.phaseActionsUsed } : null;
   }
   getStopReason(): string | null { return this.stopReason; }
+  isTakenOver(): boolean { return this.takenOver; }
   getLastFinalState(): typeof this.lastFinalState { return this.lastFinalState ? { ...this.lastFinalState } : null; }
 
   getStatusSnapshot() {
@@ -178,6 +190,7 @@ export class ExecutionEngine {
       queueLength: this.queue.length,
       inFlight: this.getInFlight(),
       pendingApproval: this.getPendingApproval(),
+      takenOver: this.takenOver,
       phase: this.getPhase(),
       actionsUsedThisRun: this.runActionsUsed,
       maxActionsPerRun: this.maxActionsPerRun,
@@ -237,6 +250,12 @@ export class ExecutionEngine {
     }
     if (this.state === 'error') {
       return Promise.reject(new Error('Execution engine is in error state: explicit reset or resume is required.'));
+    }
+    if (this.takenOver) {
+      return Promise.reject(new Error(
+        `The human has taken over the browser: "${request.toolName}" was not queued. ` +
+        'Wait until they hand control back. Do not retry in a loop; browser_resume cannot end a take-over.'
+      ));
     }
     if (this.queue.length >= this.maxQueueSize) {
       return Promise.reject(new Error(`Execution queue is full (${this.maxQueueSize} pending actions).`));
@@ -438,7 +457,9 @@ export class ExecutionEngine {
       toolName: record.toolName,
       args: record.args,
       summary: record.summary,
-      domain: record.domain
+      domain: record.domain,
+      details: entry.request.details,
+      previewSelector: entry.request.previewSelector
     };
     this.transition('awaiting_approval', `approval required for ${record.toolName}`);
     this.emit({ type: 'approval_needed', approval: { ...this.pendingApproval } });
@@ -490,6 +511,7 @@ export class ExecutionEngine {
   /** §10 Next Step — execute exactly one action, then pause. */
   nextStep(): void {
     this.assertNotStopped('next step');
+    if (this.takenOver) return;
     this.mode = 'step';
     if (this.state === 'idle') this.transition('running', 'next-step requested');
     if (this.state === 'paused') this.transition('running', 'next-step resume');
@@ -499,6 +521,7 @@ export class ExecutionEngine {
   /** §10 Full Control / Auto-run — allowed actions run automatically. */
   setAutoRun(): void {
     this.assertNotStopped('auto-run');
+    if (this.takenOver) return;
     this.mode = 'auto';
     if (this.state === 'paused') this.transition('running', 'auto-run selected');
     this.pump();
@@ -513,6 +536,8 @@ export class ExecutionEngine {
 
   /** §10 Resume — continue from the saved execution state. */
   resume(): void {
+    // Only handBack() ends a take-over, and only the trusted window can call it.
+    if (this.takenOver) return;
     if (this.state !== 'paused' && this.state !== 'stopped') return;
     if (this.state === 'stopped') {
       this.generation++;
@@ -524,6 +549,53 @@ export class ExecutionEngine {
     this.pump();
   }
 
+  /**
+   * The human takes the browser. The agent is paused, queued actions are
+   * cancelled and a pending approval is rejected, so nothing stale runs on a
+   * page the human is about to change. An action already in flight finishes.
+   * Only handBack() ends it; the agent cannot resume.
+   */
+  takeOver(): boolean {
+    if (this.takenOver) return true;
+    if (this.state === 'stopping' || this.state === 'stopped' || this.state === 'error') return false;
+
+    // Queue first: rejecting the approval below must not pump the next action.
+    const queued = this.queue;
+    this.queue = [];
+    for (const entry of queued) {
+      const record = this.buildRecord(entry, 'cancelled');
+      this.finalize(record, 'cancelled', { error: 'Cancelled: the human took over the browser.' });
+      entry.resolve(record);
+    }
+    this.takenOver = true;
+    this.handoffNote = null;
+    if (this.pendingApproval) this.respondToApproval(this.pendingApproval.actionId, false);
+
+    this.pause();
+    this.emit({ type: 'takeover_changed', takenOver: true });
+    return true;
+  }
+
+  /** The human gives the browser back. `note` (already sanitized) is shown to the agent once. */
+  handBack(note: string | null): boolean {
+    if (!this.takenOver) return false;
+    this.takenOver = false;
+    this.handoffNote = typeof note === 'string' && note ? note : null;
+    this.emit({ type: 'takeover_changed', takenOver: false });
+    if (this.state === 'paused') this.resume();
+    return true;
+  }
+
+  /** The hand-back note without delivering it (the caller consumes it after a successful result). */
+  peekHandoffNote(): string | null { return this.handoffNote; }
+
+  /** The hand-back note, once; null when there is none. */
+  consumeHandoffNote(): string | null {
+    const note = this.handoffNote;
+    this.handoffNote = null;
+    return note;
+  }
+
   /** §10 STOP NOW — emergency stop. Synchronous acknowledgement. */
   stop(reason: string): { accepted: true; inFlightAborted: boolean; cancelled: number; finalStateNote: string } {
     if (this.state === 'stopping' || this.state === 'stopped') {
@@ -532,6 +604,11 @@ export class ExecutionEngine {
 
     this.stopReason = reason;
     this.generation++;
+    if (this.takenOver) {
+      this.takenOver = false;
+      this.emit({ type: 'takeover_changed', takenOver: false });
+    }
+    this.handoffNote = null;
 
     const hadInFlight = this.inFlightEntry !== null;
     let cancelled = 0;

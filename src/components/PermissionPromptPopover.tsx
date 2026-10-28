@@ -173,7 +173,7 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -8, scale: 0.95 }}
         transition={{ duration: 0.18, ease: 'easeOut' }}
-        className="absolute top-11 left-2 z-[999999] w-88 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl shadow-2xl p-4 text-slate-800 dark:text-slate-100 select-none cursor-default"
+        className="absolute top-11 start-2 z-[999999] w-88 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl shadow-2xl p-4 text-slate-800 dark:text-slate-100 select-none cursor-default"
         style={{
           boxShadow: '0 20px 45px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
         }}
@@ -231,7 +231,7 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
             <span>{l({ en: 'Remember this choice for this site', ar: 'تذكّر هذا الاختيار لهذا الموقع', de: 'Diese Entscheidung für diese Website merken' })}</span>
           </label>
           {requests.length > 1 && (
-            <span className="ml-auto text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full font-medium">
+            <span className="ms-auto text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full font-medium">
               +{requests.length - 1} {l({ en: 'more', ar: 'أخرى', de: 'weitere' })}
             </span>
           )}

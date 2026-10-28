@@ -919,13 +919,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
             <div className="relative flex items-center gap-1.5 no-drag" ref={controlsRef}>
               {/* Audio Read Aloud Quick Button */}
-              <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 mr-1 no-drag shadow-xs ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
+              <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 me-1 no-drag shadow-xs ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
                 <button
                   onClick={toggleSpeech}
                   className={`p-1.5 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                   title={isPlaying ? l({ en: 'Pause', ar: 'إيقاف مؤقت', de: 'Pause' }) : l({ en: 'Read Aloud with Natural Voice', ar: 'القراءة بصوت طبيعي', de: 'Mit natürlicher Stimme vorlesen' })}
                 >
-                  {isPlaying ? <Pause className="w-4 h-4 text-cyan-400" /> : <Play className="w-4 h-4 ml-0.5 text-cyan-400" />}
+                  {isPlaying ? <Pause className="w-4 h-4 text-cyan-400" /> : <Play className="w-4 h-4 ms-0.5 text-cyan-400" />}
                 </button>
                 {(isPlaying || isPaused) && (
                   <button
@@ -955,7 +955,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
               </button>
 
               {showControls && (
-                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[320px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-900 border-white/10 shadow-black/50 text-slate-100' : theme === 'sepia' ? 'bg-[#fdf8ee] border-amber-800/20 text-[#4a3928]' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className={`absolute top-full end-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[320px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-900 border-white/10 shadow-black/50 text-slate-100' : theme === 'sepia' ? 'bg-[#fdf8ee] border-amber-800/20 text-[#4a3928]' : 'bg-white border-slate-200 text-slate-800'}`}>
                   {/* Theme */}
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">{l({ en: 'Theme', ar: 'السمة', de: 'Design' })}</div>
@@ -1192,7 +1192,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                       className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all shadow-md active:scale-95 cursor-pointer"
                       title={isPlaying ? l({ en: 'Pause', ar: 'إيقاف مؤقت', de: 'Pause' }) : l({ en: 'Resume', ar: 'استئناف', de: 'Fortsetzen' })}
                     >
-                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ms-0.5" />}
                     </button>
                     <button
                       onClick={nextSentence}

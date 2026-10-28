@@ -44,7 +44,8 @@
     "wake": "Wake Tab",
     "sleeping": "Tab is Sleeping",
     "sleepingDesc": "This tab was hibernated to save memory and reduce CPU usage.",
-    "wakeUp": "Wake Up Tab"
+    "wakeUp": "Wake Up Tab",
+    "newTabWithShortcut": "New tab ({shortcut})"
   },
   "settings": {
     "title": "Settings",
@@ -292,7 +293,6 @@
   "agentPanel": {
     "title": "Agent Control",
     "expand": "Agent control",
-    "shortcutHint": "Ctrl+Shift+.",
     "states": {
       "idle": "Idle",
       "running": "Running",
@@ -341,7 +341,36 @@
     "statusCancelled": "cancelled",
     "statusRejected": "rejected",
     "statusRunning": "running",
-    "statusRequested": "queued"
+    "statusRequested": "queued",
+    "ageSeconds": "{count}s ago",
+    "ageMinutes": "{count}m ago",
+    "ageHours": "{count}h ago",
+    "moveHint": "Drag to move. Arrow keys move it, double-click resets.",
+    "hidePill": "Hide agent status",
+    "hidePillHint": "Hide agent status ({shortcut} shows it again)",
+    "pillHideWhenIdle": "Hide agent status when idle",
+    "pillHideWhenIdleHint": "The status button appears only while the agent works or needs your approval.",
+    "pillShow": "Show agent status button",
+    "pillShowHint": "Turn off to close the floating button. An approval request always brings it back.",
+    "pillSettingsTitle": "Agent status button",
+    "tabMarker": "The agent is working in this tab",
+    "pageMarker": "The agent is working on this page",
+    "approvalDetails": {
+      "type": "Will type",
+      "value": "Value",
+      "url": "Will open",
+      "key": "Will press",
+      "option": "Will choose"
+    },
+    "waitingForApproval": "Waiting for your approval",
+    "waitingForApprovalAt": "Waiting for your approval - {domain}",
+    "takeOver": "Take over",
+    "handBack": "Hand back to agent",
+    "takeOverHint": "Pauses the agent and cancels what it had queued. You drive the browser until you hand it back.",
+    "takenOverNotice": "You are driving the browser. The agent is waiting.",
+    "takenOverPill": "You are driving",
+    "tabMarkerTakenOver": "You are driving this tab",
+    "pageMarkerTakenOver": "You are driving this page"
   },
   "appearance": {
     "wallpaper": {
@@ -464,6 +493,84 @@
         "name": "Video / Image URL",
         "badge": "Custom"
       }
+    }
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "subtitle": "Click a shortcut, then press the new key combination. Esc cancels.",
+    "search": "Search shortcuts",
+    "resetAll": "Reset all",
+    "resetOne": "Reset to default",
+    "edit": "Change shortcut",
+    "pressKeys": "Press keys...",
+    "needsModifier": "Use Ctrl, Cmd or Alt with the key (or an F key).",
+    "conflict": "Already used by \"{action}\". Choose another combination.",
+    "customized": "Changed",
+    "fixedTitle": "Always available",
+    "noResults": "No shortcut matches this search.",
+    "groups": {
+      "tabs": "Tabs",
+      "navigation": "Navigation",
+      "page": "Page",
+      "panels": "Panels",
+      "agent": "Agent control"
+    },
+    "actions": {
+      "newTab": "New tab",
+      "closeTab": "Close tab",
+      "reopenTab": "Reopen closed tab",
+      "newIncognito": "New private window",
+      "nextTab": "Next tab",
+      "prevTab": "Previous tab",
+      "omnibox": "Quick search (Spotlight)",
+      "focusAddress": "Focus address bar",
+      "goBack": "Back",
+      "goForward": "Forward",
+      "reload": "Reload page",
+      "bookmark": "Bookmark page",
+      "history": "Open history",
+      "downloads": "Open downloads",
+      "findInPage": "Find in page",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "resetZoom": "Reset zoom",
+      "print": "Print page",
+      "screenshot": "Take screenshot",
+      "devtools": "Developer tools",
+      "toggleSidebar": "Show or hide sidebar",
+      "toggleAiPanel": "Show or hide King Assistant",
+      "toggleAgentPanel": "Open or close agent control",
+      "toggleAgentPill": "Show or hide agent status button",
+      "agentStopNow": "STOP the agent now",
+      "switchTab": "Go to tab 1-9",
+      "help": "Help center",
+      "shortcutsHelp": "Shortcuts guide",
+      "newWindow": "New window",
+      "forceReload": "Reload without cache",
+      "settings": "Open settings",
+      "copy": "Copy",
+      "paste": "Paste",
+      "cut": "Cut",
+      "selectAll": "Select all",
+      "undo": "Undo",
+      "redo": "Redo",
+      "quit": "Quit",
+      "agentTakeOver": "Take over from the agent / hand back"
+    },
+    "reserved": "Reserved for \"{action}\". Choose another combination."
+  },
+  "folders": {
+    "chooseColor": "Folder color",
+    "colorNone": "No color",
+    "colors": {
+      "red": "Red",
+      "orange": "Orange",
+      "amber": "Amber",
+      "green": "Green",
+      "teal": "Teal",
+      "blue": "Blue",
+      "violet": "Violet",
+      "pink": "Pink"
     }
   }
 }

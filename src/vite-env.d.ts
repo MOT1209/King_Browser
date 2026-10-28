@@ -87,12 +87,21 @@ export interface ElectronEngineActionRecord {
 }
 
 /** Action awaiting an explicit Approve/Reject decision. */
+export interface ElectronApprovalDetailLine {
+  kind: 'type' | 'value' | 'url' | 'key' | 'option' | 'other';
+  text: string;
+}
+
 export interface ElectronEnginePendingApproval {
   actionId: string;
   toolName: string;
   args: Record<string, unknown>;
   summary?: string;
   domain?: string;
+  /** Redacted, bounded lines describing what the action will do. */
+  details?: ElectronApprovalDetailLine[];
+  /** Selector of the element to highlight while waiting for the decision. */
+  previewSelector?: string;
 }
 
 /** Active phase progress shown by the control panel. */
@@ -113,6 +122,8 @@ export interface ElectronEngineStatus {
   queueLength: number;
   inFlight: ElectronEngineActionRecord | null;
   pendingApproval: ElectronEnginePendingApproval | null;
+  /** The human has taken the browser; the agent waits until they hand it back. */
+  takenOver?: boolean;
   phase: ElectronEnginePhaseInfo | null;
   actionsUsedThisRun: number;
   maxActionsPerRun: number;
@@ -130,6 +141,7 @@ export type ElectronEngineEvent =
   | { type: 'action_updated'; record: ElectronEngineActionRecord }
   | { type: 'approval_needed'; approval: ElectronEnginePendingApproval }
   | { type: 'approval_resolved'; actionId: string; approved: boolean }
+  | { type: 'takeover_changed'; takenOver: boolean }
   | {
       type: 'phase_updated';
       phase: ElectronEnginePhaseInfo['phase'] | null;
@@ -392,6 +404,7 @@ export interface ElectronAPI {
   ) => () => void;
   // App Locale / Language sync
   setAppLanguage: (lang: string) => Promise<{ success: boolean; acceptLanguages: string }>;
+  setShortcutBindings?: (bindings: Record<string, { key: string; shift?: boolean; meta?: boolean; alt?: boolean }>) => Promise<{ success: boolean; error?: string }>;
   // Microphone & Permissions
   checkMicrophonePermission: () => Promise<{ status: 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'; canAsk: boolean; platform?: string }>;
   requestMicrophonePermission: () => Promise<{ granted: boolean; status: string; platform?: string }>;

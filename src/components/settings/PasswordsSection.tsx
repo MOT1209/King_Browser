@@ -111,7 +111,7 @@ const PasswordList = () => {
                 </button>
               </div>
             </div>
-            <button onClick={() => handleDelete(i)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg ml-4">
+            <button onClick={() => handleDelete(i)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg ms-4">
               <Trash2 size={16} />
             </button>
           </div>

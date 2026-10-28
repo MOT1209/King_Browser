@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, type Dispatch, type SetStateA
 import { defaultSettings, type UserSettings } from '../types/browser';
 import { normalizeLanguage } from '../services/language';
 import { safeParseObjectWithBackup } from '../utils/safeStorage';
+import { buildDefaultShortcuts } from '../utils/shortcutCatalog';
 
 export interface UseSettingsOptions {
   isDemo?: boolean;
@@ -29,8 +30,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
       newTabBackground: (options.demoBg as any) || (options.demoFeature === 'vertical_tabs' ? 'cyber_grid' : options.demoFeature === 'ai' ? 'nebula' : defaultSettings.newTabBackground),
       shortcuts: {
         ...defaultSettings.shortcuts,
-        downloads: { key: 'j', shift: isMac, meta: true },
-        findInPage: { key: 'f', shift: false, meta: true },
+        ...buildDefaultShortcuts(isMac),
       }
     };
 

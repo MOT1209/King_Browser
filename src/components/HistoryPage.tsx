@@ -94,7 +94,7 @@ const HistoryRowItem: React.FC<HistoryRowItemProps> = React.memo(({
           <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5" title={item.url}>{item.url}</p>
         </div>
       </div>
-      <div className="flex items-center gap-3 shrink-0 pl-4">
+      <div className="flex items-center gap-3 shrink-0 ps-4">
         <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap font-mono">{formatTime(item.timestamp)}</span>
         <button
           onClick={() => onRemoveHistoryItem(item.id)}
@@ -252,7 +252,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
         )}
 
         <div className="relative mb-6">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Search className="absolute start-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
             type="text"
             value={searchTerm}

@@ -3,6 +3,7 @@ import { resolveLoginCredential, buildLoginFillScript, describeLoginResult, LOGI
 import { useEffect, useRef, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import type { Bookmark, HistoryItem, Tab, UserSettings } from '../types/browser';
 import { publishActionContext } from '../services/aiActionContext';
+import { markAgentTab } from '../services/agentTabStore';
 import { orchestrator } from '../services/agentOrchestrator';
 // The agent boundary uses the strict destination policy, not the general
 // navigation one: agent-supplied URLs are untrusted, and the general predicate
@@ -120,6 +121,14 @@ const AGENT_TAB_INDEPENDENT_TOOLS = new Set([
   'king_browser_info', 'browser_wait', 'browser_new_tab', 'browser_list_tabs',
   'browser_switch_tab', 'browser_close_tab', MCP_POLICY_CONTEXT_ACTION
 ]);
+
+type HighlightRect = { x: number; y: number; width: number; height: number };
+
+/** Tells the overlay which element to frame (or null to clear). No-op outside a browser page. */
+function dispatchHighlight(detail: HighlightRect | null): void {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof CustomEvent !== 'function') return;
+  window.dispatchEvent(new CustomEvent('ai-highlight', { detail }));
+}
 
 export function useBrowserAgentBridge({
   activeTabId,
@@ -252,6 +261,8 @@ export function useBrowserAgentBridge({
       if (isolated && !AGENT_TAB_INDEPENDENT_TOOLS.has(toolName) && activeTabId === null) {
         return "Error: Isolated agent profile is on and the active tab is not one the agent opened. Use browser_new_tab to open a tab for the agent.";
       }
+      // The tab strip and page frame mark the tab the agent works in.
+      markAgentTab(activeTabId);
       const activeWebview = guardedGuest(canExecute);
 
       // Show the human where the agent is about to act, then give them a beat to
@@ -1208,7 +1219,44 @@ export function useBrowserAgentBridge({
       });
       unsubscribeMcpCancel = electronAPI.onMcpActionCancel?.(cancelAction);
     }
+
+    // While the human decides on an approval, frame the element the agent wants
+    // to act on. Read-only: it measures the element (scrolling it into view only
+    // when it is off screen) and never clicks, types or changes anything.
+    const setHighlight = (detail: { x: number; y: number; width: number; height: number } | null) => {
+      dispatchHighlight(detail);
+    };
+    const unsubscribeEngineHighlight = electronAPI?.onEngineEvent?.(event => {
+      if (event.type === 'approval_resolved') { setHighlight(null); return; }
+      if (event.type !== 'approval_needed') return;
+      const selector = event.approval.previewSelector;
+      const guest = selector ? currentGuest() : null;
+      if (!selector || !guest?.executeJavaScript) { setHighlight(null); return; }
+      const tabId = browserDataRef.current.activeTabId;
+      Promise.resolve(guest.executeJavaScript(`
+        (() => {
+          try {
+            const el = document.querySelector(${JSON.stringify(selector)});
+            if (!el) return null;
+            let r = el.getBoundingClientRect();
+            if (r.bottom <= 0 || r.top >= window.innerHeight) {
+              el.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+              r = el.getBoundingClientRect();
+            }
+            return { x: r.left, y: r.top, width: r.width, height: r.height };
+          } catch (_) { return null; }
+        })()
+      `)).then((rect: any) => {
+        if (browserDataRef.current.activeTabId !== tabId) return;
+        if (!rect || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) { setHighlight(null); return; }
+        const bounds = guest.getBoundingClientRect();
+        setHighlight({ x: bounds.left + rect.x, y: bounds.top + rect.y, width: rect.width, height: rect.height });
+      }).catch(() => setHighlight(null));
+    });
+
     return () => {
+      unsubscribeEngineHighlight?.();
+      setHighlight(null);
       for (const guest of Array.from(document.querySelectorAll('webview'))) guestListeners.get(guest)?.();
       unsubscribeMcpBridge?.();
       unsubscribeMcpCancel?.();
@@ -1219,4 +1267,9 @@ export function useBrowserAgentBridge({
       activeWaitResolversRef.current.clear();
     };
   }, []);
+
+  // A highlight belongs to the tab it was measured in.
+  useEffect(() => {
+    dispatchHighlight(null);
+  }, [activeTabId]);
 }

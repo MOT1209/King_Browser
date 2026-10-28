@@ -63,7 +63,7 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = React.mem
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             transition={{ type: 'spring', damping: 26, stiffness: 420 }}
-            className="absolute top-14 right-4 w-88 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 z-[9999] overflow-hidden select-none"
+            className="absolute top-14 end-4 w-88 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 z-[9999] overflow-hidden select-none"
           >
             <div className="p-4 flex flex-col gap-3.5">
               {/* Header */}
@@ -95,7 +95,7 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = React.mem
               <div className="space-y-2">
                 {/* Username Input */}
                 <div className="bg-slate-50 dark:bg-slate-950/60 p-2 rounded-xl border border-slate-200/70 dark:border-white/5 flex items-center gap-2">
-                  <User size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-1" />
+                  <User size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ms-1" />
                   <div className="flex-1 min-w-0">
                     <label htmlFor="password-prompt-username" className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                       {l({ en: 'Username / Email', ar: 'اسم المستخدم / البريد', de: 'Benutzername / E-Mail' })}
@@ -114,7 +114,7 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = React.mem
                 {/* Password Input */}
                 {initialPassword && (
                   <div className="bg-slate-50 dark:bg-slate-950/60 p-2 rounded-xl border border-slate-200/70 dark:border-white/5 flex items-center gap-2">
-                    <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-1" />
+                    <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ms-1" />
                     <div className="flex-1 min-w-0">
                       <label htmlFor="password-prompt-password" className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         {l({ en: 'Password', ar: 'كلمة المرور', de: 'Passwort' })}

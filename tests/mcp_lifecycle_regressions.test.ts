@@ -58,6 +58,7 @@ async function run() {
   }, {
     react: { useEffect: (fn: Function) => fn(), useRef: (current: unknown) => ({ current }) },
     '../services/aiActionContext': { publishActionContext: () => {} },
+    '../services/agentTabStore': { markAgentTab: () => {} },
     '../services/agentOrchestrator': { orchestrator: {
       enqueueAction: () => ({ id: 'approval', done: new Promise<boolean>(resolve => { approve = resolve; }) }),
       denyAction: () => { denied++; approve(false); }, updateActionState: () => {}
@@ -110,6 +111,9 @@ async function run() {
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
+  const approvalDetailsModule = loadSource('electron/main/approvalDetails.ts', {}, {});
+  const handoffNoteModule = loadSource('electron/main/handoffNote.ts', { URL }, {});
+  const uiStringsModule = loadSource('electron/main/uiStrings.ts', {}, {});
   const serverModule = loadSource('electron/mcpServer.ts', { process, Buffer, setTimeout, clearTimeout }, {
     electron: { app: { isPackaged: false }, powerMonitor: { on: (name: string, fn: Function) => lockEvents.set(name, fn) },
       dialog: { showMessageBox: () => new Promise(resolve => { resolveDialog = resolve; }) } },
@@ -117,6 +121,9 @@ async function run() {
     './main/mcpBridge.js': { requestRendererMcpAction: async () => { forwarded++; return 'ok'; }, cancelPendingMcpActions: () => {} },
     './main/executionEngine.js': executionEngineModule,
     './main/policyEngine.js': policyEngineModule,
+    './main/approvalDetails.js': approvalDetailsModule,
+    './main/handoffNote.js': handoffNoteModule,
+    './main/uiStrings.js': uiStringsModule,
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
     './main/elementRefs.js': elementRefsModule,
