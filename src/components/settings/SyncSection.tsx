@@ -287,7 +287,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                           syncService.updatePreferences({ [item.key]: !isChecked });
                         }
                       }}
-                      className="w-full flex items-center justify-between py-3.5 first:pt-0 last:pb-0 cursor-pointer hover:opacity-80 transition-opacity text-left"
+                      className="w-full flex items-center justify-between py-3.5 first:pt-0 last:pb-0 cursor-pointer hover:opacity-80 transition-opacity text-start"
                     >
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">

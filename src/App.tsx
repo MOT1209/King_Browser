@@ -1495,7 +1495,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         <>
           {/* Left Edge Mouse Sensor for Instant Hover Reveal */}
           <div
-            className="fixed top-0 left-0 bottom-0 w-8 z-40 no-drag"
+            className="fixed top-0 start-0 bottom-0 w-8 z-40 no-drag"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             onMouseEnter={handleHoverSidebarOpen}
           />
@@ -1528,7 +1528,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 onMouseEnter={handleHoverSidebarOpen}
                 onMouseLeave={handleHoverSidebarClose}
                 style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-slate-900/98 border-r border-slate-200 dark:border-white/10"
+                className="fixed top-0 start-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-slate-900/98 border-e border-slate-200 dark:border-white/10"
               >
                 <SidebarTabs
                   tabs={workspaceTabs}
@@ -1599,7 +1599,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         useVerticalTabs
           ? isSidebarCollapsed
             ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
-            : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ml-1.5'
+            : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ms-1.5'
           : 'bg-white dark:bg-slate-900 rounded-none m-0 border-0'
       }`}>
         {/* TOP NAVIGATION BAR with fluid accordion fold transition */}
@@ -1746,7 +1746,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.15 }}
               className={`absolute inset-y-0 ${
-                splitDragSide === 'left' ? 'left-0 border-r-2' : 'right-0 border-l-2'
+                splitDragSide === 'left' ? 'left-0 border-e-2' : 'right-0 border-s-2'
               } w-[48%] bg-blue-500/15 border-blue-500/60 backdrop-blur-sm z-[999] flex items-center justify-center pointer-events-none`}
             >
               <div className="bg-blue-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex flex-col items-center gap-2.5 text-sm font-semibold">
@@ -1860,7 +1860,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     }`}
                   >
                     {/* Left side: Pane Indicator + Favicon + Page Title + Hostname */}
-                    <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 me-2">
                       <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded transition-colors shrink-0 ${
                         activeTabId === tab.id
                           ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25'

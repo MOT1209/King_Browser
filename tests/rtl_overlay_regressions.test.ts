@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-// index.css mirrors physical offset utilities under [dir="rtl"] (for example
+// index.css used to mirror physical offset utilities under [dir="rtl"] (for example
 // `.right-2 { right: auto; left: 0.5rem }`). Floating elements positioned with
 // those classes moved in Arabic onto other controls. These checks pin the fixes.
 const root = process.cwd();
@@ -16,11 +16,13 @@ assert.ok(!/className="fixed[^"]*"\s+dir="ltr"/.test(panel), 'agent panel must f
 assert.ok(panel.includes('style={{ left: placed.x, top: placed.y }}'), 'agent pill is placed with physical pixel offsets');
 
 // 2. The omnibox actions box had an inline `right` only; the mirror rule added
-// `left: 0.5rem`, so in Arabic the box spanned the whole address bar and
-// swallowed clicks meant for the input.
+// `left: 0.5rem`, so in Arabic the box spanned the whole address bar and swallowed
+// clicks meant for the input. The mirror rules are gone (see rtl_logical_classes);
+// the address bar is physical by design, so its badge and action box use literal
+// left/right classes together with its physical input padding.
 const omnibox = read('src/components/topbar/OmniboxBar.tsx');
-const actions = omnibox.slice(omnibox.indexOf('king-omnibox-actions'), omnibox.indexOf('king-omnibox-actions') + 600);
-assert.ok(/left: 'auto'/.test(actions), 'omnibox actions must pin left: auto against the RTL mirror rule');
-assert.ok(omnibox.includes("style={{ left: '0.5rem', right: 'auto' }}"), 'site-info badge stays on the unmirrored padding side');
+assert.ok(/className="absolute left-2 top-1\/2[^"]*"/.test(omnibox), 'site-info badge is placed on the physical left, next to the input padding');
+assert.ok(/king-omnibox-actions absolute inset-y-0 right-2/.test(omnibox), 'the action box is placed on the physical right');
+assert.ok(!omnibox.includes("left: 'auto'") && !omnibox.includes("style={{ left: '0.5rem'"), 'no inline pins are needed once nothing rewrites left/right');
 
 console.log('[PASS] [RTL-Overlay] agent pill and omnibox overlays are not moved by the RTL mirror rules.');

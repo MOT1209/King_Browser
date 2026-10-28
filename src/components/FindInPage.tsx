@@ -97,7 +97,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
           tabIndex={-1}
         >
           <div className="relative flex-1 flex items-center bg-slate-100/60 dark:bg-slate-800/60 rounded-xl px-3 py-1 border border-transparent focus-within:border-cyan-500/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-colors">
-            <Search className={`w-4 h-4 mr-2 ${noMatches ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`} />
+            <Search className={`w-4 h-4 me-2 ${noMatches ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`} />
             <input
               ref={inputRef}
               type="text"
@@ -111,7 +111,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
             
             <div className="flex items-center gap-1 shrink-0">
               {searchText && (
-                <span className={`text-xs font-medium mr-2 ${noMatches ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                <span className={`text-xs font-medium me-2 ${noMatches ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
                   {matchCount > 0 ? `${matchIndex}/${matchCount}` : '0/0'}
                 </span>
               )}
@@ -131,7 +131,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
                   setWholeWord(!wholeWord);
                   triggerSearch(searchText, true, matchCase, !wholeWord);
                 }}
-                className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-colors mr-1 ${wholeWord ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-colors me-1 ${wholeWord ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
                 title={t('find.wholeWord')}
               >
                 W
@@ -139,7 +139,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0 px-1 border-l border-slate-200/80 dark:border-white/10">
+          <div className="flex items-center gap-1 shrink-0 px-1 border-s border-slate-200/80 dark:border-white/10">
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => triggerSearch(searchText, false)}
@@ -161,7 +161,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={handleClose}
-            className="p-2 ml-1 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+            className="p-2 ms-1 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
             title={t('find.close')}
           >
             <X className="w-4 h-4" />

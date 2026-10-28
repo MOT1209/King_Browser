@@ -317,7 +317,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                 <div className="space-y-4">
                   {/* Search Shortcuts Input */}
                   <div className="relative">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <Search className="w-4 h-4 text-slate-400 absolute start-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       placeholder={l({ en: 'Search shortcuts (e.g. tab, zoom, reload, find)...', ar: 'ابحث في الاختصارات (مثلاً: تبويب، تكبير، تحميل، بحث)...', de: 'Tastenkürzel suchen (z. B. Tab, Zoom, Neu laden, Suchen)...' })}

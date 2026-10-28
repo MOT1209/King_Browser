@@ -130,7 +130,7 @@ export const AICursorOverlay: React.FC = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
             style={{ left: ripple.x, top: ripple.y }}
-            className="absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-2 border-cyan-400"
+            className="absolute w-8 h-8 -ms-4 -mt-4 rounded-full border-2 border-cyan-400"
           />
         ))}
       </AnimatePresence>
@@ -140,7 +140,7 @@ export const AICursorOverlay: React.FC = () => {
         <motion.div
           animate={{ x: cursor.x, y: cursor.y }}
           transition={{ type: 'spring', damping: 25, stiffness: 300, mass: 0.5 }}
-          className="absolute top-0 left-0 flex items-start gap-2"
+          className="absolute top-0 start-0 flex items-start gap-2"
           style={{ opacity: isVisible ? 1 : 0 }}
         >
           <div className="relative">
@@ -161,7 +161,7 @@ export const AICursorOverlay: React.FC = () => {
               </motion.div>
             )}
 
-            <div className="absolute top-full left-full mt-1 ml-1 bg-cyan-500 text-slate-950 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-md flex items-center gap-1">
+            <div className="absolute top-full start-full mt-1 ms-1 bg-cyan-500 text-slate-950 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-md flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-slate-950 rounded-full animate-pulse" />
               AI Agent
             </div>
@@ -169,7 +169,7 @@ export const AICursorOverlay: React.FC = () => {
             {cursor.action === 'type' && cursor.text && (
               <div
                 data-testid="ai-cursor-typed"
-                className="absolute top-full left-full mt-6 ml-1 max-w-[260px] truncate bg-slate-900/90 text-cyan-100 text-xs font-mono px-2 py-1 rounded-md shadow-lg"
+                className="absolute top-full start-full mt-6 ms-1 max-w-[260px] truncate bg-slate-900/90 text-cyan-100 text-xs font-mono px-2 py-1 rounded-md shadow-lg"
               >
                 {cursor.masked ? '••••••••' : cursor.text}
               </div>
@@ -195,7 +195,7 @@ export const AICursorOverlay: React.FC = () => {
               <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[line.status] ?? 'bg-slate-400'}`} />
               <span className="font-medium capitalize">{line.label}</span>
               {line.site && <span className="text-slate-400 truncate">{line.site}</span>}
-              <span className="ml-auto text-slate-400">{STATUS_LABEL_KEYS[line.status] ? t(STATUS_LABEL_KEYS[line.status]) : line.status}</span>
+              <span className="ms-auto text-slate-400">{STATUS_LABEL_KEYS[line.status] ? t(STATUS_LABEL_KEYS[line.status]) : line.status}</span>
             </div>
           ))}
         </div>

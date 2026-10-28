@@ -106,7 +106,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                       </div>
                     
                       <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
-                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate pr-2" title={item.filename}>
+                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate pe-2" title={item.filename}>
                           {item.filename}
                         </div>
                       

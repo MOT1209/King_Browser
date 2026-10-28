@@ -443,7 +443,7 @@ const MemoizedTabItem = React.memo(
           {tab.isPlayingAudio && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleMuteTab(tab.id, e); }}
-              className="absolute -top-1 -right-1 p-0.5 bg-blue-500 text-white rounded-full shadow-xs"
+              className="absolute -top-1 -end-1 p-0.5 bg-blue-500 text-white rounded-full shadow-xs"
               title={l({ en: 'Mute Tab', ar: 'كتم صوت التبويب', de: 'Tab stummschalten' })}
             >
               <Volume2 className="w-2.5 h-2.5 animate-pulse" />
@@ -600,7 +600,7 @@ const MemoizedTabItem = React.memo(
             <span dir="auto" className="truncate">{displayTabTitle(tab)}</span>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0 ml-1">
+          <div className="flex items-center gap-1 shrink-0 ms-1">
             {tab.isMuted ? (
               <button
                 onClick={(e) => onToggleMuteTab(tab.id, e)}
@@ -1180,7 +1180,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <div className="relative no-drag mb-1">
               <button
                 onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold bg-slate-200/50 hover:bg-slate-300/50 text-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:text-slate-300 transition-colors mr-1"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold bg-slate-200/50 hover:bg-slate-300/50 text-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:text-slate-300 transition-colors me-1"
               >
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: WORKSPACE_COLORS[activeWorkspace.color] || '#64748b' }} />
                 <span>{displayWorkspaceName(activeWorkspace)}</span>
@@ -1194,7 +1194,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
-                    className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50">
+                    className="absolute top-full start-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50">
                     {workspaces.map(w => (
                       <button
                         key={w.id}
@@ -1238,7 +1238,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => scrollTabs('left')}
-                className={`absolute left-0 z-30 p-1 rounded-r-lg shadow-md no-drag transition-colors ${
+                className={`absolute start-0 z-30 p-1 rounded-r-lg shadow-md no-drag transition-colors ${
                   isIncognito ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700' : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
                 }`}
                 title={l({ en: 'Scroll Left', ar: 'التمرير يساراً', de: 'Nach links scrollen' })}
@@ -1385,7 +1385,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => scrollTabs('right')}
-                className={`absolute right-0 z-30 p-1 rounded-l-lg shadow-md no-drag transition-colors ${
+                className={`absolute end-0 z-30 p-1 rounded-l-lg shadow-md no-drag transition-colors ${
                   isIncognito ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700' : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
                 }`}
                 title={l({ en: 'Scroll Right', ar: 'التمرير يميناً', de: 'Nach rechts scrollen' })}
@@ -1435,7 +1435,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onReload} className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title={l({ en: 'Reload Page', ar: 'إعادة تحميل الصفحة', de: 'Seite neu laden' })}>
             <RotateCw className={`w-4 h-4 transition-transform duration-500 active:rotate-180 ${activeTab?.isLoading ? 'animate-spin' : ''}`} />
           </motion.button>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => onNavigate('king://newtab')} className={`p-1.5 rounded-lg transition-colors ml-0.5 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title={l({ en: 'New Tab Page', ar: 'صفحة التبويب الجديد', de: 'Neuer Tab' })}>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => onNavigate('king://newtab')} className={`p-1.5 rounded-lg transition-colors ms-0.5 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title={l({ en: 'New Tab Page', ar: 'صفحة التبويب الجديد', de: 'Neuer Tab' })}>
             <Home className="w-4 h-4" />
           </motion.button>
         </div>
@@ -1458,7 +1458,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         />
 
         {/* Extensions / Action Controls / More Menu */}
-        <div className="flex items-center gap-1.5 ml-auto relative shrink-0">
+        <div className="flex items-center gap-1.5 ms-auto relative shrink-0">
           {/* Assistant toggle */}
           <motion.button
             whileHover={{ scale: 1 }}
@@ -1536,7 +1536,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             >
               {isWhitelisted ? <ShieldOff className="w-4 h-4 text-slate-400" /> : <Shield className="w-4 h-4 text-cyan-400" />}
               {(!isWhitelisted && (activeTab?.blockedAdsCount || 0) > 0) && (
-                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -end-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
                   {activeTab?.blockedAdsCount ?? 0}
                 </span>
               )}
@@ -1571,7 +1571,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             >
               <Download className={`w-4 h-4 ${(activeDownloadsCount || 0) > 0 ? 'text-cyan-500' : ''}`} />
               {(activeDownloadsCount || 0) > 0 && (
-                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-xs animate-pulse">
+                <span className="absolute -top-1 -end-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-xs animate-pulse">
                   {activeDownloadsCount}
                 </span>
               )}
@@ -1892,7 +1892,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     {createPortal(
       <div
         ref={ghostElRef}
-        className="fixed top-0 left-0 pointer-events-none z-[999999] opacity-90 transition-none"
+        className="fixed top-0 start-0 pointer-events-none z-[999999] opacity-90 transition-none"
         style={{ display: 'none', willChange: 'transform' }}
       >
         <div className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-2xl border backdrop-blur-md ${

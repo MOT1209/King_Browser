@@ -761,7 +761,7 @@ export const SidePanel = React.memo(({
             width: { type: 'spring', damping: 32, stiffness: 360, mass: 0.8 },
             opacity: { duration: 0.2, ease: 'easeInOut' }
           }}
-          className="flex-shrink-0 relative h-full border-l border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.12)] dark:shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.45)] overflow-hidden select-none"
+          className="flex-shrink-0 relative h-full border-s border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.12)] dark:shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.45)] overflow-hidden select-none"
         >
           <motion.div
             initial={{ x: 28, opacity: 0 }}
@@ -795,7 +795,7 @@ export const SidePanel = React.memo(({
                 </div>
 
           {/* Right Action Buttons */}
-          <div className="flex items-center gap-1 ml-auto">
+          <div className="flex items-center gap-1 ms-auto">
             {messages.length > 0 && !isLoading && (
               <button
                 type="button"
@@ -931,7 +931,7 @@ export const SidePanel = React.memo(({
               {streamingText ? (
                 <>
                   <span className="whitespace-pre-wrap break-words">{streamingText}</span>
-                  <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-500 animate-pulse rounded-full align-middle" />
+                  <span className="inline-block w-1.5 h-3.5 ms-1 bg-cyan-500 animate-pulse rounded-full align-middle" />
                 </>
               ) : (
                 <div className="flex items-center gap-2 text-slate-400 font-medium text-xs">

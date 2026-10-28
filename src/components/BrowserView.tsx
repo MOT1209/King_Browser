@@ -1461,7 +1461,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               }}
             />
             {isDemo && tab?.url && tab.url.startsWith('http') && (
-              <div className="absolute bottom-3 right-3 z-30 pointer-events-auto">
+              <div className="absolute bottom-3 end-3 z-30 pointer-events-auto">
                 <a
                   href={tab.url}
                   target="_blank"
@@ -1503,7 +1503,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                   e.preventDefault();
                   handleSelectAutofill(acc, autofillMenu.origin, autofillMenu.hostname);
                 }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
+                className="w-full text-start px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
               >
                 <span className="font-medium text-slate-100">{acc.username || 'Unnamed Account'}</span>
                 <span className="text-[10px] text-slate-400">{l({ en: 'Click to fill password', ar: 'انقر لتعبئة كلمة المرور', de: 'Zum Ausfüllen des Passworts klicken' })}</span>

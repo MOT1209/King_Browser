@@ -65,7 +65,7 @@ const DownloadRowItem: React.FC<DownloadRowItemProps> = React.memo(({
           </div>
         </div>
 
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-end">
           {item.state === 'completed' && (
             <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
               <CheckCircle2 className="w-3.5 h-3.5" /> {t('downloads.completed')}
@@ -197,7 +197,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
 
         {downloads.length > 0 && (
           <div className="relative flex items-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-white/10 rounded-2xl px-3.5 py-2 shadow-xs">
-            <Search className="w-4 h-4 text-slate-400 mr-2.5 shrink-0" />
+            <Search className="w-4 h-4 text-slate-400 me-2.5 shrink-0" />
             <input
               type="text"
               value={filterText}

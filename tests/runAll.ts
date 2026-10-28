@@ -50,6 +50,7 @@ import './adblock_filter_engine.test';
 import './keyboard_shortcuts.test';
 import './agent_pill_placement.test';
 import './rtl_overlay_regressions.test';
+import './rtl_logical_classes.test';
 import './agent_tab_marker.test';
 import './approval_attention.test';
 import './approval_details.test';
