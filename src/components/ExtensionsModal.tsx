@@ -296,7 +296,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                       onClick={(e) => handleLaunchExtension(ext, e)}
                       className={`flex items-center justify-between p-3 rounded-xl hover:bg-slate-100/70 dark:hover:bg-white/[0.04] group transition-colors ${ext.popupUrl || ext.optionsUrl ? 'cursor-pointer' : ''}`}
                     >
-                      <div className="flex items-center gap-3 min-w-0 pr-2">
+                      <div className="flex items-center gap-3 min-w-0 pe-2">
                         <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0">
                           {ext.iconData ? (
                             <img src={ext.iconData} alt={ext.name} className="w-5 h-5 object-contain" />

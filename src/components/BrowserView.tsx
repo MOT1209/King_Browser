@@ -14,6 +14,7 @@ import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { AGENT_PARTITION, AGENT_PERSIST_PARTITION } from '../utils/appConstants';
 import { recordConsoleMessage, clearConsoleMessages } from '../utils/consoleBuffer';
 import { useTranslation } from '../services/i18n';
+import { siteZoomFor } from '../utils/siteZoom';
 
 const PasswordPromptModal = lazy(() => import('./PasswordPromptModal').then(m => ({ default: m.PasswordPromptModal })));
 const AILinkPreview = lazy(() => import('./AILinkPreview').then(m => ({ default: m.AILinkPreview })));
@@ -490,7 +491,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
       try {
         const currentTab = latestTabRef.current;
-        if (currentTab?.zoomFactor !== undefined) {
+        // A factor the user chose for this site wins over the tab's own and the default.
+        const rememberedZoom = siteZoomFor(
+          (typeof webview.getURL === 'function' ? webview.getURL() : '') || currentTab?.url,
+          currentTab?.isIncognito
+        );
+        if (rememberedZoom !== undefined) {
+          webview.setZoomFactor(rememberedZoom);
+          if (rememberedZoom !== currentTab?.zoomFactor) onUpdateTab(tab.id, { zoomFactor: rememberedZoom });
+        } else if (currentTab?.zoomFactor !== undefined) {
           webview.setZoomFactor(currentTab.zoomFactor);
         } else {
           const zoomMap = { small: 0.85, medium: 1.0, large: 1.25 };
@@ -1452,7 +1461,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               }}
             />
             {isDemo && tab?.url && tab.url.startsWith('http') && (
-              <div className="absolute bottom-3 right-3 z-30 pointer-events-auto">
+              <div className="absolute bottom-3 end-3 z-30 pointer-events-auto">
                 <a
                   href={tab.url}
                   target="_blank"
@@ -1494,7 +1503,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                   e.preventDefault();
                   handleSelectAutofill(acc, autofillMenu.origin, autofillMenu.hostname);
                 }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
+                className="w-full text-start px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
               >
                 <span className="font-medium text-slate-100">{acc.username || 'Unnamed Account'}</span>
                 <span className="text-[10px] text-slate-400">{l({ en: 'Click to fill password', ar: 'انقر لتعبئة كلمة المرور', de: 'Zum Ausfüllen des Passworts klicken' })}</span>

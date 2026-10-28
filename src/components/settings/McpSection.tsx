@@ -380,7 +380,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
               <div key={c.id} className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-green-400" />
                 <span className="text-slate-700 dark:text-slate-300 truncate">{c.userAgent}</span>
-                <span className="text-slate-400 text-xs ml-auto">
+                <span className="text-slate-400 text-xs ms-auto">
                   {Math.round((Date.now() - c.connectedAt) / 1000)}s ago
                 </span>
               </div>
@@ -490,7 +490,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
           <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Tool Permissions ({n})', ar: 'أذونات الأدوات ({n})', de: 'Werkzeugberechtigungen ({n})' }, { n: MCP_TOOLS.length })}</p>
         </div>
         <p className="text-xs text-slate-500 mb-2">{l({ en: 'Enable or disable specific browser capabilities. Sensitive actions are disabled by default.', ar: 'فعّل أو عطّل قدرات معيّنة في المتصفح. الإجراءات الحساسة معطّلة افتراضياً.', de: 'Bestimmte Browserfunktionen aktivieren oder deaktivieren. Sensible Aktionen sind standardmäßig deaktiviert.' })}</p>
-        <div className="grid grid-cols-1 gap-1.5 max-h-[400px] overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 gap-1.5 max-h-[400px] overflow-y-auto pe-1">
           {MCP_TOOLS.map(tool => {
             const isDisabled = disabledTools.includes(tool.name);
             let badgeClass = "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400";
@@ -505,7 +505,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
 
             return (
               <div key={tool.name} className={`flex items-center justify-between py-2 px-3 rounded-lg border transition-colors ${isDisabled ? 'bg-slate-50 border-slate-200 dark:bg-slate-800/30 dark:border-slate-700/50 opacity-60' : 'bg-white border-slate-200 dark:bg-slate-800/50 dark:border-slate-700/50'}`}>
-                <div className="flex flex-col gap-1 pr-4 min-w-0">
+                <div className="flex flex-col gap-1 pe-4 min-w-0">
                   <div className="flex items-center gap-2">
                     <code className="text-xs text-blue-600 dark:text-blue-400 font-mono font-medium truncate">{tool.name}</code>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${badgeClass}`}>{badgeText}</span>
@@ -644,18 +644,18 @@ export const McpSection: React.FC<McpSectionProps> = ({
           const rows = activity.filter(entry => activityFilter === 'all' || entry.status === activityFilter);
           if (rows.length === 0) return <p className="text-xs text-slate-400">{l({ en: 'No activity to show.', ar: 'لا يوجد نشاط لعرضه.', de: 'Keine Aktivität vorhanden.' })}</p>;
           return (
-            <div className="max-h-[300px] overflow-y-auto pr-1">
+            <div className="max-h-[300px] overflow-y-auto pe-1">
               <table className="w-full text-xs text-start">
                 <thead className="text-slate-500">
-                  <tr><th className="py-1 pr-2 font-medium">{l({ en: 'Time', ar: 'الوقت', de: 'Zeit' })}</th><th className="py-1 pr-2 font-medium">{l({ en: 'Tool', ar: 'الأداة', de: 'Werkzeug' })}</th><th className="py-1 pr-2 font-medium">{l({ en: 'Site', ar: 'الموقع', de: 'Website' })}</th><th className="py-1 pr-2 font-medium">{l({ en: 'Result', ar: 'النتيجة', de: 'Ergebnis' })}</th></tr>
+                  <tr><th className="py-1 pe-2 font-medium">{l({ en: 'Time', ar: 'الوقت', de: 'Zeit' })}</th><th className="py-1 pe-2 font-medium">{l({ en: 'Tool', ar: 'الأداة', de: 'Werkzeug' })}</th><th className="py-1 pe-2 font-medium">{l({ en: 'Site', ar: 'الموقع', de: 'Website' })}</th><th className="py-1 pe-2 font-medium">{l({ en: 'Result', ar: 'النتيجة', de: 'Ergebnis' })}</th></tr>
                 </thead>
                 <tbody>
                   {rows.map(entry => (
                     <tr key={entry.id} className="border-t border-slate-100 dark:border-slate-700/50 align-top" title={entry.reason || undefined}>
-                      <td className="py-1 pr-2 whitespace-nowrap text-slate-500">{entry.requestedAt ? new Date(entry.requestedAt).toLocaleString() : ''}</td>
-                      <td className="py-1 pr-2"><code className="text-blue-600 dark:text-blue-400">{entry.tool}</code></td>
-                      <td className="py-1 pr-2 text-slate-600 dark:text-slate-300 break-all">{entry.domain}</td>
-                      <td className={`py-1 pr-2 font-medium ${entry.status === 'completed' ? 'text-green-600' : entry.status === 'rejected' ? 'text-amber-600' : 'text-red-600'}`}>{({ completed: l({ en: 'completed', ar: 'مكتمل', de: 'abgeschlossen' }), rejected: l({ en: 'rejected', ar: 'مرفوض', de: 'abgelehnt' }), failed: l({ en: 'failed', ar: 'فشل', de: 'fehlgeschlagen' }), cancelled: l({ en: 'cancelled', ar: 'ملغى', de: 'abgebrochen' }) } as Record<string, string>)[entry.status] ?? entry.status}</td>
+                      <td className="py-1 pe-2 whitespace-nowrap text-slate-500">{entry.requestedAt ? new Date(entry.requestedAt).toLocaleString() : ''}</td>
+                      <td className="py-1 pe-2"><code className="text-blue-600 dark:text-blue-400">{entry.tool}</code></td>
+                      <td className="py-1 pe-2 text-slate-600 dark:text-slate-300 break-all">{entry.domain}</td>
+                      <td className={`py-1 pe-2 font-medium ${entry.status === 'completed' ? 'text-green-600' : entry.status === 'rejected' ? 'text-amber-600' : 'text-red-600'}`}>{({ completed: l({ en: 'completed', ar: 'مكتمل', de: 'abgeschlossen' }), rejected: l({ en: 'rejected', ar: 'مرفوض', de: 'abgelehnt' }), failed: l({ en: 'failed', ar: 'فشل', de: 'fehlgeschlagen' }), cancelled: l({ en: 'cancelled', ar: 'ملغى', de: 'abgebrochen' }) } as Record<string, string>)[entry.status] ?? entry.status}</td>
                     </tr>
                   ))}
                 </tbody>

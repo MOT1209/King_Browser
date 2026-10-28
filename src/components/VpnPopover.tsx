@@ -204,7 +204,7 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
                     >
                       <button
                         onClick={() => onSelectLocation(loc)}
-                        className="flex-1 flex items-center gap-2.5 text-left cursor-pointer"
+                        className="flex-1 flex items-center gap-2.5 text-start cursor-pointer"
                       >
                         {loc.type === 'custom' ? <MapPin className="w-3.5 h-3.5 text-purple-500 shrink-0" /> : <Globe className="w-3.5 h-3.5 text-cyan-500 shrink-0" />}
                         <div className="truncate">

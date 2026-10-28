@@ -67,10 +67,13 @@ export interface PillVisibilityInput {
   panelOpen: boolean;
   hiddenByUser: boolean;
   hideWhenIdle: boolean;
+  /** The human has taken the browser: the way to hand it back must stay reachable. */
+  takenOver?: boolean;
 }
 
 export function shouldShowPill(input: PillVisibilityInput): boolean {
   if (input.hasPendingApproval || input.state === 'awaiting_approval') return true;
+  if (input.takenOver) return true;
   if (input.panelOpen) return true;
   if (input.hiddenByUser) return false;
   if (input.hideWhenIdle && input.state === 'idle' && input.queueLength === 0) return false;

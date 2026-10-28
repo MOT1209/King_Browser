@@ -109,7 +109,8 @@ const VPN_ANCHOR_REF: React.RefObject<HTMLButtonElement> = { current: null };
 
 import { isTombstonedRow } from './services/syncService';
 import { l, t } from './services/i18n';
-import { useAgentTabId } from './services/agentTabStore';
+import { useAgentTabId, useAgentTakenOver } from './services/agentTabStore';
+import { handoffUrlForAgent } from './utils/handoffUrl';
 import { customizedBindings } from './utils/shortcutCatalog';
 import { logger } from './utils/logger';
 import {
@@ -739,6 +740,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const {
     handleCreateFolder,
     handleToggleFolder,
+    handleSetFolderColor,
     handleRenameFolder,
     handleDeleteFolder,
     handleMoveTabToFolder,
@@ -797,9 +799,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
 
 
+  // Stable identity: zoom handlers are passed to memoized children and key handlers.
+  const getTabForZoom = useCallback((tabId: string) => tabsRef.current.find(t => t.id === tabId), []);
   const { handleZoomIn, handleZoomOut, handleResetZoom } = useZoom({
     activeTabId,
     setTabs,
+    getTab: getTabForZoom,
   });
 
 
@@ -1375,6 +1380,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Their physical positions remain stable based on tab order, even when activeTabId changes upon focus.
   const tabIds = useMemo(() => tabs.map(tab => tab.id), [tabs]);
   const agentTabId = useAgentTabId(tabIds);
+  const agentTakenOver = useAgentTakenOver();
 
   const { primarySplitTab, secondarySplitTab } = useMemo(() => {
     if (!activeTab || !activeTab.splitWith) return { primarySplitTab: activeTab, secondarySplitTab: null };
@@ -1451,6 +1457,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onCreateFolder={handleCreateFolder}
               onToggleFolder={handleToggleFolder}
               onRenameFolder={handleRenameFolder}
+              onSetFolderColor={handleSetFolderColor}
               onDeleteFolder={handleDeleteFolder}
               onMoveTabToFolder={handleMoveTabToFolder}
               onOpenSpotlight={handleOpenSpotlight}
@@ -1488,7 +1495,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         <>
           {/* Left Edge Mouse Sensor for Instant Hover Reveal */}
           <div
-            className="fixed top-0 left-0 bottom-0 w-8 z-40 no-drag"
+            className="fixed top-0 start-0 bottom-0 w-8 z-40 no-drag"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             onMouseEnter={handleHoverSidebarOpen}
           />
@@ -1521,7 +1528,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 onMouseEnter={handleHoverSidebarOpen}
                 onMouseLeave={handleHoverSidebarClose}
                 style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-slate-900/98 border-r border-slate-200 dark:border-white/10"
+                className="fixed top-0 start-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-slate-900/98 border-e border-slate-200 dark:border-white/10"
               >
                 <SidebarTabs
                   tabs={workspaceTabs}
@@ -1547,6 +1554,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onCreateFolder={handleCreateFolder}
                   onToggleFolder={handleToggleFolder}
                   onRenameFolder={handleRenameFolder}
+              onSetFolderColor={handleSetFolderColor}
                   onDeleteFolder={handleDeleteFolder}
                   onMoveTabToFolder={handleMoveTabToFolder}
                   onOpenSpotlight={handleOpenSpotlight}
@@ -1591,7 +1599,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         useVerticalTabs
           ? isSidebarCollapsed
             ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
-            : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ml-1.5'
+            : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ms-1.5'
           : 'bg-white dark:bg-slate-900 rounded-none m-0 border-0'
       }`}>
         {/* TOP NAVIGATION BAR with fluid accordion fold transition */}
@@ -1738,7 +1746,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.15 }}
               className={`absolute inset-y-0 ${
-                splitDragSide === 'left' ? 'left-0 border-r-2' : 'right-0 border-l-2'
+                splitDragSide === 'left' ? 'left-0 border-e-2' : 'right-0 border-s-2'
               } w-[48%] bg-blue-500/15 border-blue-500/60 backdrop-blur-sm z-[999] flex items-center justify-center pointer-events-none`}
             >
               <div className="bg-blue-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex flex-col items-center gap-2.5 text-sm font-semibold">
@@ -1776,6 +1784,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           hideWhenIdle={settings.agentPillHideWhenIdle !== false}
           hidden={!!settings.agentPillHidden}
           onHiddenChange={handleAgentPillHiddenChange}
+          activeTabUrl={handoffUrlForAgent(activeTab, Boolean(settings.agentIsolatedProfile))}
         />
 
         {/* Unified Browser Views Container (Single persistent container for primary, secondary split, and background tabs) */}
@@ -1851,7 +1860,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     }`}
                   >
                     {/* Left side: Pane Indicator + Favicon + Page Title + Hostname */}
-                    <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 me-2">
                       <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded transition-colors shrink-0 ${
                         activeTabId === tab.id
                           ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25'
@@ -2043,11 +2052,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           {/* Frame the page while the agent works in a visible tab, so the human
               always sees which page is under agent control. */}
           {agentTabId !== null && (agentTabId === primarySplitTab?.id || agentTabId === secondarySplitTab?.id) && (
-            <div className="pointer-events-none absolute inset-0 z-30 ring-2 ring-inset ring-amber-400/80" data-agent-frame="true">
+            <div className={`pointer-events-none absolute inset-0 z-30 ring-2 ring-inset ${agentTakenOver ? 'ring-sky-400/80' : 'ring-amber-400/80'}`} data-agent-frame="true">
               <div className="absolute top-2 inset-x-0 flex justify-center">
-                <span className="flex items-center gap-1.5 rounded-full bg-amber-400 text-slate-900 text-[11px] font-semibold px-2.5 py-0.5 shadow-md">
+                <span className={`flex items-center gap-1.5 rounded-full ${agentTakenOver ? 'bg-sky-400' : 'bg-amber-400'} text-slate-900 text-[11px] font-semibold px-2.5 py-0.5 shadow-md`}>
                   <Bot className="w-3 h-3" />
-                  {t('agentPanel.pageMarker')}
+                  {t(agentTakenOver ? 'agentPanel.pageMarkerTakenOver' : 'agentPanel.pageMarker')}
                 </span>
               </div>
             </div>

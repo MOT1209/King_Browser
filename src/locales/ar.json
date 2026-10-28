@@ -378,7 +378,23 @@
     "pillShowHint": "أوقفه لإغلاق الزر العائم. طلب الموافقة يعيده دائما.",
     "pillSettingsTitle": "زر حالة الوكيل",
     "tabMarker": "الوكيل يعمل في هذا التبويب",
-    "pageMarker": "الوكيل يعمل في هذه الصفحة"
+    "pageMarker": "الوكيل يعمل في هذه الصفحة",
+    "approvalDetails": {
+      "type": "سيكتب",
+      "value": "القيمة",
+      "url": "سيفتح",
+      "key": "سيضغط",
+      "option": "سيختار"
+    },
+    "waitingForApproval": "بانتظار موافقتك",
+    "waitingForApprovalAt": "بانتظار موافقتك - {domain}",
+    "takeOver": "استلم أنت",
+    "handBack": "أعِد التحكم للوكيل",
+    "takeOverHint": "يوقف الوكيل مؤقتا ويلغي ما كان في قائمته. تتحكم أنت بالمتصفح حتى تعيده.",
+    "takenOverNotice": "أنت تتحكم بالمتصفح. الوكيل ينتظر.",
+    "takenOverPill": "أنت تتحكم",
+    "tabMarkerTakenOver": "أنت تتحكم بهذا التبويب",
+    "pageMarkerTakenOver": "أنت تتحكم بهذه الصفحة"
   },
   "appearance": {
     "wallpaper": {
@@ -562,8 +578,23 @@
       "selectAll": "تحديد الكل",
       "undo": "تراجع",
       "redo": "إعادة",
-      "quit": "إنهاء"
+      "quit": "إنهاء",
+      "agentTakeOver": "استلام التحكم من الوكيل أو إعادته"
     },
     "reserved": "محجوز لـ \"{action}\". اختر مجموعة أخرى."
+  },
+  "folders": {
+    "chooseColor": "لون المجلد",
+    "colorNone": "بلا لون",
+    "colors": {
+      "red": "أحمر",
+      "orange": "برتقالي",
+      "amber": "كهرماني",
+      "green": "أخضر",
+      "teal": "أزرق مخضر",
+      "blue": "أزرق",
+      "violet": "بنفسجي",
+      "pink": "وردي"
+    }
   }
 }

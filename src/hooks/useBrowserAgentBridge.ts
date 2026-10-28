@@ -91,6 +91,14 @@ const AGENT_TAB_INDEPENDENT_TOOLS = new Set([
   'browser_switch_tab', 'browser_close_tab', MCP_POLICY_CONTEXT_ACTION
 ]);
 
+type HighlightRect = { x: number; y: number; width: number; height: number };
+
+/** Tells the overlay which element to frame (or null to clear). No-op outside a browser page. */
+function dispatchHighlight(detail: HighlightRect | null): void {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof CustomEvent !== 'function') return;
+  window.dispatchEvent(new CustomEvent('ai-highlight', { detail }));
+}
+
 export function useBrowserAgentBridge({
   activeTabId,
   tabs,
@@ -1171,7 +1179,44 @@ export function useBrowserAgentBridge({
       });
       unsubscribeMcpCancel = electronAPI.onMcpActionCancel?.(cancelAction);
     }
+
+    // While the human decides on an approval, frame the element the agent wants
+    // to act on. Read-only: it measures the element (scrolling it into view only
+    // when it is off screen) and never clicks, types or changes anything.
+    const setHighlight = (detail: { x: number; y: number; width: number; height: number } | null) => {
+      dispatchHighlight(detail);
+    };
+    const unsubscribeEngineHighlight = electronAPI?.onEngineEvent?.(event => {
+      if (event.type === 'approval_resolved') { setHighlight(null); return; }
+      if (event.type !== 'approval_needed') return;
+      const selector = event.approval.previewSelector;
+      const guest = selector ? currentGuest() : null;
+      if (!selector || !guest?.executeJavaScript) { setHighlight(null); return; }
+      const tabId = browserDataRef.current.activeTabId;
+      Promise.resolve(guest.executeJavaScript(`
+        (() => {
+          try {
+            const el = document.querySelector(${JSON.stringify(selector)});
+            if (!el) return null;
+            let r = el.getBoundingClientRect();
+            if (r.bottom <= 0 || r.top >= window.innerHeight) {
+              el.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+              r = el.getBoundingClientRect();
+            }
+            return { x: r.left, y: r.top, width: r.width, height: r.height };
+          } catch (_) { return null; }
+        })()
+      `)).then((rect: any) => {
+        if (browserDataRef.current.activeTabId !== tabId) return;
+        if (!rect || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) { setHighlight(null); return; }
+        const bounds = guest.getBoundingClientRect();
+        setHighlight({ x: bounds.left + rect.x, y: bounds.top + rect.y, width: rect.width, height: rect.height });
+      }).catch(() => setHighlight(null));
+    });
+
     return () => {
+      unsubscribeEngineHighlight?.();
+      setHighlight(null);
       for (const guest of Array.from(document.querySelectorAll('webview'))) guestListeners.get(guest)?.();
       unsubscribeMcpBridge?.();
       unsubscribeMcpCancel?.();
@@ -1182,4 +1227,9 @@ export function useBrowserAgentBridge({
       activeWaitResolversRef.current.clear();
     };
   }, []);
+
+  // A highlight belongs to the tab it was measured in.
+  useEffect(() => {
+    dispatchHighlight(null);
+  }, [activeTabId]);
 }

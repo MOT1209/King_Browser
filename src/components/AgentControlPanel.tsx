@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import {
   Bot,
   ChevronDown,
+  Hand,
   Download,
   AlertTriangle,
   GripVertical,
@@ -104,13 +105,16 @@ export interface AgentControlPanelProps {
   hideWhenIdle?: boolean;
   hidden?: boolean;
   onHiddenChange?: (hidden: boolean) => void;
+  /** The active page, named to the agent on hand-back. Undefined when the agent must not learn it. */
+  activeTabUrl?: string;
 }
 
 export function AgentControlPanel({
   shortcuts: shortcutsProp,
   hideWhenIdle = true,
   hidden = false,
-  onHiddenChange
+  onHiddenChange,
+  activeTabUrl
 }: AgentControlPanelProps) {
   const { t, isRTL } = useTranslation();
   const shortcuts = useMemo(
@@ -180,10 +184,6 @@ export function AgentControlPanel({
 
   const pending = status?.pendingApproval ?? null;
 
-  // Shared with the tab strip so it can mark the tab the agent works in.
-  useEffect(() => {
-    setAgentEngineState(status?.state ?? null);
-  }, [status?.state]);
 
   useEffect(() => {
     if (pending) setOpen(true);
@@ -222,10 +222,26 @@ export function AgentControlPanel({
     [api, supported, refresh]
   );
 
+  const takenOver = Boolean(status?.takenOver);
+  const toggleTakeOver = useCallback(
+    () => runCommand(takenOver ? 'hand_back' : 'take_over', takenOver ? { url: activeTabUrl } : undefined),
+    [runCommand, takenOver, activeTabUrl]
+  );
+
+  // The tab strip and page frame mark the tab the agent works in, and change
+  // color while the human drives.
+  useEffect(() => {
+    setAgentEngineState(status?.state ?? null, takenOver);
+  }, [status?.state, takenOver]);
+
   useEffect(() => {
     if (!supported) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (matchesShortcut(shortcuts.toggleAgentPanel, event, isMac)) {
+      if (matchesShortcut(shortcuts.agentTakeOver, event, isMac)) {
+        event.preventDefault();
+        setOpen(true);
+        void toggleTakeOver();
+      } else if (matchesShortcut(shortcuts.toggleAgentPanel, event, isMac)) {
         event.preventDefault();
         setOpen(value => !value);
       } else if (matchesShortcut(shortcuts.toggleAgentPill, event, isMac)) {
@@ -244,7 +260,7 @@ export function AgentControlPanel({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [supported, shortcuts, hidden, onHiddenChange, runCommand]);
+  }, [supported, shortcuts, hidden, onHiddenChange, runCommand, toggleTakeOver]);
 
   // Pill placement: physical pixels from the top-left, so the RTL stylesheet
   // that mirrors `right-*` utilities cannot push it onto the side panel.
@@ -334,11 +350,15 @@ export function AgentControlPanel({
 
   const state = status.state;
   const isStopped = state === 'stopped' || state === 'stopping';
-  const canAutoRun = !isStopped && state !== 'error';
-  const canPause = state === 'running' || state === 'awaiting_approval';
-  const canResume = state === 'paused' || state === 'stopped';
+  // While the human drives, only hand-back and STOP NOW apply.
+  const canAutoRun = !isStopped && state !== 'error' && !takenOver;
+  const canPause = (state === 'running' || state === 'awaiting_approval') && !takenOver;
+  const canResume = (state === 'paused' || state === 'stopped') && !takenOver;
+  const canTakeOver = takenOver || (!isStopped && state !== 'error');
 
-  const pillTone = pending
+  const pillTone = takenOver
+    ? 'bg-sky-500'
+    : pending
     ? 'bg-amber-500'
     : state === 'running'
       ? 'bg-emerald-500'
@@ -356,7 +376,8 @@ export function AgentControlPanel({
     queueLength: status.queueLength,
     panelOpen: open,
     hiddenByUser: hidden,
-    hideWhenIdle
+    hideWhenIdle,
+    takenOver
   });
   if (!visible) return null;
 
@@ -373,6 +394,7 @@ export function AgentControlPanel({
     : { left: panelLeft, top: placed.y + pillSize.height + 8, width: panelWidth, maxHeight: Math.max(160, viewport.height - placed.y - pillSize.height - 24) };
   const panelShortcut = formatBinding(shortcuts.toggleAgentPanel, isMac);
   const pillShortcut = formatBinding(shortcuts.toggleAgentPill, isMac);
+  const takeOverShortcut = formatBinding(shortcuts.agentTakeOver, isMac);
 
   return (
     <>
@@ -461,6 +483,20 @@ export function AgentControlPanel({
                   )}
                   {pending.summary && <span className="block mt-0.5">{pending.summary}</span>}
                 </div>
+                {pending.details && pending.details.length > 0 && (
+                  <ul
+                    data-testid="approval-details"
+                    className="rounded-lg bg-white/70 dark:bg-black/20 border border-amber-200 dark:border-amber-900 px-2.5 py-1.5 space-y-0.5 text-xs text-gray-800 dark:text-gray-200"
+                  >
+                    {pending.details.map((line, index) => (
+                      <li key={index} className="break-words" dir="auto">
+                        {line.kind === 'other'
+                          ? line.text
+                          : <><span className="font-semibold">{t(`agentPanel.approvalDetails.${line.kind}`)}:</span> {line.text}</>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="flex gap-2 pt-0.5">
                   <button
                     type="button"
@@ -485,6 +521,27 @@ export function AgentControlPanel({
                 {t('agentPanel.commandFailed', { error })}
               </div>
             )}
+
+            {takenOver && (
+              <div className="rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900 px-3 py-2 text-xs text-sky-800 dark:text-sky-200">
+                {t('agentPanel.takenOverNotice')}
+              </div>
+            )}
+
+            <button
+              type="button"
+              disabled={!canTakeOver || busy !== null}
+              onClick={() => void toggleTakeOver()}
+              title={`${t('agentPanel.takeOverHint')}${takeOverShortcut ? ` (${takeOverShortcut})` : ''}`}
+              className={`w-full flex items-center justify-center gap-1.5 rounded-xl disabled:opacity-40 text-sm font-semibold py-2.5 ${
+                takenOver
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  : 'bg-sky-600 hover:bg-sky-500 text-white'
+              }`}
+            >
+              <Hand size={14} />
+              {takenOver ? t('agentPanel.handBack') : t('agentPanel.takeOver')}
+            </button>
 
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -634,7 +691,7 @@ export function AgentControlPanel({
         >
           <span className={`w-2 h-2 rounded-full ${pillTone} ${pending ? 'animate-pulse' : ''}`} />
           <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap">
-            {t(`agentPanel.states.${state}`)}
+            {takenOver ? t('agentPanel.takenOverPill') : t(`agentPanel.states.${state}`)}
           </span>
           {pending && <AlertTriangle size={13} className="text-amber-500" />}
           {status.queueLength > 0 && (

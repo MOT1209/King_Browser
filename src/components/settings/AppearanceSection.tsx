@@ -106,7 +106,7 @@ const DailyWallpaperSection = () => {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 max-h-[300px] overflow-y-auto pe-1">
             {photos.map((p) => {
               const isActive = p.id === currentPhoto?.id;
               return (
@@ -114,7 +114,7 @@ const DailyWallpaperSection = () => {
                   key={p.id}
                   type="button"
                   onClick={() => selectPhoto(p.id)}
-                  className={`group relative aspect-video rounded-lg overflow-hidden border text-left transition-all ${
+                  className={`group relative aspect-video rounded-lg overflow-hidden border text-start transition-all ${
                     isActive 
                       ? 'ring-2 ring-blue-500 border-blue-500 shadow-md scale-[0.98]' 
                       : 'border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:scale-[1.02] opacity-80 hover:opacity-100'
@@ -132,7 +132,7 @@ const DailyWallpaperSection = () => {
                     <p className="text-[9px] text-white/70 truncate">{p.author}</p>
                   </div>
                   {isActive && (
-                    <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-blue-600 text-white text-[9px] font-bold flex items-center gap-0.5 shadow">
+                    <div className="absolute top-1 end-1 px-1.5 py-0.5 rounded bg-blue-600 text-white text-[9px] font-bold flex items-center gap-0.5 shadow">
                       <Check className="w-2.5 h-2.5" />
                       <span>{l({ en: 'Active', ar: 'مفعّلة', de: 'Aktiv' })}</span>
                     </div>
@@ -227,7 +227,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                       <button
                         key={ta.id}
                         onClick={() => onUpdateSettings({ tabAnimation: ta.id as any })}
-                        className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-start justify-between gap-3 text-left ${
+                        className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-start justify-between gap-3 text-start ${
                           isSelected
                             ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-100 shadow-sm'
                             : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/50'
@@ -281,7 +281,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                       <button
                         key={bc.id}
                         onClick={() => onUpdateSettings({ browserColor: bc.id as any })}
-                        className={`p-3.5 rounded-2xl border-2 transition-all flex flex-col gap-3 text-left relative overflow-hidden ${
+                        className={`p-3.5 rounded-2xl border-2 transition-all flex flex-col gap-3 text-start relative overflow-hidden ${
                           isSelected
                             ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-500/10 shadow-sm'
                             : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/40'
@@ -297,7 +297,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                             <div className="w-1.5 h-1.5 rounded-full bg-red-400/80" />
                             <div className="w-1.5 h-1.5 rounded-full bg-amber-400/80" />
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/80" />
-                            <div className="ml-1.5 w-14 h-2.5 rounded-t bg-white/20 dark:bg-white/15" />
+                            <div className="ms-1.5 w-14 h-2.5 rounded-t bg-white/20 dark:bg-white/15" />
                           </div>
                           {/* Mini omnibox & content */}
                           <div className="flex items-center gap-1 w-full h-3 px-1 rounded bg-black/10 dark:bg-white/10">

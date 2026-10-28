@@ -73,7 +73,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       {/* Sidebar */}
       <div 
         style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-        className="w-64 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-xl flex flex-col"
+        className="w-64 border-e border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-xl flex flex-col"
       >
         <div className="p-6 pb-2">
           <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">

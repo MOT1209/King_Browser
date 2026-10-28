@@ -62,7 +62,7 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
           transition={{ duration: 0.14, ease: 'easeOut' }}
-          className="absolute top-full right-0 mt-2.5 w-80 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/15 shadow-2xl shadow-black/30 select-none overflow-hidden z-[99999]"
+          className="absolute top-full end-0 mt-2.5 w-80 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/15 shadow-2xl shadow-black/30 select-none overflow-hidden z-[99999]"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/5">
@@ -106,7 +106,7 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
                 </button>
 
                 {isDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-44 max-h-52 overflow-y-auto rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/15 shadow-xl z-50 py-1 scrollbar-thin">
+                  <div className="absolute end-0 top-full mt-1.5 w-44 max-h-52 overflow-y-auto rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/15 shadow-xl z-50 py-1 scrollbar-thin">
                     {SUPPORTED_LANGUAGES.map((lang) => (
                       <button
                         key={lang.code}
@@ -114,7 +114,7 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
                           setSelectedTargetLang(lang.code);
                           setIsDropdownOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-100 dark:hover:bg-white/10 transition-colors ${
+                        className={`w-full text-start px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-100 dark:hover:bg-white/10 transition-colors ${
                           lang.code === selectedTargetLang ? 'text-cyan-600 dark:text-cyan-400 font-semibold bg-cyan-500/10' : 'text-slate-700 dark:text-slate-200'
                         }`}
                       >

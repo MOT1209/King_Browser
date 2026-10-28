@@ -120,7 +120,7 @@ export const UpdateToast: React.FC = React.memo(() => {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ type: 'spring', damping: 22, stiffness: 320 }}
-          className="fixed bottom-6 right-6 z-[9999] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 p-4 rounded-2xl shadow-2xl flex items-start gap-3.5 max-w-sm w-full"
+          className="fixed bottom-6 end-6 z-[9999] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 p-4 rounded-2xl shadow-2xl flex items-start gap-3.5 max-w-sm w-full"
         >
           <div className="w-10 h-10 rounded-xl bg-cyan-500/10 dark:bg-cyan-500/15 border border-cyan-500/20 flex items-center justify-center shrink-0">
             {isDownloading || isInstalling ? (

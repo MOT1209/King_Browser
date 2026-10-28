@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { AgentTabMarker } from './ui/AgentTabMarker';
+import { FOLDER_COLOR_CLASSES, FOLDER_COLOR_KEYS, normalizeFolderColor } from '../utils/folderColors';
 import { useAgentTabId } from '../services/agentTabStore';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   Folder as FolderIcon,
+  Palette,
   FolderPlus,
   Check,
   Settings,
@@ -150,6 +152,7 @@ export interface SidebarTabsProps {
   onCreateFolder?: () => void;
   onToggleFolder?: (id: string) => void;
   onRenameFolder?: (id: string, name: string) => void;
+  onSetFolderColor?: (id: string, color?: string) => void;
   onDeleteFolder?: (id: string) => void;
   onMoveTabToFolder?: (tabId: string, folderId?: string) => void;
   onOpenSpotlight?: () => void;
@@ -299,7 +302,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       onMouseLeave={onMouseLeave}
       style={isActive ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
       className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none overflow-hidden ${
-        isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
+        isNested ? 'ms-3.5 w-[calc(100%-14px)]' : 'w-full'
       } ${
         isDragOver
           ? 'ring-2 ring-cyan-500 bg-cyan-500/15 text-slate-900 dark:text-white shadow-md'
@@ -519,6 +522,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onCreateFolder,
   onToggleFolder,
   onRenameFolder,
+  onSetFolderColor,
   onDeleteFolder,
   onMoveTabToFolder,
   onOpenSpotlight,
@@ -548,6 +552,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onReorderTabs
 }) => {
   const { l, t } = useTranslation();
+  const [colorPickerFolderId, setColorPickerFolderId] = useState<string | null>(null);
   const tabIds = useMemo(() => tabs.map(tab => tab.id), [tabs]);
   const agentTabId = useAgentTabId(tabIds);
   const activeTab = tabs.find(t => t.id === activeTabId);
@@ -894,7 +899,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           live page content forces a recomposite on every page repaint. */}
       <div
         style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-        className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-slate-900 border-r border-slate-200/80 dark:border-white/[0.06] font-sans"
+        className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-slate-900 border-e border-slate-200/80 dark:border-white/[0.06] font-sans"
       >
 
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
@@ -995,7 +1000,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 ? 'bg-white border-cyan-500/50 shadow-md ring-1 ring-cyan-500/20 dark:bg-white/12 dark:border-white/20 dark:shadow-lg dark:ring-white/10'
                 : 'bg-white/80 hover:bg-white border-slate-300/80 dark:bg-white/6 dark:hover:bg-white/8 dark:border-white/[0.08]'
             }`}>
-              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0 mr-2 opacity-70" />
+              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0 me-2 opacity-70" />
 
               <input
                 ref={omniboxInputRef}
@@ -1051,7 +1056,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 autoComplete="off"
               />
 
-              <div className="flex items-center gap-1.5 shrink-0 ml-1">
+              <div className="flex items-center gap-1.5 shrink-0 ms-1">
                 {privacyShield ? (
                   <span title={l({ en: 'Privacy Shield Active', ar: 'درع الخصوصية مفعّل', de: 'Privacy Shield aktiv' })} className="text-emerald-500 dark:text-emerald-400/90">
                     <ShieldCheck className="w-3.5 h-3.5" />
@@ -1083,7 +1088,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.98 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-11 left-3 right-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+                className="absolute top-11 start-3 end-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
                 {suggestions.map((s, idx) => (
                   <button
@@ -1128,7 +1133,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {/* Delete Shortcut */}
                 <button
                   onClick={(e) => handleRemoveFavorite(fav.id, e)}
-                  className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10 cursor-pointer"
+                  className="absolute -top-1 -end-1 w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10 cursor-pointer"
                 >
                   <X className="w-2 h-2" />
                 </button>
@@ -1221,7 +1226,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-9 left-3 right-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+                className="absolute top-9 start-3 end-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
                 <div className="max-h-48 overflow-y-auto no-scrollbar py-1">
                   {workspaces.map(w => (
@@ -1309,6 +1314,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {/* Folders */}
             {folders?.filter(f => f.workspaceId === activeWorkspaceId).map(folder => {
               const folderTabs = tabs.filter(t => t.folderId === folder.id);
+              const folderColorKey = normalizeFolderColor(folder.color);
+              const folderColor = folderColorKey ? FOLDER_COLOR_CLASSES[folderColorKey] : null;
               return (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -1347,13 +1354,25 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       const tabId = e.dataTransfer.getData('text/plain');
                       if (tabId) onMoveTabToFolder?.(tabId, folder.id);
                     }}
-                    className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-colors group/folder ${dragOverFolderId === folder.id ? 'bg-slate-200/80 dark:bg-white/15 ring-2 ring-cyan-500/50' : ''}`}
+                    className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-colors group/folder ${folderColor ? `border-s-2 ${folderColor.border}` : ''} ${dragOverFolderId === folder.id ? 'bg-slate-200/80 dark:bg-white/15 ring-2 ring-cyan-500/50' : ''}`}
                   >
                     <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
                       {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     </div>
-                    <FolderIcon className="w-3.5 h-3.5 opacity-70 group-hover/folder:opacity-100 transition-opacity" />
+                    <FolderIcon className={`w-3.5 h-3.5 ${folderColor ? folderColor.icon : 'opacity-70'} group-hover/folder:opacity-100 transition-opacity`} />
                     <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>
+                    {onSetFolderColor && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setColorPickerFolderId(prev => (prev === folder.id ? null : folder.id)); }}
+                        onKeyDown={(e) => { e.stopPropagation(); }}
+                        aria-label={t('folders.chooseColor')}
+                        aria-expanded={colorPickerFolderId === folder.id}
+                        title={t('folders.chooseColor')}
+                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 focus:opacity-100 transition-opacity text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      >
+                        <Palette className="w-3 h-3" />
+                      </button>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
                       onKeyDown={(e) => { e.stopPropagation(); }}
@@ -1362,6 +1381,28 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       <X className="w-3 h-3" />
                     </button>
                   </div>
+                  {onSetFolderColor && colorPickerFolderId === folder.id && (
+                    <div role="group" aria-label={t('folders.chooseColor')} className="flex items-center gap-1.5 ps-8 pe-2 py-1.5">
+                      {FOLDER_COLOR_KEYS.map(key => (
+                        <button
+                          key={key}
+                          onClick={() => { onSetFolderColor(folder.id, key); setColorPickerFolderId(null); }}
+                          aria-label={t(`folders.colors.${key}`)}
+                          aria-pressed={folderColorKey === key}
+                          title={t(`folders.colors.${key}`)}
+                          className={`w-4 h-4 rounded-full ${FOLDER_COLOR_CLASSES[key].dot} ${folderColorKey === key ? 'ring-2 ring-offset-1 ring-slate-400 dark:ring-slate-300 dark:ring-offset-slate-900' : ''} cursor-pointer`}
+                        />
+                      ))}
+                      <button
+                        onClick={() => { onSetFolderColor(folder.id, undefined); setColorPickerFolderId(null); }}
+                        aria-label={t('folders.colorNone')}
+                        title={t('folders.colorNone')}
+                        className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-400 cursor-pointer"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  )}
                   <AnimatePresence>
                     {folder.isExpanded && (
                       <motion.div
@@ -1490,7 +1531,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute bottom-12 left-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
+                className="absolute bottom-12 start-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
               >
                 {onToggleAIAssistant && (
                   <button
