@@ -42,12 +42,13 @@ export interface LinuxSandboxDecision {
 }
 
 const SETUID_BIT = 0o4000;
-const OWNER_EXECUTE = 0o100;
+// The helper is executed by the invoking user, not by its owner (root).
+const OTHERS_EXECUTE = 0o001;
 
 /** The same conditions Chromium checks before it uses the helper. */
 export function isUsableSetuidHelper(stat: SetuidHelperStat | null): boolean {
   if (!stat || !stat.isFile) return false;
-  return stat.uid === 0 && (stat.mode & SETUID_BIT) !== 0 && (stat.mode & OWNER_EXECUTE) !== 0;
+  return stat.uid === 0 && (stat.mode & SETUID_BIT) !== 0 && (stat.mode & OTHERS_EXECUTE) !== 0;
 }
 
 export function decideLinuxSandbox(input: LinuxSandboxInput): LinuxSandboxDecision {
@@ -61,6 +62,12 @@ export function decideLinuxSandbox(input: LinuxSandboxInput): LinuxSandboxDecisi
 
 const USERNS_CLONE_SYSCTL = '/proc/sys/kernel/unprivileged_userns_clone';
 
+/** Where Chromium looks for the helper: CHROME_DEVEL_SANDBOX first, else next to the executable. */
+export function setuidHelperPath(execPath: string, env: NodeJS.ProcessEnv = process.env): string {
+  const override = env.CHROME_DEVEL_SANDBOX;
+  return override ? override : path.join(path.dirname(execPath), 'chrome-sandbox');
+}
+
 /** Reads the real system state; any read error counts as "not available". */
 export function readLinuxSandboxInput(execPath: string): LinuxSandboxInput {
   let usernsCloneSetting: string | null = null;
@@ -71,7 +78,7 @@ export function readLinuxSandboxInput(execPath: string): LinuxSandboxInput {
   }
   let setuidHelper: SetuidHelperStat | null = null;
   try {
-    const stat = fs.statSync(path.join(path.dirname(execPath), 'chrome-sandbox'));
+    const stat = fs.statSync(setuidHelperPath(execPath));
     setuidHelper = { uid: stat.uid, mode: stat.mode, isFile: stat.isFile() };
   } catch {
     setuidHelper = null;

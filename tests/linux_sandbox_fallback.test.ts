@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { decideLinuxSandbox, isUsableSetuidHelper } from '../electron/main/linuxSandbox';
+import { decideLinuxSandbox, isUsableSetuidHelper, setuidHelperPath } from '../electron/main/linuxSandbox';
 
 /**
  * When the kernel disables unprivileged user namespaces, Chromium can still
@@ -18,6 +18,10 @@ assert.equal(isUsableSetuidHelper(helper()), true, 'root-owned 4755 file is usab
 assert.equal(isUsableSetuidHelper(helper({ mode: 0o100755 })), false, 'no setuid bit');
 assert.equal(isUsableSetuidHelper(helper({ uid: 1000 })), false, 'not owned by root (AppImage mounts, npm installs)');
 assert.equal(isUsableSetuidHelper(helper({ mode: 0o104644 })), false, 'setuid but not executable');
+// The helper runs as the invoking user, not its owner: Chromium requires the
+// "others" execute bit. Trusting owner-execute alone (4744) would keep the
+// sandbox switch on where Chromium then refuses to start.
+assert.equal(isUsableSetuidHelper(helper({ mode: 0o104744 })), false, 'only root can execute it');
 assert.equal(isUsableSetuidHelper(helper({ isFile: false })), false, 'not a regular file');
 assert.equal(isUsableSetuidHelper(null), false, 'missing helper');
 
@@ -47,5 +51,9 @@ assert.deepEqual(
 );
 // Whitespace from /proc is tolerated.
 assert.equal(decideLinuxSandbox({ isRoot: false, usernsCloneSetting: '0\n', setuidHelper: null }).disableSandbox, true);
+
+// The helper path is the one Chromium itself uses, including its override.
+assert.equal(setuidHelperPath('/opt/King Browser/king-browser', {}), '/opt/King Browser/chrome-sandbox');
+assert.equal(setuidHelperPath('/opt/King Browser/king-browser', { CHROME_DEVEL_SANDBOX: '/usr/local/sbin/chrome-devel-sandbox' }), '/usr/local/sbin/chrome-devel-sandbox');
 
 console.log('[PASS] Linux sandbox is only disabled as root, or without namespaces AND without a usable setuid helper');
