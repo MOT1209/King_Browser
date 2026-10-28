@@ -10,6 +10,7 @@ import { orchestrator } from '../services/agentOrchestrator';
 // deliberately permits loopback/private hosts for real user navigation.
 import { isSafeAgentNavigationUrl } from '../utils/safeNavigation';
 import { buildSnapshotScript } from '../utils/elementSnapshot';
+import { redactSnapshotUrls, redactUrlForAgent, redactUrlParamsInText } from '../utils/urlRedaction';
 import { getConsoleMessages } from '../utils/consoleBuffer';
 import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS, MCP_POLICY_CONTEXT_ACTION } from '../utils/mcpActionTiming';
 
@@ -26,7 +27,15 @@ import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS, MCP_POLICY_CONTEXT_ACTIO
  * not connection pinning; it does not prove the address Chromium connected to.
  */
 async function agentNavigationAllowed(url: string): Promise<{ ok: boolean; reason?: string }> {
-  if (!isSafeAgentNavigationUrl(url)) return { ok: false, reason: 'destination is not a public address' };
+  if (!isSafeAgentNavigationUrl(url)) {
+    let scheme = '';
+    try { scheme = new URL(url).protocol; } catch { /* unparseable: keep the generic reason */ }
+    const webScheme = scheme === 'http:' || scheme === 'https:';
+    return {
+      ok: false,
+      reason: scheme && !webScheme ? `only http and https destinations are allowed (got ${scheme})` : 'destination is not a public address'
+    };
+  }
   // The synchronous policy already validates internal renderer routes. They
   // have no network host; sending them to the HTTP-only DNS guard rejects them.
   const protocol = new URL(url).protocol;
@@ -43,6 +52,28 @@ async function agentNavigationAllowed(url: string): Promise<{ ok: boolean; reaso
   }
 }
 import { searchHistoryAndBookmarks, SearchableItem } from '../utils/searchHistoryBookmarks';
+
+/**
+ * browser_read_page answers with a JSON document whose `links` array is the
+ * only URL-bearing field. Rewrite it before the payload reaches the agent so a
+ * signed link or an OAuth callback in the page source cannot carry a token into
+ * the client's transcript. Page text is left verbatim: reading the page is the
+ * feature, and the agent needs what the page actually says.
+ */
+function redactReadPageResult(raw: unknown): unknown {
+  if (typeof raw !== 'string') return raw;
+  try {
+    const parsed = JSON.parse(raw) as { links?: unknown } | null;
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.links)) {
+      parsed.links = parsed.links.map(link => (typeof link === 'string' ? redactUrlForAgent(link) : link));
+      return JSON.stringify(parsed);
+    }
+    return raw;
+  } catch (_) {
+    // Fail closed if the page script ever stops returning JSON.
+    return redactUrlParamsInText(raw);
+  }
+}
 
 // A ref the agent was never issued (or one a navigation invalidated) is
 // forwarded to the page as `[data-king-ref="e12"]`, and the plain "element not
@@ -279,12 +310,12 @@ export function useBrowserAgentBridge({
             return `Error: Navigation to this destination is blocked for security (${gate.reason}).`;
           }
           mcpHandlersRef.current.handleNavigate(safeArgs.url, activeTabId || undefined);
-          return `Navigated to ${safeArgs.url}`;
+          return `Navigated to ${redactUrlForAgent(safeArgs.url)}`;
         }
 
         case 'browser_read_page':
           if (activeWebview && activeWebview.executeJavaScript) {
-            return await activeWebview.executeJavaScript(`
+            return redactReadPageResult(await activeWebview.executeJavaScript(`
               (() => {
                 const MAX_TEXT = 10000;
                 const MAX_LINKS = 50;
@@ -304,13 +335,14 @@ export function useBrowserAgentBridge({
                   totalLinks: links.length
                 });
               })();
-            `);
+            `));
           }
           return "Error: No active webview available.";
 
         case 'browser_snapshot':
           if (activeWebview && activeWebview.executeJavaScript) {
-            return await activeWebview.executeJavaScript(buildSnapshotScript());
+            const snapshot = await activeWebview.executeJavaScript(buildSnapshotScript());
+            return typeof snapshot === 'string' ? redactSnapshotUrls(snapshot) : snapshot;
           }
           return "Error: No active webview available.";
 
@@ -422,7 +454,7 @@ export function useBrowserAgentBridge({
           return "Error: browser_run_js has been removed for security reasons (VULN-01).";
 
         case 'browser_list_tabs':
-          return JSON.stringify(tabs.map(t => ({ id: t.id, title: t.title, url: t.url, isActive: t.id === activeTabId })));
+          return JSON.stringify(tabs.map(t => ({ id: t.id, title: t.title, url: t.url ? redactUrlForAgent(t.url) : t.url, isActive: t.id === activeTabId })));
 
         case 'browser_switch_tab': {
           if (!safeArgs.tabId || typeof safeArgs.tabId !== 'string') return "Error: Missing or invalid 'tabId' parameter";
@@ -477,10 +509,10 @@ export function useBrowserAgentBridge({
           const gate = await agentNavigationAllowed(newUrl);
           if (!canExecute()) return "Error: MCP action was cancelled or expired.";
           if (!gate.ok) {
-            return `Error: Navigation blocked for unsafe destination (${gate.reason}): ${newUrl}`;
+            return `Error: Navigation blocked for unsafe destination (${gate.reason}): ${redactUrlForAgent(newUrl)}`;
           }
           mcpHandlersRef.current.handleNewTab(newUrl, undefined, { reuseBlank: false, agentOwned: isolated, agentPersistent: isolated && Boolean(settingsRef.current?.agentPersistentProfile) });
-          return `Opened new tab: ${newUrl}`;
+          return `Opened new tab: ${redactUrlForAgent(newUrl)}`;
         }
 
         case 'browser_go_back':
@@ -508,7 +540,7 @@ export function useBrowserAgentBridge({
 
         case 'browser_get_url': {
           const activeTab = tabs.find(t => t.id === activeTabId);
-          return activeTab?.url || "Error: Could not get URL";
+          return activeTab?.url ? redactUrlForAgent(activeTab.url) : "Error: Could not get URL";
         }
 
         case MCP_POLICY_CONTEXT_ACTION: {
@@ -527,7 +559,10 @@ export function useBrowserAgentBridge({
               const type = (el.getAttribute('type') || '').toLowerCase();
               const isButton = el.tagName === 'BUTTON' || ['submit', 'button', 'reset'].includes(type);
               const labels = el.labels ? Array.from(el.labels).map(label => label.innerText) : [];
-              const parts = [el.innerText || el.textContent || '', ...labels,
+              // A submit control of a POST form sends data whatever its label says.
+              const submitsPost = !!el.form && (type === 'submit' || (el.tagName === 'BUTTON' && !type)) &&
+                (el.form.getAttribute('method') || 'get').toLowerCase() === 'post';
+              const parts = [el.innerText || el.textContent || '', ...labels, submitsPost ? 'king:post-form-submit' : '',
                 el.getAttribute('aria-label'), el.getAttribute('title'), el.getAttribute('alt'),
                 el.getAttribute('placeholder'), el.getAttribute('name'), el.getAttribute('autocomplete'),
                 type, isButton ? el.getAttribute('value') : ''];
@@ -738,7 +773,12 @@ export function useBrowserAgentBridge({
           const level = safeArgs.level === 'error' || safeArgs.level === 'warning' ? safeArgs.level : 'all';
           const messages = getConsoleMessages(activeTabId, level, Number(safeArgs.limit) || 50);
           if (messages.length === 0) return 'No console messages recorded for this page.';
-          return JSON.stringify(messages.map(m => ({ level: m.level, message: m.message, source: m.source, line: m.line })));
+          return JSON.stringify(messages.map(m => ({
+            level: m.level,
+            message: redactUrlParamsInText(m.message),
+            source: typeof m.source === 'string' ? redactUrlParamsInText(m.source) : m.source,
+            line: m.line
+          })));
         }
 
         case 'browser_element_screenshot': {
@@ -880,7 +920,7 @@ export function useBrowserAgentBridge({
             const gate = await agentNavigationAllowed(currentTab.url);
             if (!canExecute() || !gate.ok) return "Error: Duplicate navigation blocked for security or changed target.";
             mcpHandlersRef.current.handleNewTab(currentTab.url);
-            return `Duplicated tab: ${currentTab.url}`;
+            return `Duplicated tab: ${redactUrlForAgent(currentTab.url)}`;
           }
           return "Error: No active tab to duplicate";
         }
@@ -1116,7 +1156,7 @@ export function useBrowserAgentBridge({
           }
           const live = captureTarget();
           if (live.tabId !== approvedTarget.tabId) {
-            return `MCP action "${toolName}" did not run: the active tab changed from ${approvedTarget.url || '(none)'} to ${live.url || '(none)'} before execution. Re-issue the action for the tab you intend to drive.`;
+            return `MCP action "${toolName}" did not run: the active tab changed from ${redactUrlForAgent(approvedTarget.url || '(none)')} to ${redactUrlForAgent(live.url || '(none)')} before execution. Re-issue the action for the tab you intend to drive.`;
           }
           if (!live.guest) {
             return `MCP action "${toolName}" did not run: the page went away before execution (the tab was closed, navigated to a browser page, or the webview was destroyed).`;

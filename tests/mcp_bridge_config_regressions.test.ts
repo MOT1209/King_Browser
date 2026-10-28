@@ -19,20 +19,39 @@ for (const file of ['mcp-bridge.ts', 'mcp-bridge.mjs']) {
     `${file} must pass TOOL_CALL_TIMEOUT_MS to callTool`);
   const start = source.indexOf('function getUserDataPath');
   const end = source.indexOf('async function main', start);
-  function config(token?: string) {
+  function run(token: string | undefined, env: Record<string, string> = {}, call = 'resolveMcpConfig()') {
     const readFiles: string[] = [];
-    const code = ts.transpileModule(source.slice(start, end) + '\nresolveMcpConfig();', {
+    const code = ts.transpileModule(source.slice(start, end) + `\n${call};`, {
       compilerOptions: { target: ts.ScriptTarget.ES2020 }
     }).outputText;
     const result = vm.runInNewContext(code, {
-      os, path, process: { platform: 'darwin', env: { MCP_TOKEN: token } },
+      os, path, URL, process: { platform: 'darwin', env: { MCP_TOKEN: token, ...env } },
       fs: { existsSync: () => true, readFileSync: (name: string) => { readFiles.push(name); return name.endsWith('king-mcp-port') ? '3020' : 'NMCP encrypted ciphertext'; } }
     });
     assert.ok(readFiles.every(name => !name.endsWith('king-mcp-token')), 'standalone Node must never read an encrypted token as plaintext');
     return result;
   }
+  const config = (token?: string, env: Record<string, string> = {}) => run(token, env);
+  const endpoint = (url?: string) => run('12345678-1234-1234-1234-123456789abc', url === undefined ? {} : { MCP_SSE_URL: url }, 'resolveSseUrl(3020)');
   assert.throws(() => config(), /MCP_TOKEN/, `${file} must explain the missing explicit token before connecting`);
   assert.equal(config('12345678-1234-1234-1234-123456789abc').token, '12345678-1234-1234-1234-123456789abc');
   assert.throws(() => config('malicious\r\nheader'), /MCP_TOKEN/, 'invalid header characters must be rejected');
+
+  // The endpoint decides where the bearer token is sent.
+  assert.equal(endpoint().href, 'http://127.0.0.1:3020/sse', `${file} must default to the loopback SSE endpoint`);
+  assert.equal(endpoint('https://mcp.example.com/sse').href, 'https://mcp.example.com/sse', 'https to a remote host is allowed');
+  for (const loopback of ['http://127.0.0.1:3020/sse', 'http://localhost:3020/sse', 'http://[::1]:3020/sse']) {
+    assert.equal(endpoint(loopback).href, loopback, `loopback endpoint ${loopback} must be accepted`);
+  }
+  assert.throws(() => endpoint('http://10.0.0.5:3020/sse'), /cleartext/i,
+    'a remote http endpoint must be refused: the token would cross the network in cleartext');
+  assert.throws(() => endpoint('http://127.0.0.1.evil.example:3020/sse'), /cleartext/i,
+    'a hostname that merely starts with a loopback address must not be trusted');
+  assert.throws(() => endpoint('http://user:secret@127.0.0.1:3020/sse'), /must not embed credentials/);
+  assert.throws(() => endpoint('http://token@127.0.0.1:3020/sse'), /must not embed credentials/);
+  for (const scheme of ['file:///etc/passwd', 'ftp://127.0.0.1/sse', 'javascript:alert(1)']) {
+    assert.throws(() => endpoint(scheme), /must use http or https/, `${scheme} must be refused`);
+  }
+  assert.throws(() => endpoint('not a url'), /not a valid URL/);
 }
 console.log('[PASS] Standalone MCP bridge credential configuration');

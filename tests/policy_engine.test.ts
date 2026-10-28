@@ -4,6 +4,7 @@ import {
   extractDomain,
   redactArgs,
   buildApprovalSummary,
+  FORM_SUBMIT_MARKER,
   type PolicyInput
 } from '../electron/main/policyEngine';
 
@@ -336,6 +337,39 @@ async function run() {
     });
     assert.equal(harmless.risk, 'safe', 'neutral German/Turkish text stays safe');
     console.log('[PASS] Policy — German and Turkish text detected');
+  }
+
+  // Regression: a POST form was submitted with no approval because the button
+  // text ("Submit order") matched no purchase/send keyword and the classifier
+  // never looked at what the control does. The page-context script now tags
+  // submit controls of POST forms; the policy must treat that tag as a trigger
+  // whatever the button says, while GET (search) forms stay safe.
+  {
+    const post = classifyAction({
+      toolName: 'browser_click',
+      args: { selector: '[data-king-ref="e13"]' },
+      currentUrl: 'https://httpbin.org/forms/post',
+      elementText: `Submit order submit ${FORM_SUBMIT_MARKER}`
+    });
+    assert.equal(post.risk, 'sensitive', 'POST form submit button needs approval');
+    assert.ok(post.triggers.includes('consequential_form'), 'consequential_form trigger present');
+
+    const neutralLabel = classifyAction({
+      toolName: 'browser_click',
+      args: { selector: 'button' },
+      currentUrl: 'https://example.com/',
+      elementText: `Go ${FORM_SUBMIT_MARKER}`
+    });
+    assert.equal(neutralLabel.risk, 'sensitive', 'the label does not matter, the form method does');
+
+    const search = classifyAction({
+      toolName: 'browser_click',
+      args: { selector: 'button' },
+      currentUrl: 'https://example.com/',
+      elementText: 'Search submit'
+    });
+    assert.equal(search.risk, 'safe', 'a GET search button carries no marker and stays safe');
+    console.log('[PASS] Policy — POST form submit needs approval regardless of label');
   }
 
   console.log('[PASS] Policy Engine suite complete');

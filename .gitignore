@@ -58,3 +58,6 @@ electron/keys/*private*.pem
 # Playwright Electron checks (tests/electron)
 test-results/
 playwright-report/
+
+# Git Bash crash dumps
+*.stackdump

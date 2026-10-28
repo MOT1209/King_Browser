@@ -47,6 +47,28 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.10',
+    date: 'October 2026',
+    title: 'More control over what the agent does',
+    badge: 'Pre-release',
+    lede: 'A POST form can no longer be submitted by the agent without your approval, and the approval screen shows more of what an action will do.',
+    highlights: [
+      'Submitting a POST form now needs your approval whatever the button says. Before, a button labelled “Submit order” was clicked with no prompt.',
+      'You can take the browser from the agent and hand it back, and the approval screen shows what an action will do before you decide.',
+      'Recently closed tabs, folder colors, and zoom remembered per site.',
+    ],
+    changes: [
+      { category: 'security', text: 'Agent clicks that submit a POST form are held for approval; search (GET) forms are unchanged.' },
+      { category: 'security', text: 'URLs returned to MCP clients no longer carry credential values from the query string.' },
+      { category: 'security', text: 'The MCP bridge rejects unsafe endpoints.' },
+      { category: 'feature', text: 'Agent: mark the agent tab, notify on background approvals, a movable status pill, and a full shortcuts editor.' },
+      { category: 'feature', text: 'Agent: take the browser and hand it back; see what an action will do before approving it.' },
+      { category: 'feature', text: 'Browser: recently closed tabs list, folder colors, zoom remembered per site.' },
+      { category: 'improvement', text: 'Right-to-left layout uses logical utilities instead of global mirror rules.' },
+      { category: 'fix', text: 'Navigation to file: and javascript: addresses is blocked with a message that names the real reason.' },
+    ],
+  },
+  {
     version: '0.0.9',
     date: 'October 2026',
     title: 'The new tab page is back in shape',
