@@ -363,7 +363,14 @@
       "option": "Wird wählen"
     },
     "waitingForApproval": "Wartet auf Ihre Freigabe",
-    "waitingForApprovalAt": "Wartet auf Ihre Freigabe - {domain}"
+    "waitingForApprovalAt": "Wartet auf Ihre Freigabe - {domain}",
+    "takeOver": "Übernehmen",
+    "handBack": "An Agent zurückgeben",
+    "takeOverHint": "Hält den Agenten an und verwirft seine Warteschlange. Sie steuern den Browser, bis Sie ihn zurückgeben.",
+    "takenOverNotice": "Sie steuern den Browser. Der Agent wartet.",
+    "takenOverPill": "Sie steuern",
+    "tabMarkerTakenOver": "Sie steuern diesen Tab",
+    "pageMarkerTakenOver": "Sie steuern diese Seite"
   },
   "appearance": {
     "wallpaper": {
@@ -547,7 +554,8 @@
       "selectAll": "Alles auswählen",
       "undo": "Rückgängig",
       "redo": "Wiederholen",
-      "quit": "Beenden"
+      "quit": "Beenden",
+      "agentTakeOver": "Vom Agenten übernehmen / zurückgeben"
     },
     "reserved": "Reserviert für „{action}“. Andere Kombination wählen."
   }

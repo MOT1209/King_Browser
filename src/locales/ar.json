@@ -387,7 +387,14 @@
       "option": "سيختار"
     },
     "waitingForApproval": "بانتظار موافقتك",
-    "waitingForApprovalAt": "بانتظار موافقتك - {domain}"
+    "waitingForApprovalAt": "بانتظار موافقتك - {domain}",
+    "takeOver": "استلم أنت",
+    "handBack": "أعِد التحكم للوكيل",
+    "takeOverHint": "يوقف الوكيل مؤقتا ويلغي ما كان في قائمته. تتحكم أنت بالمتصفح حتى تعيده.",
+    "takenOverNotice": "أنت تتحكم بالمتصفح. الوكيل ينتظر.",
+    "takenOverPill": "أنت تتحكم",
+    "tabMarkerTakenOver": "أنت تتحكم بهذا التبويب",
+    "pageMarkerTakenOver": "أنت تتحكم بهذه الصفحة"
   },
   "appearance": {
     "wallpaper": {
@@ -571,7 +578,8 @@
       "selectAll": "تحديد الكل",
       "undo": "تراجع",
       "redo": "إعادة",
-      "quit": "إنهاء"
+      "quit": "إنهاء",
+      "agentTakeOver": "استلام التحكم من الوكيل أو إعادته"
     },
     "reserved": "محجوز لـ \"{action}\". اختر مجموعة أخرى."
   }

@@ -122,6 +122,8 @@ export interface ElectronEngineStatus {
   queueLength: number;
   inFlight: ElectronEngineActionRecord | null;
   pendingApproval: ElectronEnginePendingApproval | null;
+  /** The human has taken the browser; the agent waits until they hand it back. */
+  takenOver?: boolean;
   phase: ElectronEnginePhaseInfo | null;
   actionsUsedThisRun: number;
   maxActionsPerRun: number;
@@ -139,6 +141,7 @@ export type ElectronEngineEvent =
   | { type: 'action_updated'; record: ElectronEngineActionRecord }
   | { type: 'approval_needed'; approval: ElectronEnginePendingApproval }
   | { type: 'approval_resolved'; actionId: string; approved: boolean }
+  | { type: 'takeover_changed'; takenOver: boolean }
   | {
       type: 'phase_updated';
       phase: ElectronEnginePhaseInfo['phase'] | null;

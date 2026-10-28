@@ -36,11 +36,25 @@ markAgentTab('t1');
 setAgentEngineState('running');
 markAgentTab('');
 markAgentTab(undefined);
-assert.deepEqual(getAgentTabSnapshot(), { tabId: 't1', engineState: 'running' });
+assert.deepEqual(getAgentTabSnapshot(), { tabId: 't1', engineState: 'running', takenOver: false });
 assert.equal(calls, 2, 'duplicate and empty updates do not notify');
 unsubscribe();
 markAgentTab('t2');
 assert.equal(calls, 2, 'unsubscribed listeners are not called');
+resetAgentTabStoreForTests();
+
+// The marker changes color while the human drives; leaving the take-over notifies listeners too.
+resetAgentTabStoreForTests();
+let takeOverCalls = 0;
+const unsubscribeTakeOver = subscribeAgentTab(() => { takeOverCalls++; });
+setAgentEngineState('paused', true);
+assert.equal(getAgentTabSnapshot().takenOver, true);
+setAgentEngineState('paused', true);
+assert.equal(takeOverCalls, 1, 'an unchanged take-over does not notify');
+setAgentEngineState('running', false);
+assert.equal(getAgentTabSnapshot().takenOver, false);
+assert.equal(takeOverCalls, 2);
+unsubscribeTakeOver();
 resetAgentTabStoreForTests();
 
 // Regression: the tab items use custom React.memo comparators. A comparator

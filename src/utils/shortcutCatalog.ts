@@ -45,6 +45,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: 'toggleAgentPanel', group: 'agent' },
   { id: 'toggleAgentPill', group: 'agent' },
   { id: 'agentStopNow', group: 'agent' },
+  { id: 'agentTakeOver', group: 'agent' },
 ];
 
 export function buildDefaultShortcuts(isMac: boolean): Record<string, Required<ShortcutBindingLike>> {
@@ -84,6 +85,7 @@ export function buildDefaultShortcuts(isMac: boolean): Record<string, Required<S
     toggleAgentPill: b('m', { shift: true }),
     // Not Ctrl+Shift+Esc: Windows reserves it for Task Manager.
     agentStopNow: b('x', { shift: true }),
+    agentTakeOver: b('h', { shift: true }),
   };
 }
 

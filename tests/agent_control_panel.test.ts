@@ -167,12 +167,12 @@ async function renderSuite() {
       return until(container.innerHTML);
     };
 
-    const mount = async () => {
+    const mount = async (props: Record<string, unknown> = {}) => {
       const container = w.document.createElement('div');
       w.document.body.appendChild(container);
       const root = createRoot(container);
       await act(async () => {
-        root.render(React.createElement(AgentControlPanel));
+        root.render(React.createElement(AgentControlPanel, props));
       });
       await settle(container, html => html.includes('Running'));
       mounted.push({ root, container });
@@ -264,6 +264,39 @@ async function renderSuite() {
       check('approval card lists the address it will open', details.textContent.includes('Will open: https://example.com/pay'));
       check('other arguments are shown as key: value', details.textContent.includes('delay: 5'));
       check('a secret in the raw args never reaches the card', !container.textContent.includes('hunter2'));
+    }
+
+    // 3c. The human can take the browser and hand it back; while driving, only hand-back and STOP NOW apply.
+    {
+      statusPayload = makeStatus({ state: 'running' });
+      const container = await mount({ activeTabUrl: 'https://shop.test/cart?token=SECRET' });
+      const pill = container.querySelector('button[aria-expanded]');
+      await act(async () => { pill.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); });
+      await settle(container, html => html.includes('Take over'));
+
+      const takeOver = findButton(container, 'Take over');
+      check('the panel offers to take over', Boolean(takeOver));
+      const before = commands.length;
+      await act(async () => { takeOver.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); });
+      await settle(container, () => commands.length > before);
+      check('taking over sends take_over', commands.slice(before).some(c => c.command === 'take_over'), JSON.stringify(commands.slice(before)));
+
+      statusPayload = makeStatus({ state: 'paused', takenOver: true });
+      await emitEngineEvent(container);
+      await settle(container, html => html.includes('Hand back to agent'));
+      check('the pill says the human is driving', container.textContent.includes('You are driving'));
+      check('the notice says the agent is waiting', container.textContent.includes('The agent is waiting'));
+      check('while driving, resume is disabled', findButton(container, 'Resume')?.disabled === true);
+      check('while driving, full control is disabled', findButton(container, 'Full control')?.disabled === true);
+      check('STOP NOW stays available while driving', findButton(container, 'STOP NOW')?.disabled === false);
+
+      const handBack = findButton(container, 'Hand back to agent');
+      const before2 = commands.length;
+      await act(async () => { handBack.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); });
+      await settle(container, () => commands.length > before2);
+      const handBackCommand = commands.slice(before2).find(c => c.command === 'hand_back');
+      check('handing back sends hand_back with the page', JSON.stringify(handBackCommand?.payload) === JSON.stringify({ url: 'https://shop.test/cart?token=SECRET' }), JSON.stringify(handBackCommand));
+      statusPayload = makeStatus({ state: 'running' });
     }
 
     // 4. Reject carries the exact action id and refuses the binding.

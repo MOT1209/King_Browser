@@ -24,6 +24,7 @@ import { createActivityStore, type ActivityStore } from './main/activityStore.js
 import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from './main/executionEngine.js';
 import { classifyAction, buildApprovalSummary, redactArgs } from './main/policyEngine.js';
 import { describeApprovalArgs, previewSelectorFor } from './main/approvalDetails.js';
+import { formatHandoffMessage } from './main/handoffNote.js';
 import { approvalDialogStrings, buildApprovalDialogDetail, type UiLanguage } from './main/uiStrings.js';
 
 // Security: Screen-lock tracking prevents MCP execution while user is away
@@ -1134,6 +1135,22 @@ export class BrowserMCPServer {
    * Runs one tool call, then lets the recorder note it. Recording happens after
    * the call succeeded, so refused or failed actions never enter a recording.
    */
+  /**
+   * Entry point for MCP clients. After the human hands the browser back, the
+   * first successful tool result carries one note naming the page they left
+   * (see handoffNote.ts), so the agent re-checks before acting. Internal calls
+   * such as recording replay use executeTool directly and never consume it.
+   */
+  private async executeToolForClient(toolName: string, args: Record<string, any>): Promise<string> {
+    const note = this.engineInstance?.peekHandoffNote() ?? null;
+    const result = await this.executeTool(toolName, args);
+    if (note && this.engineInstance?.peekHandoffNote() === note) {
+      this.engineInstance.consumeHandoffNote();
+      return formatHandoffMessage(note) + result;
+    }
+    return result;
+  }
+
   private async executeTool(toolName: string, args: Record<string, any>): Promise<string> {
     const result = await this.executeToolCore(toolName, args);
     try {
@@ -1286,10 +1303,16 @@ export class BrowserMCPServer {
       return `Pause requested. State: ${this.engine().getState()}`;
     }
     if (toolName === 'browser_resume') {
+      if (this.engine().isTakenOver()) {
+        return 'The human has taken over the browser, so you cannot resume. Wait until they hand control back; do not retry in a loop.';
+      }
       this.engine().resume();
       return `Resume requested. State: ${this.engine().getState()}`;
     }
     if (toolName === 'browser_next_step') {
+      if (this.engine().isTakenOver()) {
+        return 'The human has taken over the browser, so you cannot continue. Wait until they hand control back; do not retry in a loop.';
+      }
       this.engine().nextStep();
       return 'Step mode enabled: exactly one action will run, then execution pauses again.';
     }
@@ -1483,7 +1506,7 @@ export class BrowserMCPServer {
     return {
       get serverVersion() { return electronApp?.getVersion?.() || '1.5.0'; },
       listTools: () => TOOLS.filter((tool) => this.isToolAllowed(tool.name)),
-      callTool: (name, args) => this.executeTool(name, args as Record<string, any>)
+      callTool: (name, args) => this.executeToolForClient(name, args as Record<string, any>)
     };
   }
 
@@ -1706,7 +1729,7 @@ export class BrowserMCPServer {
       if (!tool) return res.status(400).json({ error: 'Missing tool name' });
 
       try {
-        const result = await this.executeTool(tool, args);
+        const result = await this.executeToolForClient(tool, args);
         res.json({ success: true, result });
       } catch (err: any) {
         const homeDir = process.env.HOME || process.env.USERPROFILE || '';

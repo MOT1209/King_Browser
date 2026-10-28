@@ -43,6 +43,11 @@ assert.equal(shouldShowPill({ ...base, state: 'running' }), true);
 assert.equal(shouldShowPill({ ...base, state: 'running', hiddenByUser: true }), false, 'the user can close the pill');
 assert.equal(shouldShowPill({ ...base, state: 'running', hiddenByUser: true, panelOpen: true }), true, 'opening the panel by shortcut shows it');
 
+// While the human drives, the way to hand the browser back must stay reachable.
+assert.equal(shouldShowPill({ ...base, state: 'paused', takenOver: true, hiddenByUser: true }), true, 'a take-over keeps the pill even if the user closed it');
+assert.equal(shouldShowPill({ ...base, state: 'idle', takenOver: true }), true, 'and even when idle');
+assert.equal(shouldShowPill({ ...base, takenOver: false }), false);
+
 // The approval gate cannot be hidden: a pending approval always shows the pill.
 assert.equal(shouldShowPill({ ...base, hasPendingApproval: true, hiddenByUser: true }), true);
 assert.equal(shouldShowPill({ ...base, state: 'awaiting_approval', hiddenByUser: true }), true);

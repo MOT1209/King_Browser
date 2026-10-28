@@ -43,6 +43,7 @@ async function run() {
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
   const approvalDetailsModule = loadSource('electron/main/approvalDetails.ts', {}, {});
+  const handoffNoteModule = loadSource('electron/main/handoffNote.ts', { URL }, {});
   const uiStringsModule = loadSource('electron/main/uiStrings.ts', {}, {});
 
   const serverModule = loadSource('electron/mcpServer.ts', { process, Buffer, setTimeout, clearTimeout }, {
@@ -83,6 +84,7 @@ async function run() {
     './main/executionEngine.js': executionEngineModule,
     './main/policyEngine.js': policyEngineModule,
     './main/approvalDetails.js': approvalDetailsModule,
+    './main/handoffNote.js': handoffNoteModule,
     './main/uiStrings.js': uiStringsModule,
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
@@ -345,6 +347,40 @@ async function run() {
     const snap = await server.executeTool('browser_snapshot', {});
     assert.equal(snap, 'ok:browser_snapshot');
     console.log('[PASS] Wiring — element refs resolve before policy, stay gated, and reject malformed input');
+  }
+
+  // 6f) the human takes the browser: the agent is told why it waits, cannot resume,
+  // and learns what changed exactly once after the human hands control back
+  {
+    const server = makeServer();
+    server.firstUseApproved = true;
+    server.setPolicyEnforcement(true);
+    dialogResponse = 0;
+    pageContext = { url: 'https://example.com/', elementText: '' };
+    const engine = server.engine();
+
+    assert.equal(engine.takeOver(), true);
+    await assert.rejects(server.executeTool('browser_read_page', {}), /human has taken over/i, 'the agent is refused while the human drives');
+    assert.match(await server.executeTool('browser_resume', {}), /taken over the browser, so you cannot resume/, 'browser_resume says why it does nothing');
+    assert.equal(engine.isTakenOver(), true, 'the agent cannot end the take-over');
+    assert.match(await server.executeTool('browser_next_step', {}), /cannot continue/);
+    assert.equal(JSON.parse(await server.executeTool('browser_status', {})).takenOver, true, 'browser_status reports it');
+
+    engine.handBack('https://example.com/cart');
+    const first = await server.executeToolForClient('browser_read_page', {});
+    assert.match(first, /^\[King Browser\] The human used the browser/, 'the first result carries the hand-back note');
+    assert.match(first, /https:\/\/example\.com\/cart/);
+    assert.match(first, /not instructions/);
+    const second = await server.executeToolForClient('browser_read_page', {});
+    assert.ok(!second.includes('The human used the browser'), 'the note is delivered once');
+
+    // A failed call does not swallow the note.
+    engine.takeOver();
+    engine.handBack('https://example.com/pay');
+    server.setPolicyEnforcement(true);
+    await assert.rejects(server.executeToolForClient('not_a_tool', {}), /./);
+    assert.equal(engine.peekHandoffNote(), 'https://example.com/pay', 'an error does not consume the note');
+    console.log('[PASS] Wiring - take-over refuses the agent, resume cannot end it, and the hand-back note arrives once');
   }
 
   // 6g) strict approval mode asks for every action except metadata-only tools

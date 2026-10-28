@@ -29,14 +29,16 @@ export function agentTabToMark(
 interface AgentTabSnapshot {
   tabId: string | null;
   engineState: string | null;
+  /** The human has taken the browser; the marker turns from the agent's color to the human's. */
+  takenOver: boolean;
 }
 
-let snapshot: AgentTabSnapshot = { tabId: null, engineState: null };
+let snapshot: AgentTabSnapshot = { tabId: null, engineState: null, takenOver: false };
 const listeners = new Set<() => void>();
 
 function update(next: Partial<AgentTabSnapshot>) {
   const merged = { ...snapshot, ...next };
-  if (merged.tabId === snapshot.tabId && merged.engineState === snapshot.engineState) return;
+  if (merged.tabId === snapshot.tabId && merged.engineState === snapshot.engineState && merged.takenOver === snapshot.takenOver) return;
   snapshot = merged;
   listeners.forEach(listener => listener());
 }
@@ -45,8 +47,8 @@ export function markAgentTab(tabId: string | null | undefined): void {
   if (typeof tabId === 'string' && tabId) update({ tabId });
 }
 
-export function setAgentEngineState(engineState: string | null): void {
-  update({ engineState });
+export function setAgentEngineState(engineState: string | null, takenOver = false): void {
+  update({ engineState, takenOver });
 }
 
 export function getAgentTabSnapshot(): AgentTabSnapshot {
@@ -64,8 +66,13 @@ export function useAgentTabId(openTabIds: readonly string[]): string | null {
   return agentTabToMark(current.tabId, current.engineState, openTabIds);
 }
 
+/** True while the human drives the browser (the agent is paused and waits). */
+export function useAgentTakenOver(): boolean {
+  return useSyncExternalStore(subscribeAgentTab, () => getAgentTabSnapshot().takenOver, () => getAgentTabSnapshot().takenOver);
+}
+
 /** Test-only: reset module state between cases. */
 export function resetAgentTabStoreForTests(): void {
-  snapshot = { tabId: null, engineState: null };
+  snapshot = { tabId: null, engineState: null, takenOver: false };
   listeners.clear();
 }

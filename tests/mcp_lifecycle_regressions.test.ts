@@ -110,6 +110,7 @@ async function run() {
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
   const approvalDetailsModule = loadSource('electron/main/approvalDetails.ts', {}, {});
+  const handoffNoteModule = loadSource('electron/main/handoffNote.ts', { URL }, {});
   const uiStringsModule = loadSource('electron/main/uiStrings.ts', {}, {});
   const serverModule = loadSource('electron/mcpServer.ts', { process, Buffer, setTimeout, clearTimeout }, {
     electron: { app: { isPackaged: false }, powerMonitor: { on: (name: string, fn: Function) => lockEvents.set(name, fn) },
@@ -119,6 +120,7 @@ async function run() {
     './main/executionEngine.js': executionEngineModule,
     './main/policyEngine.js': policyEngineModule,
     './main/approvalDetails.js': approvalDetailsModule,
+    './main/handoffNote.js': handoffNoteModule,
     './main/uiStrings.js': uiStringsModule,
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,

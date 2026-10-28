@@ -53,6 +53,7 @@ import './rtl_overlay_regressions.test';
 import './agent_tab_marker.test';
 import './approval_attention.test';
 import './approval_details.test';
+import './engine_takeover.test';
 import './menu_accelerators.test';
 import './reader_mode_sanitization.test';
 import './session_isolation.test';

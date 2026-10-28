@@ -363,7 +363,14 @@
       "option": "Will choose"
     },
     "waitingForApproval": "Waiting for your approval",
-    "waitingForApprovalAt": "Waiting for your approval - {domain}"
+    "waitingForApprovalAt": "Waiting for your approval - {domain}",
+    "takeOver": "Take over",
+    "handBack": "Hand back to agent",
+    "takeOverHint": "Pauses the agent and cancels what it had queued. You drive the browser until you hand it back.",
+    "takenOverNotice": "You are driving the browser. The agent is waiting.",
+    "takenOverPill": "You are driving",
+    "tabMarkerTakenOver": "You are driving this tab",
+    "pageMarkerTakenOver": "You are driving this page"
   },
   "appearance": {
     "wallpaper": {
@@ -547,7 +554,8 @@
       "selectAll": "Select all",
       "undo": "Undo",
       "redo": "Redo",
-      "quit": "Quit"
+      "quit": "Quit",
+      "agentTakeOver": "Take over from the agent / hand back"
     },
     "reserved": "Reserved for \"{action}\". Choose another combination."
   }
