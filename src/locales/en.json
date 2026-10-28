@@ -558,5 +558,19 @@
       "agentTakeOver": "Take over from the agent / hand back"
     },
     "reserved": "Reserved for \"{action}\". Choose another combination."
+  },
+  "folders": {
+    "chooseColor": "Folder color",
+    "colorNone": "No color",
+    "colors": {
+      "red": "Red",
+      "orange": "Orange",
+      "amber": "Amber",
+      "green": "Green",
+      "teal": "Teal",
+      "blue": "Blue",
+      "violet": "Violet",
+      "pink": "Pink"
+    }
   }
 }

@@ -3,6 +3,7 @@ import type { Folder, Tab } from '../types/browser';
 import { generateId } from '../utils/idGenerator';
 import { isTombstonedRow } from '../services/syncService';
 import { canMoveTabToFolder } from '../utils/verticalTabs';
+import { setFolderColor } from '../utils/folderColors';
 
 export interface UseFoldersOptions {
   folders: Folder[];
@@ -39,6 +40,10 @@ export function useFolders({
     setFolders(prev => prev.map(f => f.id === folderId ? { ...f, name: trimmed.slice(0, 100) } : f));
   }, [setFolders]);
 
+  const handleSetFolderColor = useCallback((folderId: string, color?: string) => {
+    setFolders(prev => setFolderColor(prev, folderId, color));
+  }, [setFolders]);
+
   const handleDeleteFolder = useCallback((folderId: string) => {
     setFolders(prev => {
       const target = prev.find(f => f.id === folderId);
@@ -67,6 +72,7 @@ export function useFolders({
     handleCreateFolder,
     handleToggleFolder,
     handleRenameFolder,
+    handleSetFolderColor,
     handleDeleteFolder,
     handleMoveTabToFolder,
   };

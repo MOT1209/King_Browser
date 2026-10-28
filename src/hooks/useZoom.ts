@@ -1,5 +1,6 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { Tab } from '../types/browser';
+import { forgetSiteZoom, rememberSiteZoom } from '../utils/siteZoom';
 
 export const ZOOM_FACTORS = [
   0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0
@@ -8,9 +9,11 @@ export const ZOOM_FACTORS = [
 export interface UseZoomOptions {
   activeTabId: string | null;
   setTabs: Dispatch<SetStateAction<Tab[]>>;
+  /** Current tab record, so a chosen factor can be remembered for the tab's site. */
+  getTab?: (tabId: string) => Tab | undefined;
 }
 
-export function useZoom({ activeTabId, setTabs }: UseZoomOptions) {
+export function useZoom({ activeTabId, setTabs, getTab }: UseZoomOptions) {
   // getZoomFactor() resolves asynchronously, so two quick presses can land out of
   // order. Every request takes a ticket; only the newest one may commit.
   const zoomRequestIdRef = useRef(0);
@@ -62,6 +65,9 @@ export function useZoom({ activeTabId, setTabs }: UseZoomOptions) {
         console.error("Zoom apply error:", e);
       }
       commitFactor(tabId, nextFactor);
+      // A factor the user chose is remembered for the site (never for private tabs).
+      const tab = getTab?.(tabId);
+      if (tab) rememberSiteZoom(tab.url, nextFactor, tab.isIncognito);
     };
 
     // Internal pages have no webview in the DOM: nothing to read, so step from
@@ -84,7 +90,7 @@ export function useZoom({ activeTabId, setTabs }: UseZoomOptions) {
     Promise.resolve(pending as number)
       .then((current: number) => applyFactor(current))
       .catch((e) => console.error("Zoom factor read error:", e));
-  }, [activeTabId, commitFactor, readCommittedFactor]);
+  }, [activeTabId, commitFactor, readCommittedFactor, getTab]);
 
   const handleZoomIn = useCallback(() => stepZoom(1), [stepZoom]);
 
@@ -104,7 +110,10 @@ export function useZoom({ activeTabId, setTabs }: UseZoomOptions) {
     }
     // Recorded even without a webview, so the badge clears on internal pages too.
     commitFactor(activeTabId, 1.0);
-  }, [activeTabId, commitFactor]);
+    // Reset forgets the site: later visits start from the default again.
+    const tab = getTab?.(activeTabId);
+    if (tab) forgetSiteZoom(tab.url, tab.isIncognito);
+  }, [activeTabId, commitFactor, getTab]);
 
   return {
     handleZoomIn,

@@ -558,5 +558,19 @@
       "agentTakeOver": "Vom Agenten übernehmen / zurückgeben"
     },
     "reserved": "Reserviert für „{action}“. Andere Kombination wählen."
+  },
+  "folders": {
+    "chooseColor": "Ordnerfarbe",
+    "colorNone": "Keine Farbe",
+    "colors": {
+      "red": "Rot",
+      "orange": "Orange",
+      "amber": "Bernstein",
+      "green": "Grün",
+      "teal": "Petrol",
+      "blue": "Blau",
+      "violet": "Violett",
+      "pink": "Rosa"
+    }
   }
 }

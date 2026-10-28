@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { AgentTabMarker } from './ui/AgentTabMarker';
+import { FOLDER_COLOR_CLASSES, FOLDER_COLOR_KEYS, normalizeFolderColor } from '../utils/folderColors';
 import { useAgentTabId } from '../services/agentTabStore';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   Folder as FolderIcon,
+  Palette,
   FolderPlus,
   Check,
   Settings,
@@ -150,6 +152,7 @@ export interface SidebarTabsProps {
   onCreateFolder?: () => void;
   onToggleFolder?: (id: string) => void;
   onRenameFolder?: (id: string, name: string) => void;
+  onSetFolderColor?: (id: string, color?: string) => void;
   onDeleteFolder?: (id: string) => void;
   onMoveTabToFolder?: (tabId: string, folderId?: string) => void;
   onOpenSpotlight?: () => void;
@@ -519,6 +522,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onCreateFolder,
   onToggleFolder,
   onRenameFolder,
+  onSetFolderColor,
   onDeleteFolder,
   onMoveTabToFolder,
   onOpenSpotlight,
@@ -548,6 +552,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onReorderTabs
 }) => {
   const { l, t } = useTranslation();
+  const [colorPickerFolderId, setColorPickerFolderId] = useState<string | null>(null);
   const tabIds = useMemo(() => tabs.map(tab => tab.id), [tabs]);
   const agentTabId = useAgentTabId(tabIds);
   const activeTab = tabs.find(t => t.id === activeTabId);
@@ -1309,6 +1314,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {/* Folders */}
             {folders?.filter(f => f.workspaceId === activeWorkspaceId).map(folder => {
               const folderTabs = tabs.filter(t => t.folderId === folder.id);
+              const folderColorKey = normalizeFolderColor(folder.color);
+              const folderColor = folderColorKey ? FOLDER_COLOR_CLASSES[folderColorKey] : null;
               return (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -1347,13 +1354,25 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       const tabId = e.dataTransfer.getData('text/plain');
                       if (tabId) onMoveTabToFolder?.(tabId, folder.id);
                     }}
-                    className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-colors group/folder ${dragOverFolderId === folder.id ? 'bg-slate-200/80 dark:bg-white/15 ring-2 ring-cyan-500/50' : ''}`}
+                    className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-colors group/folder ${folderColor ? `border-s-2 ${folderColor.border}` : ''} ${dragOverFolderId === folder.id ? 'bg-slate-200/80 dark:bg-white/15 ring-2 ring-cyan-500/50' : ''}`}
                   >
                     <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
                       {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     </div>
-                    <FolderIcon className="w-3.5 h-3.5 opacity-70 group-hover/folder:opacity-100 transition-opacity" />
+                    <FolderIcon className={`w-3.5 h-3.5 ${folderColor ? folderColor.icon : 'opacity-70'} group-hover/folder:opacity-100 transition-opacity`} />
                     <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>
+                    {onSetFolderColor && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setColorPickerFolderId(prev => (prev === folder.id ? null : folder.id)); }}
+                        onKeyDown={(e) => { e.stopPropagation(); }}
+                        aria-label={t('folders.chooseColor')}
+                        aria-expanded={colorPickerFolderId === folder.id}
+                        title={t('folders.chooseColor')}
+                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 focus:opacity-100 transition-opacity text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      >
+                        <Palette className="w-3 h-3" />
+                      </button>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
                       onKeyDown={(e) => { e.stopPropagation(); }}
@@ -1362,6 +1381,28 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       <X className="w-3 h-3" />
                     </button>
                   </div>
+                  {onSetFolderColor && colorPickerFolderId === folder.id && (
+                    <div role="group" aria-label={t('folders.chooseColor')} className="flex items-center gap-1.5 ps-8 pe-2 py-1.5">
+                      {FOLDER_COLOR_KEYS.map(key => (
+                        <button
+                          key={key}
+                          onClick={() => { onSetFolderColor(folder.id, key); setColorPickerFolderId(null); }}
+                          aria-label={t(`folders.colors.${key}`)}
+                          aria-pressed={folderColorKey === key}
+                          title={t(`folders.colors.${key}`)}
+                          className={`w-4 h-4 rounded-full ${FOLDER_COLOR_CLASSES[key].dot} ${folderColorKey === key ? 'ring-2 ring-offset-1 ring-slate-400 dark:ring-slate-300 dark:ring-offset-slate-900' : ''} cursor-pointer`}
+                        />
+                      ))}
+                      <button
+                        onClick={() => { onSetFolderColor(folder.id, undefined); setColorPickerFolderId(null); }}
+                        aria-label={t('folders.colorNone')}
+                        title={t('folders.colorNone')}
+                        className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-400 cursor-pointer"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  )}
                   <AnimatePresence>
                     {folder.isExpanded && (
                       <motion.div

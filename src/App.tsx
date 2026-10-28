@@ -740,6 +740,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const {
     handleCreateFolder,
     handleToggleFolder,
+    handleSetFolderColor,
     handleRenameFolder,
     handleDeleteFolder,
     handleMoveTabToFolder,
@@ -798,9 +799,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
 
 
+  // Stable identity: zoom handlers are passed to memoized children and key handlers.
+  const getTabForZoom = useCallback((tabId: string) => tabsRef.current.find(t => t.id === tabId), []);
   const { handleZoomIn, handleZoomOut, handleResetZoom } = useZoom({
     activeTabId,
     setTabs,
+    getTab: getTabForZoom,
   });
 
 
@@ -1453,6 +1457,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onCreateFolder={handleCreateFolder}
               onToggleFolder={handleToggleFolder}
               onRenameFolder={handleRenameFolder}
+              onSetFolderColor={handleSetFolderColor}
               onDeleteFolder={handleDeleteFolder}
               onMoveTabToFolder={handleMoveTabToFolder}
               onOpenSpotlight={handleOpenSpotlight}
@@ -1549,6 +1554,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onCreateFolder={handleCreateFolder}
                   onToggleFolder={handleToggleFolder}
                   onRenameFolder={handleRenameFolder}
+              onSetFolderColor={handleSetFolderColor}
                   onDeleteFolder={handleDeleteFolder}
                   onMoveTabToFolder={handleMoveTabToFolder}
                   onOpenSpotlight={handleOpenSpotlight}

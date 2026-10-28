@@ -18,6 +18,7 @@ import {
 import { Tab } from '../types/browser';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { useTranslation } from '../services/i18n';
+import { reopenClosedAt, useRecentlyClosed } from '../services/closedTabsStore';
 
 /**
  * Which menu item a navigation key moves to, or `null` for a key the menu does
@@ -81,6 +82,7 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
   totalTabs
 }) => {
   const { l } = useTranslation();
+  const recentlyClosed = useRecentlyClosed();
   const menuRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -344,6 +346,25 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
               </span>
               <span className="text-[10px] font-mono opacity-80">{isMac ? '⇧⌘T' : 'Ctrl+Shift+T'}</span>
             </button>
+            {recentlyClosed.length > 0 && (
+              <div role="group" aria-label={l({ en: 'Recently closed', ar: 'أُغلقت مؤخرا', de: 'Zuletzt geschlossen' })} className="mt-0.5">
+                <div className="px-2.5 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  {l({ en: 'Recently closed', ar: 'أُغلقت مؤخرا', de: 'Zuletzt geschlossen' })}
+                </div>
+                {recentlyClosed.slice(0, 8).map(entry => (
+                  <button
+                    key={`${entry.index}-${entry.url}`}
+                    role="menuitem"
+                    tabIndex={-1}
+                    title={entry.url}
+                    onClick={() => { reopenClosedAt(entry.index); onClose(); }}
+                    className="w-full flex items-center px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 transition-colors text-start cursor-pointer"
+                  >
+                    <span className="truncate max-w-[220px]" dir="auto">{entry.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
         </motion.div>

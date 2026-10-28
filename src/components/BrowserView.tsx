@@ -14,6 +14,7 @@ import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { AGENT_PARTITION, AGENT_PERSIST_PARTITION } from '../utils/appConstants';
 import { recordConsoleMessage, clearConsoleMessages } from '../utils/consoleBuffer';
 import { useTranslation } from '../services/i18n';
+import { siteZoomFor } from '../utils/siteZoom';
 
 const PasswordPromptModal = lazy(() => import('./PasswordPromptModal').then(m => ({ default: m.PasswordPromptModal })));
 const AILinkPreview = lazy(() => import('./AILinkPreview').then(m => ({ default: m.AILinkPreview })));
@@ -490,7 +491,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
       try {
         const currentTab = latestTabRef.current;
-        if (currentTab?.zoomFactor !== undefined) {
+        // A factor the user chose for this site wins over the tab's own and the default.
+        const rememberedZoom = siteZoomFor(
+          (typeof webview.getURL === 'function' ? webview.getURL() : '') || currentTab?.url,
+          currentTab?.isIncognito
+        );
+        if (rememberedZoom !== undefined) {
+          webview.setZoomFactor(rememberedZoom);
+          if (rememberedZoom !== currentTab?.zoomFactor) onUpdateTab(tab.id, { zoomFactor: rememberedZoom });
+        } else if (currentTab?.zoomFactor !== undefined) {
           webview.setZoomFactor(currentTab.zoomFactor);
         } else {
           const zoomMap = { small: 0.85, medium: 1.0, large: 1.25 };

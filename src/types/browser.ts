@@ -47,6 +47,8 @@ export interface Folder extends Tombstoneable {
   name: string;
   isExpanded: boolean;
   workspaceId: string;
+  /** A palette key from utils/folderColors.ts; absent on folders saved before colors existed. */
+  color?: string;
 }
 
 export interface Workspace extends Tombstoneable {
