@@ -54,3 +54,6 @@ graphify-out/
 electron/keys/*private*.pem
 *.pem.private
 *.private.key
+
+# Git Bash crash dumps
+*.stackdump

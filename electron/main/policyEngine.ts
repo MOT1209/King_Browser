@@ -124,6 +124,11 @@ export const SENSITIVE_SELECTOR_PATTERNS = /pass(word|wd|phrase)?|passwd|\bpwd\b
 
 const REDACTED_VALUE = '••••••••';
 
+// Added to a control's description by the page-context script in
+// src/hooks/useBrowserAgentBridge.ts when the control submits a POST form.
+// Keyword matching on the label alone let "Submit order" through unapproved.
+export const FORM_SUBMIT_MARKER = 'king:post-form-submit';
+
 const PURCHASE_TEXT = /(buy|purchase|pay\b|payment|checkout|place order|complete order|subscribe|donate|upgrade to|add to cart|شراء|اشتر|ادفع|الدفع|دفع|تبرع|اكمل الطلب|إتمام الطلب|اشترك)/i;
 const SEND_TEXT = /(\bsend\b|send now|submit (application|comment|reply|message)|post comment|post reply|dm |direct message|أرسل|إرسال|ارسال|انشر التعليق|رد)/i;
 const DELETE_TEXT = /(delete|remove|trash|unsubscribe|deactivate|close account|cancel subscription|حذف|احذف|إزالة|الغاء الاشتراك|الغاء حسابي|إلغاء الحساب|إلغاء الاشتراك)/i;
@@ -282,6 +287,9 @@ function classifyActingTool(input: PolicyInput, context: ClassificationContext):
   }
 
   if (toolName === 'browser_click') {
+    if (text.includes(FORM_SUBMIT_MARKER)) {
+      addTrigger(context, 'consequential_form', 'This control submits a form that sends data to the site.');
+    }
     if (matchesAny(text, PURCHASE_TEXT, PURCHASE_TEXT_I18N)) addTrigger(context, 'purchase', `Button/link text suggests a purchase ("${text.slice(0, 60)}").`);
     if (matchesAny(text, DELETE_TEXT, DELETE_TEXT_I18N)) addTrigger(context, 'delete', `Button/link text suggests deletion ("${text.slice(0, 60)}").`);
     if (matchesAny(text, SECURITY_TEXT, SECURITY_TEXT_I18N)) addTrigger(context, 'security_settings', `Button/link text suggests a security change ("${text.slice(0, 60)}").`);

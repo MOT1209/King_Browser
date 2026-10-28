@@ -540,7 +540,10 @@ export function useBrowserAgentBridge({
               const type = (el.getAttribute('type') || '').toLowerCase();
               const isButton = el.tagName === 'BUTTON' || ['submit', 'button', 'reset'].includes(type);
               const labels = el.labels ? Array.from(el.labels).map(label => label.innerText) : [];
-              const parts = [el.innerText || el.textContent || '', ...labels,
+              // A submit control of a POST form sends data whatever its label says.
+              const submitsPost = !!el.form && (type === 'submit' || (el.tagName === 'BUTTON' && !type)) &&
+                (el.form.getAttribute('method') || 'get').toLowerCase() === 'post';
+              const parts = [el.innerText || el.textContent || '', ...labels, submitsPost ? 'king:post-form-submit' : '',
                 el.getAttribute('aria-label'), el.getAttribute('title'), el.getAttribute('alt'),
                 el.getAttribute('placeholder'), el.getAttribute('name'), el.getAttribute('autocomplete'),
                 type, isButton ? el.getAttribute('value') : ''];
