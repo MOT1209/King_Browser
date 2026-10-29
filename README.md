@@ -601,9 +601,24 @@ npm run build
 npm --prefix website test
 npm --prefix website run build
 
+# Typecheck, lint, translation checks and the full suite in one go
+npm run verify
+
+# Launch the built app under Playwright: runtime security settings, tab shortcuts,
+# axe accessibility scan (needs `npm run build` and a display; `xvfb-run -a` on Linux)
+npm run test:electron
+
+# Audit runtime dependencies for known vulnerabilities
+npm run audit:prod
+
 # Run V8 runtime state and tab allocation micro-benchmarks
 npm run benchmark
+
+# Startup, new-tab and memory measurements of the built app on this machine
+npm run benchmark:startup
 ```
+
+Tooling decisions, the latest local baseline and security review notes are in [`docs/engineering/`](docs/engineering/).
 
 ---
 

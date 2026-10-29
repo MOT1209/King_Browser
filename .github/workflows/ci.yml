@@ -21,9 +21,9 @@ jobs:
       # downloads done by postinstall scripts are not needed.
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -39,6 +39,12 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      # Only what ships: devDependencies (Remotion video tooling, build tools)
+      # never reach users. Their advisories are tracked in
+      # docs/engineering/quality-baseline.md instead of failing every PR.
+      - name: Production dependency audit
+        run: npm run audit:prod
 
       - name: Interface translations
         run: npm run check:i18n && npm run check:strings
@@ -69,9 +75,9 @@ jobs:
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -94,9 +100,9 @@ jobs:
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -109,3 +115,49 @@ jobs:
 
       - name: Build and test
         run: npm test
+
+  # Launches the built app under Playwright: runtime security preferences of
+  # the window and a guest page, tab shortcuts, and an axe scan
+  # (tests/electron). New job, so it reports without blocking merges until it
+  # has passed a few times, like test-macos; remove continue-on-error then.
+  electron-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      # --ignore-scripts skips the onnxruntime-node download the app does not
+      # need here; the Electron binary is fetched explicitly instead.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install Electron binary
+        run: node node_modules/electron/install.js
+
+      - name: Build
+        run: npm run build
+
+      # Ubuntu 24.04 restricts unprivileged user namespaces, so Chromium needs
+      # its setuid sandbox helper. Configuring it keeps the sandbox ON; never
+      # pass --no-sandbox to get this job green.
+      - name: Enable Chromium setuid sandbox helper
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
+      - name: Electron smoke and accessibility checks
+        run: xvfb-run -a npm run test:electron
+
+      - name: Upload Playwright results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: electron-e2e-results
+          path: test-results/electron
+          retention-days: 7

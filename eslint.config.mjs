@@ -10,6 +10,8 @@ export default [
       "node_modules/**",
       "dist/**",
       "dist-test/**",
+      "test-results/**",
+      "playwright-report/**",
       "dist-electron/**",
       "build/**",
       "public/**",
