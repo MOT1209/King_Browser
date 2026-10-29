@@ -127,7 +127,13 @@ const REDACTED_VALUE = '••••••••';
 // Added to a control's description by the page-context script in
 // src/hooks/useBrowserAgentBridge.ts when the control submits a POST form.
 // Keyword matching on the label alone let "Submit order" through unapproved.
-export const FORM_SUBMIT_MARKER = 'king:post-form-submit';
+// The markers avoid every keyword below ("post" would also read as publish).
+export const FORM_SUBMIT_MARKER = 'king:form-submission';
+// Added when the target is a field inside a POST form: Enter there submits it.
+export const FORM_FIELD_MARKER = 'king:field-in-data-form';
+
+const ENTER_KEYS = new Set(['enter', 'return']);
+const SPACE_KEYS = new Set(['space', 'spacebar', ' ']);
 
 const PURCHASE_TEXT = /(buy|purchase|pay\b|payment|checkout|place order|complete order|subscribe|donate|upgrade to|add to cart|شراء|اشتر|ادفع|الدفع|دفع|تبرع|اكمل الطلب|إتمام الطلب|اشترك)/i;
 const SEND_TEXT = /(\bsend\b|send now|submit (application|comment|reply|message)|post comment|post reply|dm |direct message|أرسل|إرسال|ارسال|انشر التعليق|رد)/i;
@@ -283,6 +289,9 @@ function classifyActingTool(input: PolicyInput, context: ClassificationContext):
     if (PERMISSION_TEXT.test(text) || PERMISSION_TEXT.test(selector)) {
       addTrigger(context, 'grant_permission', 'Typing near what looks like a permission grant.');
     }
+    if (args.pressEnter === true && (input.elementText ?? '').includes(FORM_FIELD_MARKER)) {
+      addTrigger(context, 'consequential_form', 'Pressing Enter in this field submits a form that sends data to the site.');
+    }
     return;
   }
 
@@ -314,7 +323,17 @@ function classifyActingTool(input: PolicyInput, context: ClassificationContext):
   }
 
   if (toolName === 'browser_press_key') {
-    return; // context-only escalation happens in classifyUrlContext
+    // The focused element decides what a key does: Enter in a POST form field,
+    // or Enter/Space on its submit button, sends the form.
+    const rawKey = typeof args.key === 'string' ? args.key.toLowerCase() : '';
+    const key = rawKey.trim() || rawKey; // a literal " " is the space key
+    const described = input.elementText ?? '';
+    const submitsField = ENTER_KEYS.has(key) && described.includes(FORM_FIELD_MARKER);
+    const submitsButton = (ENTER_KEYS.has(key) || SPACE_KEYS.has(key)) && described.includes(FORM_SUBMIT_MARKER);
+    if (submitsField || submitsButton) {
+      addTrigger(context, 'consequential_form', 'This key submits a form that sends data to the site.');
+    }
+    return; // URL-based escalation happens in classifyUrlContext
   }
 }
 

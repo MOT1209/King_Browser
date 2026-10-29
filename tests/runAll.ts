@@ -125,6 +125,7 @@ import './mcp_server_transports.test';
 import './mcp_tool_catalog.test';
 import './element_refs.test';
 import './url_redaction.test';
+import './trusted_input.test';
 import './approval_mode.test';
 import './injection_corpus.test';
 import './agent_profile_settings.test';

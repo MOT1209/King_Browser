@@ -3,6 +3,7 @@ import * as agentLoginModule from '../src/utils/agentLogin';
 import * as elementSnapshotModule from '../src/utils/elementSnapshot';
 import * as consoleBufferModule from '../src/utils/consoleBuffer';
 import * as urlRedactionModule from '../src/utils/urlRedaction';
+import * as trustedInputModule from '../src/utils/trustedInput';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -70,7 +71,8 @@ async function run() {
     '../utils/elementSnapshot': elementSnapshotModule,
     '../utils/consoleBuffer': consoleBufferModule,
     '../utils/agentLogin': agentLoginModule,
-    '../utils/urlRedaction': urlRedactionModule
+    '../utils/urlRedaction': urlRedactionModule,
+    '../utils/trustedInput': trustedInputModule
   });
   hook.useBrowserAgentBridge({ activeTabId: 'tab', tabs: [], history: [], bookmarks: [], settingsRef,
     activeWorkspaceIdRef: { current: 'default' }, setActiveWorkspaceId: () => {}, setActiveTabId: () => {}, setTabs: () => {},

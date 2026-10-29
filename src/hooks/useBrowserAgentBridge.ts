@@ -13,6 +13,26 @@ import { buildSnapshotScript } from '../utils/elementSnapshot';
 import { redactSnapshotUrls, redactUrlForAgent, redactUrlParamsInText } from '../utils/urlRedaction';
 import { getConsoleMessages } from '../utils/consoleBuffer';
 import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS, MCP_POLICY_CONTEXT_ACTION } from '../utils/mcpActionTiming';
+import { buildLocateScript, keyEventSequence, parseKeyCombo, selectAllCombo, wheelDelta, type KeyCombo } from '../utils/trustedInput';
+
+// Native input. `guest` is the guarded webview proxy, so every event re-checks
+// that the document is still the one the action was approved for.
+async function sendKeyCombo(guest: any, combo: KeyCombo): Promise<void> {
+  for (const event of keyEventSequence(combo)) await guest.sendInputEvent(event);
+}
+
+async function nativeClickAt(guest: any, x: number, y: number): Promise<void> {
+  await guest.sendInputEvent({ type: 'mouseMove', x, y });
+  await guest.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+  await guest.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+}
+
+// Page CSS pixels to input-event pixels: they differ by the tab's zoom.
+function toGuestPoint(guest: any, x: number, y: number): { x: number; y: number } {
+  let zoom = 1;
+  try { zoom = Number(guest.getZoomFactor?.()) || 1; } catch (_) {}
+  return { x: Math.round(x * zoom), y: Math.round(y * zoom) };
+}
 
 /**
  * Full agent-boundary check: the synchronous renderer policy plus a
@@ -223,7 +243,7 @@ export function useBrowserAgentBridge({
           }
           const original = guest[key];
           if (typeof original !== 'function') return original;
-          if (!['executeJavaScript', 'capturePage', 'sendInputEvent', 'goBack', 'goForward', 'reload', 'setZoomLevel'].includes(String(key))) {
+          if (!['executeJavaScript', 'capturePage', 'sendInputEvent', 'insertText', 'goBack', 'goForward', 'reload', 'setZoomLevel'].includes(String(key))) {
             return original.bind(guest);
           }
           return async (...args: any[]) => {
@@ -350,57 +370,30 @@ export function useBrowserAgentBridge({
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
             if (!await previewTarget(safeArgs.selector)) return "Error: MCP action was cancelled or expired.";
-            // userGesture: Chromium marks the entry of a page that navigates
-            // without user activation as skippable, so Back (and canGoBack)
-            // jumped over it after every agent click, submit or key press.
-            // When nothing covers the element's centre the click is left to a
-            // real mouse event (below), which pages cannot tell from a human
-            // one; a covered or off-screen element falls back to el.click().
-            const result = await activeWebview.executeAction(`
-              (() => {
-                try {
-                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
-                  if (el) {
-                    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center', inline: 'center' });
-                    const rect = el.getBoundingClientRect();
-                    const x = rect.left + rect.width / 2;
-                    const y = rect.top + rect.height / 2;
-                    const inView = rect.width > 0 && rect.height > 0 && x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight;
-                    const hit = inView && typeof document.elementFromPoint === 'function' ? document.elementFromPoint(x, y) : null;
-                    if (hit && (hit === el || el.contains(hit))) {
-                      return { success: true, x, y, trusted: true };
-                    }
-                    el.click();
-                    return { success: true, x, y, trusted: false };
-                  }
-                  return { success: false, error: "Element not found with selector: " + ${JSON.stringify(safeArgs.selector)} };
-                } catch (err) {
-                  return { success: false, error: "Invalid selector or DOM error: " + String(err) };
-                }
-              })();
-            `);
-            if (result && result.success) {
-              let zoom = 1;
-              try { zoom = Number(activeWebview.getZoomFactor?.()) || 1; } catch (_) {}
-              const x = Math.round(result.x * zoom);
-              const y = Math.round(result.y * zoom);
-              if (result.trusted) {
-                // The proxy re-checks the document before each event, so a page
-                // that changed in between is never clicked blind.
-                await activeWebview.sendInputEvent({ type: 'mouseMove', x, y });
-                await activeWebview.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
-                await activeWebview.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
-              }
-              const bounds = activeWebview.getBoundingClientRect();
-              window.dispatchEvent(new CustomEvent('ai-cursor', {
-                detail: { x: bounds.left + x, y: bounds.top + y, action: 'click' }
-              }));
-              return "Successfully clicked element.";
-            }
+            // userGesture (executeAction): Chromium marks the entry of a page
+            // that navigates without user activation as skippable, so Back
+            // jumped over it after every agent click. The click itself is a
+            // real mouse event at the element's centre; a person can only
+            // click what is on top, so a covered element is an error naming
+            // the cover instead of a click through it.
+            const located = await activeWebview.executeAction(buildLocateScript(safeArgs.selector));
             // The MCP layer only marks a string that starts with "Error:" as a
             // tool failure, so a bare message here would be reported to the
             // agent as a successful click.
-            return `Error: ${describeMissingTarget(safeArgs.selector, result?.error || 'Click failed for an unknown reason.')}`;
+            if (!located?.found) {
+              return `Error: ${describeMissingTarget(safeArgs.selector, located?.error || `Element not found with selector: ${safeArgs.selector}`)}`;
+            }
+            if (!located.inView) return 'Error: The element is not visible on screen (it is hidden or has no size).';
+            if (!located.hit) {
+              return `Error: The element is covered by ${located.covering || 'another element'}. Close or scroll past it, then take a new snapshot.`;
+            }
+            const point = toGuestPoint(activeWebview, located.x, located.y);
+            await nativeClickAt(activeWebview, point.x, point.y);
+            const bounds = activeWebview.getBoundingClientRect();
+            window.dispatchEvent(new CustomEvent('ai-cursor', {
+              detail: { x: bounds.left + point.x, y: bounds.top + point.y, action: 'click' }
+            }));
+            return "Successfully clicked element.";
           }
           return "Error: No active webview available.";
 
@@ -409,43 +402,65 @@ export function useBrowserAgentBridge({
           const textToType = typeof safeArgs.text === 'string' ? safeArgs.text : String(safeArgs.text ?? '');
           if (activeWebview && activeWebview.executeJavaScript) {
             if (!await previewTarget(safeArgs.selector)) return "Error: MCP action was cancelled or expired.";
-            const result = await activeWebview.executeAction(`
-              (() => {
-                try {
-                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
-                  if (el) {
-                    const rect = el.getBoundingClientRect();
-                    el.value = ${JSON.stringify(textToType)};
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                    if (${safeArgs.pressEnter === true ? 'true' : 'false'}) {
-                      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true });
-                      const notHandled = el.dispatchEvent(enterEvent);
-                      // A synthetic keydown is untrusted, so the browser never
-                      // performs implicit form submission for it. Submit the
-                      // form ourselves unless a page script handled the key.
-                      if (notHandled && el.form && el.tagName !== 'TEXTAREA') {
-                        if (typeof el.form.requestSubmit === 'function') el.form.requestSubmit();
-                        else el.form.submit();
-                      }
-                    }
-                    return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, sensitive: el.type === 'password' };
-                  }
-                  return { success: false, error: "Element not found with selector: " + ${JSON.stringify(safeArgs.selector)} };
-                } catch (err) {
-                  return { success: false, error: "Invalid selector or DOM error: " + String(err) };
-                }
-              })();
-            `);
-            if (result && result.success) {
-              const bounds = activeWebview.getBoundingClientRect();
-              const masked = Boolean(result.sensitive) || SENSITIVE_FIELD_PATTERN.test(safeArgs.selector);
-              window.dispatchEvent(new CustomEvent('ai-cursor', {
-                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'type', text: masked ? '••••••••' : textToType.slice(0, 80), masked }
-              }));
-              return "Successfully typed text.";
+            // Real input, as a person types: click into the field, select what
+            // is there, type over it with insertText (native, Unicode-safe,
+            // works in contenteditable), check the result, then a real Enter
+            // so the browser itself decides whether the form submits.
+            const selectorJson = JSON.stringify(safeArgs.selector);
+            const located = await activeWebview.executeAction(buildLocateScript(safeArgs.selector));
+            if (!located?.found) {
+              return `Error: ${describeMissingTarget(safeArgs.selector, located?.error || `Element not found with selector: ${safeArgs.selector}`)}`;
             }
-            return `Error: ${describeMissingTarget(safeArgs.selector, result?.error || 'Typing failed for an unknown reason.')}`;
+            const point = toGuestPoint(activeWebview, located.x ?? 0, located.y ?? 0);
+            if (located.hit) await nativeClickAt(activeWebview, point.x, point.y);
+            else activeWebview.focus?.();
+            // A contenteditable editor keeps its content: the caret goes to the
+            // end instead of select-all, which would wipe a whole document.
+            const field = await activeWebview.executeAction(`
+              (() => {
+                const el = document.querySelector(${selectorJson});
+                if (!el) return { ok: false };
+                const isActive = () => document.activeElement === el || el.contains(document.activeElement);
+                if (!isActive() && typeof el.focus === 'function') el.focus();
+                const textField = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && !el.readOnly && !el.disabled;
+                if (el.isContentEditable) {
+                  const range = document.createRange();
+                  range.selectNodeContents(el);
+                  range.collapse(false);
+                  const selection = window.getSelection();
+                  if (selection) { selection.removeAllRanges(); selection.addRange(range); }
+                }
+                return { ok: isActive(), textField, editable: el.isContentEditable, sensitive: el.type === 'password' };
+              })()
+            `);
+            if (!field?.ok) return 'Error: The field could not be focused.';
+            if (!field.textField && !field.editable) return 'Error: The target is not an editable text field.';
+            if (field.textField) {
+              await sendKeyCombo(activeWebview, selectAllCombo(navigator.platform));
+              await sendKeyCombo(activeWebview, { keyCode: 'Backspace', modifiers: [] });
+            }
+            if (textToType) await activeWebview.insertText(textToType);
+            // Compared inside the page, so a password never travels back.
+            const check = await activeWebview.executeAction(`
+              (() => {
+                const el = document.querySelector(${selectorJson});
+                if (!el) return { matches: false, length: 0 };
+                const expected = ${JSON.stringify(textToType)};
+                const actual = String((el.isContentEditable ? el.innerText : el.value) ?? '');
+                const norm = (s) => s.replace(/\\s+/g, ' ').trim();
+                return { matches: el.isContentEditable ? norm(actual).includes(norm(expected)) : actual === expected, length: actual.length };
+              })()
+            `);
+            if (!check?.matches) {
+              return `Error: Typed ${textToType.length} characters, but the field now holds ${check?.length ?? 0}. The page may limit, reformat or reject the input.`;
+            }
+            if (safeArgs.pressEnter === true) await sendKeyCombo(activeWebview, { keyCode: 'Enter', modifiers: [] });
+            const bounds = activeWebview.getBoundingClientRect();
+            const masked = Boolean(field.sensitive) || SENSITIVE_FIELD_PATTERN.test(safeArgs.selector);
+            window.dispatchEvent(new CustomEvent('ai-cursor', {
+              detail: { x: bounds.left + point.x, y: bounds.top + point.y, action: 'type', text: masked ? '••••••••' : textToType.slice(0, 80), masked }
+            }));
+            return "Successfully typed text.";
           }
           return "Error: No active webview available.";
         }
@@ -491,12 +506,22 @@ export function useBrowserAgentBridge({
 
         case 'browser_scroll': {
           const direction = String(safeArgs.direction || 'down');
-          const cleanAmount = Math.min(10000, Math.max(0, Math.abs(Number(safeArgs.amount) || 500)));
           if (activeWebview && activeWebview.executeJavaScript) {
-            if (direction === 'up') await activeWebview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
-            else if (direction === 'down') await activeWebview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
-            else if (direction === 'top') await activeWebview.executeJavaScript(`window.scrollTo(0, 0)`);
+            // A real wheel at the middle of the page scrolls whatever is under
+            // the pointer, inner scroll panels included, like a mouse would.
+            const delta = wheelDelta(direction, safeArgs.amount);
+            if (delta) {
+              const bounds = activeWebview.getBoundingClientRect();
+              const x = Math.round(bounds.width / 2);
+              const y = Math.round(bounds.height / 2);
+              await activeWebview.sendInputEvent({ type: 'mouseMove', x, y });
+              await activeWebview.sendInputEvent({ type: 'mouseWheel', x, y, deltaX: delta.deltaX, deltaY: delta.deltaY, canScroll: true });
+              return `Scrolled ${direction}`;
+            }
+            // Jumping to the very top or bottom is not a wheel gesture.
+            if (direction === 'top') await activeWebview.executeJavaScript(`window.scrollTo(0, 0)`);
             else if (direction === 'bottom') await activeWebview.executeJavaScript(`window.scrollTo(0, (document.body ? document.body.scrollHeight : (document.documentElement ? document.documentElement.scrollHeight : 0)))`);
+            else return `Error: Unknown scroll direction "${direction.slice(0, 20)}". Use up, down, left, right, top or bottom.`;
             return `Scrolled ${direction}`;
           }
           return "Error: No active webview available.";
@@ -559,10 +584,16 @@ export function useBrowserAgentBridge({
               const type = (el.getAttribute('type') || '').toLowerCase();
               const isButton = el.tagName === 'BUTTON' || ['submit', 'button', 'reset'].includes(type);
               const labels = el.labels ? Array.from(el.labels).map(label => label.innerText) : [];
-              // A submit control of a POST form sends data whatever its label says.
-              const submitsPost = !!el.form && (type === 'submit' || (el.tagName === 'BUTTON' && !type)) &&
-                (el.form.getAttribute('method') || 'get').toLowerCase() === 'post';
-              const parts = [el.innerText || el.textContent || '', ...labels, submitsPost ? 'king:post-form-submit' : '',
+              // A submit control of a POST form sends data whatever its label
+              // says; so does Enter in one of its fields. A submit button's
+              // formmethod overrides the form's method.
+              const isSubmit = type === 'submit' || type === 'image' || (el.tagName === 'BUTTON' && !type);
+              const method = ((isSubmit && el.getAttribute('formmethod')) || (el.form && el.form.getAttribute('method')) || 'get').toLowerCase();
+              const postForm = !!el.form && method === 'post';
+              const isField = !isButton && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+              const parts = [el.innerText || el.textContent || '', ...labels,
+                postForm && isSubmit ? 'king:form-submission' : '',
+                postForm && isField ? 'king:field-in-data-form' : '',
                 el.getAttribute('aria-label'), el.getAttribute('title'), el.getAttribute('alt'),
                 el.getAttribute('placeholder'), el.getAttribute('name'), el.getAttribute('autocomplete'),
                 type, isButton ? el.getAttribute('value') : ''];
@@ -576,21 +607,14 @@ export function useBrowserAgentBridge({
         case 'browser_hover':
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
-            return await activeWebview.executeJavaScript(`
-              (() => {
-                try {
-                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
-                  if (el) {
-                    el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-                    el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-                    return "Hovered over element";
-                  }
-                  return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
-                } catch (err) {
-                  return "Error: Invalid selector or DOM error: " + String(err);
-                }
-              })()
-            `);
+            // A real pointer move, so CSS :hover menus open as they do for a person.
+            const located = await activeWebview.executeJavaScript(buildLocateScript(safeArgs.selector));
+            if (!located?.found) return `Error: Element not found: ${safeArgs.selector}${located?.error ? ` (${located.error})` : ''}`;
+            if (!located.inView) return 'Error: The element is not visible on screen (it is hidden or has no size).';
+            if (!located.hit) return `Error: The element is covered by ${located.covering || 'another element'}.`;
+            const point = toGuestPoint(activeWebview, located.x, located.y);
+            await activeWebview.sendInputEvent({ type: 'mouseMove', x: point.x, y: point.y });
+            return "Hovered over element";
           }
           return "Error: No active webview available.";
 
@@ -647,9 +671,15 @@ export function useBrowserAgentBridge({
                 try {
                   const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el && el.tagName === 'SELECT') {
-                    el.value = ${JSON.stringify(safeArgs.value)};
+                    // The native setter, so frameworks that track the value
+                    // (React) see the change; then the events a user's pick fires.
+                    const wanted = ${JSON.stringify(String(safeArgs.value ?? ''))};
+                    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+                    if (setter) setter.call(el, wanted); else el.value = wanted;
+                    if (el.value !== wanted) return "Error: The list has no option with value: " + wanted;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
                     el.dispatchEvent(new Event('change', { bubbles: true }));
-                    return "Selected option: " + ${JSON.stringify(safeArgs.value)};
+                    return "Selected option: " + wanted;
                   }
                   return "Error: Select element not found: " + ${JSON.stringify(safeArgs.selector)};
                 } catch (err) {
@@ -660,41 +690,32 @@ export function useBrowserAgentBridge({
           }
           return "Error: No active webview available.";
 
-        case 'browser_press_key':
+        case 'browser_press_key': {
+          // Real key events: the page and the browser react exactly as to a
+          // person (Enter submits a form natively, Ctrl+A selects, Tab moves).
+          const combo = parseKeyCombo(safeArgs.key);
+          if (!combo) {
+            return `Error: Unknown key "${String(safeArgs.key ?? '').slice(0, 40)}". Use a key name such as Enter, Tab, Escape or ArrowDown, or a combo such as Control+A.`;
+          }
           if (activeWebview && activeWebview.executeJavaScript) {
-            return await activeWebview.executeAction(`
-              (() => {
-                try {
-                  const selector = ${JSON.stringify(safeArgs.selector || null)};
-                  let target = null;
-                  if (selector) {
-                    try {
-                      target = document.querySelector(selector);
-                      if (target && target.focus) target.focus();
-                    } catch (_) {}
-                  }
-                  if (!target) target = document.activeElement || document.body;
-                  const key = ${JSON.stringify(safeArgs.key)};
-                  const keyMap = { 'Enter': 13, 'Tab': 9, 'Escape': 27, 'Space': 32, 'ArrowUp': 38, 'ArrowDown': 40, 'ArrowLeft': 37, 'ArrowRight': 39, 'Backspace': 8, 'Delete': 46 };
-                  const keyCode = keyMap[key] || (key && key.charCodeAt ? key.charCodeAt(0) : 0);
-                  let notHandled = true;
-                  ['keydown','keypress','keyup'].forEach(t => {
-                    const dispatched = target.dispatchEvent(new KeyboardEvent(t, { key, keyCode, which: keyCode, bubbles: true, cancelable: true }));
-                    if (t === 'keydown') notHandled = dispatched;
-                  });
-                  // Untrusted key events never trigger implicit form submission.
-                  if (key === 'Enter' && notHandled && target.form && target.tagName !== 'TEXTAREA') {
-                    if (typeof target.form.requestSubmit === 'function') target.form.requestSubmit();
-                    else target.form.submit();
-                  }
-                  return "Pressed key: " + key;
-                } catch (err) {
-                  return "Error: Failed to press key: " + String(err);
-                }
-              })()
-            `);
+            if (typeof safeArgs.selector === 'string' && safeArgs.selector) {
+              const focused = await activeWebview.executeAction(`
+                (() => {
+                  try {
+                    const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+                    if (el && typeof el.focus === 'function') { el.focus(); return true; }
+                  } catch (_) {}
+                  return false;
+                })()
+              `);
+              if (!focused) return `Error: ${describeMissingTarget(safeArgs.selector, `Element not found with selector: ${safeArgs.selector}`)}`;
+            }
+            activeWebview.focus?.();
+            await sendKeyCombo(activeWebview, combo);
+            return `Pressed key: ${String(safeArgs.key)}`;
           }
           return "Error: No active webview available.";
+        }
 
         case 'browser_get_element_text':
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";

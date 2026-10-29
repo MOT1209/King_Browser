@@ -3,6 +3,7 @@ import * as agentLoginModule from '../src/utils/agentLogin';
 import * as elementSnapshotModule from '../src/utils/elementSnapshot';
 import * as consoleBufferModule from '../src/utils/consoleBuffer';
 import * as urlRedactionModule from '../src/utils/urlRedaction';
+import * as trustedInputModule from '../src/utils/trustedInput';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -61,6 +62,7 @@ async function run() {
     '../utils/consoleBuffer': consoleBufferModule,
     '../utils/agentLogin': agentLoginModule,
     '../utils/urlRedaction': urlRedactionModule,
+    '../utils/trustedInput': trustedInputModule,
   };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/hooks/useBrowserAgentBridge.ts', 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },

@@ -188,13 +188,13 @@ curl -s -H "Authorization: Bearer $MCP_TOKEN" http://127.0.0.1:3020/tools
 | `browser_snapshot` | - | Lists interactive elements as `e12 button "Save"`; pass the ref to the element tools instead of guessing a CSS selector. Refs last until the next snapshot or navigation |
 | `browser_screenshot` | - | Returns the active viewport as a PNG image (internal `king://` pages cannot be captured) |
 | `browser_element_screenshot` | `ref?`, `selector?` | Returns a PNG image of one element, scrolled into view |
-| `browser_click` | `ref?`, `selector?` | Clicks an element by snapshot ref or CSS selector |
-| `browser_type` | `text`, `ref?`, `selector?`, `pressEnter?` | Types text into an input or textarea; `pressEnter` submits the surrounding form |
+| `browser_click` | `ref?`, `selector?` | Clicks an element by snapshot ref or CSS selector with a real mouse click; a covered element returns an error naming the cover |
+| `browser_type` | `text`, `ref?`, `selector?`, `pressEnter?` | Types with native keyboard input (works with React forms and contenteditable editors) and checks the result; `pressEnter` sends a real Enter, which needs approval in a form that sends data |
 | `browser_fill_form` | `fields`, `submit?` | Fills several fields in order; each field is checked and approved exactly like `browser_type` |
-| `browser_press_key` | `key`, `selector?` | Dispatches a key event (`Enter`, `Tab`, `Escape`, `ArrowDown`, ...), optionally focusing a selector first |
-| `browser_scroll` | `direction`, `amount?` | Scrolls the page `up`, `down`, `top`, or `bottom` (default 500px) |
+| `browser_press_key` | `key`, `selector?` | Presses a real key or shortcut (`Enter`, `Tab`, `Escape`, `ArrowDown`, `Control+A`, ...), optionally focusing a selector first |
+| `browser_scroll` | `direction`, `amount?` | Scrolls with a real mouse wheel `up`, `down`, `left` or `right` (default 500px), or jumps to `top` / `bottom` |
 | `browser_scroll_to_element` | `ref?`, `selector?` | Scrolls until the element is in the viewport |
-| `browser_hover` | `ref?`, `selector?` | Simulates mouse hover over an element |
+| `browser_hover` | `ref?`, `selector?` | Moves the real mouse pointer over an element |
 | `browser_focus` | `ref?`, `selector?` | Focuses an input or interactive DOM node |
 | `browser_select_option` | `value`, `ref?`, `selector?` | Selects an option in a `<select>` dropdown |
 | `browser_login` | `username` | Signs in with an account saved in King Browser; the password is filled by the browser and never returned, and every call needs your approval |

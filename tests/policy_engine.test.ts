@@ -5,8 +5,11 @@ import {
   redactArgs,
   buildApprovalSummary,
   FORM_SUBMIT_MARKER,
+  FORM_FIELD_MARKER,
   type PolicyInput
 } from '../electron/main/policyEngine';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 console.log('\n--- Approval Policy Engine (§12) Test Suite ---');
 
@@ -369,7 +372,68 @@ async function run() {
       elementText: 'Search submit'
     });
     assert.equal(search.risk, 'safe', 'a GET search button carries no marker and stays safe');
+    assert.ok(!post.triggers.includes('publish'), 'the marker itself must not read as "publish"');
     console.log('[PASS] Policy — POST form submit needs approval regardless of label');
+  }
+
+  // Regression: agent typing now uses real keys, so Enter in a field submits
+  // the form natively. Enter in a POST form field (browser_type pressEnter or
+  // browser_press_key on the focused field) must be gated like the button.
+  {
+    const typeEnter = classifyAction({
+      toolName: 'browser_type',
+      args: { selector: '#name', text: 'King', pressEnter: true },
+      currentUrl: 'https://httpbin.org/forms/post',
+      elementText: `Customer name: custname ${FORM_FIELD_MARKER}`
+    });
+    assert.ok(typeEnter.triggers.includes('consequential_form'), 'type + Enter in a POST form needs approval');
+
+    const typeOnly = classifyAction({
+      toolName: 'browser_type',
+      args: { selector: '#name', text: 'King' },
+      currentUrl: 'https://httpbin.org/forms/post',
+      elementText: `Customer name: custname ${FORM_FIELD_MARKER}`
+    });
+    assert.equal(typeOnly.risk, 'safe', 'typing without Enter submits nothing');
+
+    const keyEnter = classifyAction({
+      toolName: 'browser_press_key',
+      args: { key: 'Enter' },
+      currentUrl: 'https://httpbin.org/forms/post',
+      elementText: `Customer name: custname ${FORM_FIELD_MARKER}`
+    });
+    assert.ok(keyEnter.triggers.includes('consequential_form'), 'press_key Enter on a POST form field needs approval');
+
+    const keySpaceOnSubmit = classifyAction({
+      toolName: 'browser_press_key',
+      args: { key: 'Space' },
+      currentUrl: 'https://example.com/',
+      elementText: `Submit order ${FORM_SUBMIT_MARKER}`
+    });
+    assert.ok(keySpaceOnSubmit.triggers.includes('consequential_form'), 'Space on a focused submit button submits too');
+
+    const getSearch = classifyAction({
+      toolName: 'browser_press_key',
+      args: { key: 'Enter' },
+      currentUrl: 'https://example.com/',
+      elementText: 'Search q'
+    });
+    assert.equal(getSearch.risk, 'safe', 'Enter in a GET search field stays safe');
+
+    const arrow = classifyAction({
+      toolName: 'browser_press_key',
+      args: { key: 'ArrowDown' },
+      currentUrl: 'https://httpbin.org/forms/post',
+      elementText: `Size ${FORM_FIELD_MARKER}`
+    });
+    assert.equal(arrow.risk, 'safe', 'other keys in a POST form submit nothing');
+
+    // policyEngine must stay import-free, so the renderer script repeats the
+    // markers as literals. Pin them equal.
+    const bridge = readFileSync(join(__dirname, '..', 'src', 'hooks', 'useBrowserAgentBridge.ts'), 'utf8');
+    assert.ok(bridge.includes(`'${FORM_SUBMIT_MARKER}'`), 'renderer uses the same submit marker');
+    assert.ok(bridge.includes(`'${FORM_FIELD_MARKER}'`), 'renderer uses the same field marker');
+    console.log('[PASS] Policy — Enter in a POST form needs approval, GET forms stay safe');
   }
 
   console.log('[PASS] Policy Engine suite complete');

@@ -83,7 +83,7 @@ export const TOOLS: McpTool[] = [
   },
   {
     name: 'browser_click',
-    description: 'Clicks an element on the active page. Prefer "ref" from browser_snapshot; a CSS selector also works.',
+    description: 'Clicks an element on the active page with a real mouse click at its centre. Prefer "ref" from browser_snapshot; a CSS selector also works. If something covers the element (a dialog, a cookie banner) the call fails and names the cover: deal with it first, then snapshot again.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -94,14 +94,14 @@ export const TOOLS: McpTool[] = [
   },
   {
     name: 'browser_type',
-    description: 'Types text into an input or textarea element on the active page.',
+    description: 'Types text as a person would: clicks into the field, replaces what an input or textarea holds (a rich-text editor keeps its content and the text is added at the end), types with native keyboard input, and checks the result. Works with React forms and contenteditable editors.',
     inputSchema: {
       type: 'object',
       properties: {
         ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
         selector: { type: 'string', description: 'CSS selector of the input element (alternative to ref)' },
         text: { type: 'string', description: 'Text to type into the element' },
-        pressEnter: { type: 'boolean', description: 'Whether to press Enter after typing (default: false)' }
+        pressEnter: { type: 'boolean', description: 'Whether to press a real Enter key after typing (default: false). In a form that sends data this submits it and needs the user\'s approval.' }
       },
       required: ['text']
     }
@@ -109,11 +109,11 @@ export const TOOLS: McpTool[] = [
 
   {
     name: 'browser_scroll',
-    description: 'Scrolls the active page in a given direction.',
+    description: 'Scrolls with a real mouse wheel over the middle of the page, so the panel under it scrolls as it would for a person. top and bottom jump the whole page.',
     inputSchema: {
       type: 'object',
       properties: {
-        direction: { type: 'string', enum: ['up', 'down', 'top', 'bottom'], description: 'Direction to scroll' },
+        direction: { type: 'string', enum: ['up', 'down', 'left', 'right', 'top', 'bottom'], description: 'Direction to scroll' },
         amount: { type: 'number', description: 'Pixels to scroll (default: 500)' }
       },
       required: ['direction']
@@ -178,7 +178,7 @@ export const TOOLS: McpTool[] = [
   },
   {
     name: 'browser_hover',
-    description: 'Simulates hovering the mouse cursor over an element identified by a CSS selector.',
+    description: 'Moves the mouse pointer over an element (a real pointer move, so CSS hover menus open).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -223,11 +223,11 @@ export const TOOLS: McpTool[] = [
   },
   {
     name: 'browser_press_key',
-    description: 'Simulates pressing a keyboard key on the active page (e.g., Enter, Tab, Escape, ArrowDown).',
+    description: 'Presses a real keyboard key or shortcut on the focused element of the active page. Enter in a form that sends data submits it and needs the user\'s approval.',
     inputSchema: {
       type: 'object',
       properties: {
-        key: { type: 'string', description: 'Key name (e.g., Enter, Tab, Escape, Space, ArrowDown, ArrowUp)' },
+        key: { type: 'string', description: 'Key name or combo: Enter, Tab, Escape, Space, ArrowDown, Backspace, F5, a, Control+A, Shift+Tab' },
         selector: { type: 'string', description: 'Optional CSS selector to focus before pressing key' }
       },
       required: ['key']
@@ -1420,7 +1420,11 @@ export class BrowserMCPServer {
     // "Delete account" button; the renderer describes the real element.
     let pageContext: { currentUrl?: string; elementText?: string; contextUnavailable?: boolean } = {};
     if (PAGE_CONTEXT_TOOLS.has(canonicalTool)) {
-      const selector = canonicalTool !== 'browser_press_key' && typeof args.selector === 'string' ? args.selector : undefined;
+      // A key lands on the focused element, so that is what press_key is
+      // classified against (Enter in a POST form field submits it).
+      const selector = typeof args.selector === 'string' && args.selector
+        ? args.selector
+        : canonicalTool === 'browser_press_key' ? ':focus' : undefined;
       const context = await requestPolicyContext(this.mainWindow, selector);
       pageContext = context
         ? { currentUrl: context.url, elementText: context.elementText }

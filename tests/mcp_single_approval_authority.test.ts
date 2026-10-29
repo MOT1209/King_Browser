@@ -3,6 +3,7 @@ import * as agentLoginModule from '../src/utils/agentLogin';
 import * as elementSnapshotModule from '../src/utils/elementSnapshot';
 import * as consoleBufferModule from '../src/utils/consoleBuffer';
 import * as urlRedactionModule from '../src/utils/urlRedaction';
+import * as trustedInputModule from '../src/utils/trustedInput';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -26,15 +27,22 @@ async function run() {
     tagName: 'BUTTON', innerText: 'Delete   account', textContent: 'Delete account', labels: null,
     getAttribute: (name: string) => ({ 'aria-label': 'Remove my account', type: 'submit', value: 'delete' } as Record<string, string>)[name] ?? null,
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }),
-    click: () => { clicks++; }
+    contains: (node: unknown) => node === button,
+    // A click now reaches the page as a real mouse event, never el.click().
+    click: () => { throw new Error('el.click() must not be used'); }
   };
   const webview = {
     getURL: () => url, getAttribute: () => 'tab', isLoading: () => false,
     addEventListener: () => {}, removeEventListener: () => {},
     getBoundingClientRect: () => ({ left: 0, top: 0 }),
+    getZoomFactor: () => 1,
+    sendInputEvent: async (event: { type: string }) => { if (event.type === 'mouseDown') clicks++; },
     executeJavaScript: async (code: string) => vm.runInNewContext(code, {
-      window: { location: { href: url } },
-      document: { querySelector: (selector: string) => selector === '#btn-3' ? button : null }
+      window: { location: { href: url }, innerWidth: 800, innerHeight: 600 },
+      document: {
+        querySelector: (selector: string) => selector === '#btn-3' ? button : null,
+        elementFromPoint: () => button
+      }
     })
   };
   const api = {
@@ -56,7 +64,8 @@ async function run() {
     '../utils/elementSnapshot': elementSnapshotModule,
     '../utils/consoleBuffer': consoleBufferModule,
     '../utils/agentLogin': agentLoginModule,
-    '../utils/urlRedaction': urlRedactionModule
+    '../utils/urlRedaction': urlRedactionModule,
+    '../utils/trustedInput': trustedInputModule
   };
   const module: any = { exports: {} };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/hooks/useBrowserAgentBridge.ts', 'utf8'), {

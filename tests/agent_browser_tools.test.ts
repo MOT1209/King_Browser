@@ -104,10 +104,23 @@ for (const tool of ['browser_click', 'browser_type', 'browser_select_option', 'b
     caseBody(tool).includes('executeAction(') && !caseBody(tool).includes('executeJavaScript(`'));
 }
 check('executeAction passes userGesture=true', /key === 'executeAction'[\s\S]{0,700}?,\s*true\s*\)/.test(bridge));
-check('browser_click sends real mouse events when the element is uncovered',
-  caseBody('browser_click').includes("type: 'mouseDown'") && caseBody('browser_click').includes('elementFromPoint'));
-check('pressEnter submits the form', caseBody('browser_type').includes('requestSubmit'));
-check('press_key Enter submits the form', caseBody('browser_press_key').includes('requestSubmit'));
+const trustedInput = readFileSync(join(__dirname, '..', 'src', 'utils', 'trustedInput.ts'), 'utf8');
+check('browser_click hit-tests the element and sends a real mouse click',
+  caseBody('browser_click').includes('buildLocateScript(') && caseBody('browser_click').includes('nativeClickAt(') &&
+  bridge.includes("type: 'mouseDown'") && trustedInput.includes('elementFromPoint'));
+check('browser_click never clicks a covered element through el.click()',
+  !caseBody('browser_click').includes('el.click()') && caseBody('browser_click').includes('covered by'));
+// Real keys replace the old synthetic events: the browser itself performs the
+// implicit form submission, so no manual requestSubmit() is needed (or wanted:
+// it skipped the page's own Enter handling).
+check('browser_type types with native input, not el.value',
+  caseBody('browser_type').includes('insertText(') && !caseBody('browser_type').includes('el.value ='));
+check('pressEnter sends a real Enter key', caseBody('browser_type').includes("keyCode: 'Enter'") && !caseBody('browser_type').includes('requestSubmit'));
+check('press_key sends real key events', caseBody('browser_press_key').includes('sendKeyCombo(') &&
+  !caseBody('browser_press_key').includes('new KeyboardEvent') && !caseBody('browser_press_key').includes('requestSubmit'));
+check('scroll uses a real mouse wheel', caseBody('browser_scroll').includes("type: 'mouseWheel'"));
+check('hover moves the real pointer', caseBody('browser_hover').includes("type: 'mouseMove'") && !caseBody('browser_hover').includes("new MouseEvent('mouseover'"));
+check('insertText goes through the guarded proxy', /\['executeJavaScript', 'capturePage', 'sendInputEvent', 'insertText'/.test(bridge));
 check('close_tab refuses unknown tabs', caseBody('browser_close_tab').includes('not found'));
 check('screenshot explains internal pages', caseBody('browser_screenshot').includes('king://'));
 
