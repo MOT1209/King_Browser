@@ -11,7 +11,8 @@
  */
 
 import assert from 'node:assert/strict';
-import { JSDOM } from 'jsdom';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import {
   parseKeyCombo,
   selectAllCombo,
@@ -19,6 +20,12 @@ import {
   wheelDelta,
   buildLocateScript
 } from '../src/utils/trustedInput';
+
+// jsdom is loaded at run time (it reads files next to itself), not bundled:
+// bundled into runAll it could not find its default stylesheet and the whole
+// suite stopped on CI.
+const nodeRequire = createRequire(join(process.cwd(), 'noop.js'));
+const { JSDOM } = nodeRequire('jsdom') as typeof import('jsdom');
 
 console.log('\n--- Trusted agent input ---');
 
