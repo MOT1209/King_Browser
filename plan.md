@@ -16,7 +16,7 @@
 - **[رأي]** خطر استراتيجي: "طبقة موافقة" كإضافة لمتصفح موجود أو كخادم MCP وسيط قد تصل لناس أكثر بجهد أقل من متصفح كامل يلزمه تحديث Chromium الأمني كل بضعة أسابيع إلى الأبد. اختبر الطلب قبل أن تستثمر أكثر.
 
 ## 2) الحالة الحالية (حقائق)
-- الإصدار المنشور: `v0.0.9` (أكتوبر 2026)، ينشر سير عمل Release إصداراً تلقائياً عند رفع الإصدار في `main`. آخر الإصدارات: 0.0.6-0.0.7 واجهة بالعربية والإنجليزية والألمانية، 0.0.8 إصلاح ثغرات التبعيات (`npm audit --omit=dev` بلا ثغرات؛ بقيت ثغرات في أدوات الفيديو `remotion` فقط)، 0.0.9 موقع بثلاث لغات مع فيلم جديد وإصلاح تخطيط التبويب الجديد.
+- الإصدار المنشور: `v0.0.10` (أكتوبر 2026)، ينشر سير عمل Release إصداراً تلقائياً عند رفع الإصدار في `main`. آخر الإصدارات: 0.0.6-0.0.7 واجهة بالعربية والإنجليزية والألمانية، 0.0.8 إصلاح ثغرات التبعيات (`npm audit --omit=dev` بلا ثغرات؛ بقيت ثغرات في أدوات الفيديو `remotion` فقط)، 0.0.9 موقع بثلاث لغات مع فيلم جديد وإصلاح تخطيط التبويب الجديد، 0.0.10 موافقة لإرسال نماذج POST أياً كان نص الزر، وإخفاء رموز الدخول من العناوين المعادة للوكيل، واستلام المتصفح من الوكيل وإعادته. بعد 0.0.10 على `main` دون إصدار: إدخال حقيقي للوكيل (WP10 المرحلة 1).
 - مكتمل ومدموج: إصلاح تحميل الإصدارات؛ سجل النشاط الدائم مع التصدير؛ قواعد المواقع (اسأل/احظر)؛ إنذار حقن الأوامر؛ نافذة موافقة تعرض الصفحة والعنصر؛ ملف معزول للوكيل (اختياري ومؤقت)؛ زر OpenCode؛ اختبار Windows مانع في CI؛ نقل MCP عبر Streamable HTTP (`/mcp`) بجانب SSE القديم، مع اختبارات آلية بعملاء SDK الرسميين.
 - **غير مجرَّب فعلياً:** المثبّت على Windows، واجهة الإعدادات الجديدة، Codex (لا يوجد وصول)؛ أُبلغ يدوياً أن OpenCode وClaude Code يعملان دون تسجيل طريقة الاتصال، `browser_login` على مواقع حقيقية.
 - الاختبارات الآلية (أكثر من 1300 تأكيد ناجح، 0 إخفاق) و`tsc` و`eslint` (0 أخطاء، 1165 تحذيراً) وCI خضراء على آخر إصدار.
@@ -71,6 +71,18 @@
 - تقسيم `electron/main.ts` (نحو 6900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة.
 - تخفيض تحذيرات ESLint (1081) تدريجياً؛ macOS في CI؛ سياسة تحديث Electron (تحديثات Chromium الأمنية كل بضعة أسابيع التزام دائم).
 
+### WP10 — تحكم الوكيل بإدخال حقيقي كمستخدم (أنا) — **المرحلة 1 منفَّذة ومختبرة حياً؛ المراحل 2-4 لم تبدأ**
+- **الهدف:** كل نقرة وكتابة ومفتاح وتمرير يمر عبر مسار الإدخال الأصلي للمتصفح (`sendInputEvent` و`insertText`)، فيعمل في كل المواقع (React والمحررات والعربية). **ليس هدفاً:** التخفي عن كشف البوتات، أو حل CAPTCHA، أو تزييف البصمة.
+- **[منفَّذ] المرحلة 1 — الإدخال الأساسي** (`src/utils/trustedInput.ts`, `src/hooks/useBrowserAgentBridge.ts`): نقر حقيقي يرفض العنصر المغطّى ويسمّي الغطاء؛ كتابة بمفاتيح حقيقية و`insertText` مع تحقق من النتيجة داخل الصفحة؛ اختصارات مثل `Control+A`؛ عجلة فأرة حقيقية؛ مؤشر حقيقي للـ hover؛ setter أصلي للقوائم. تشديد الموافقة: Enter في حقل نموذج POST، أو Enter/Space على زر إرساله، يحتاج موافقة.
+  - **مختبر حياً (أكتوبر 2026):** TodoMVC (React) بنص عربي، نموذج POST في httpbin (ظهرت الموافقة ورُفضت فلم يُرسل)، hover، اختصار مفاتيح، تمرير، عنصر مغطّى بنافذة. CI أخضر على Linux وWindows وmacOS وelectron-e2e.
+  - **[لم يُختبر]** محرر contenteditable حقيقي (Gmail أو Slack أو Docs).
+- **المرحلة 2 — أدوات جديدة:** السحب والإفلات؛ رفع الملفات (`<input type=file>` عبر CDP `DOM.setFileInputFiles`، بموافقة في كل مرة لأنه يُخرج ملفاً من الجهاز)؛ نوافذ `alert`/`confirm`/`prompt`؛ النقر المزدوج والأيمن؛ دعم iframe وShadow DOM في `browser_snapshot`. الصعوبة: متوسطة-عالية. الوقت: 4-6 أسابيع **[رأي]**.
+- **المرحلة 3 — الإدراك:** شجرة الوصول عبر CDP `Accessibility.getFullAXTree` بدل مسح DOM، فتكون الأدوار والأسماء أدق (`wc.debugger` مستخدم أصلاً في `main.ts` للقطة الكاملة). الصعوبة: متوسطة. الوقت: 2-3 أسابيع **[رأي]**.
+- **المرحلة 4 — المهارات:** مهارة لقيادة King (SKILL.md) لـ Claude Code وOpenCode، مبنية من القسم 2 في `AGENTS.md` ومن مهارة `browser-automation` الموجودة. الصعوبة: منخفضة. الوقت: أيام.
+- **المكتبات:** لا جديد. إدخال Electron الأصلي وCDP يكفيان. لا Playwright داخل التطبيق، ولا إدخال على مستوى النظام (يحرّك مؤشر الإنسان الحقيقي ويكسر التحكم البشري).
+- **البروتوكولات:** لا جديد. MCP (Streamable HTTP وSSE وstdio) كافٍ. اختياري لاحقاً: `notifications/tools/list_changed` وإشعارات التقدم.
+- **في كل مرحلة:** اختبار أولاً، ثم تحقق حي، ولا تخفيف لبوابة الموافقة.
+
 ## 4) الإيراد (رأي، لا تفكر فيه الآن)
 - لا إيراد قبل مستخدمين فعليين. إن ظهر طلب: ميزات فرق (سياسات مشتركة، تصدير تدقيق، SSO) فوق نواة مفتوحة **[افتراض]**. تذكّر أن Vercel Hobby (للموقع) غير تجاري.
 
@@ -79,6 +91,7 @@
 2. WP2 ثم WP3 (أنا، أعلى قيمة).
 3. WP6 ثم WP5 ثم WP4.
 4. WP7 و WP8 حسب هدفك وقراراتك. WP9 على الهامش.
+5. WP10: المرحلة 2 بعد WP1، لأن الاستخدام الفعلي يحدد أي أداة تأتي أولاً؛ ثم 3 ثم 4.
 
 ## 6) ما لن أفعله بلا اتفاق
 حذف ميزات، تغيير الإصدار/النشر العلني، الدمج على CI أحمر، تقسيم `main.ts` دفعة واحدة، ادعاءات أمان لم تُثبت.
@@ -103,7 +116,7 @@ Ein Open-Source-Browser, in dem ein Coding-Agent (OpenCode u. ä.) einen echten,
 - **[Meinung]** Strategisches Risiko: Eine „Freigabe-Schicht“ als Erweiterung eines bestehenden Browsers oder als vermittelnder MCP-Server erreicht mit weniger Aufwand eventuell mehr Menschen als ein kompletter Browser, der auf Dauer alle paar Wochen Chromium-Sicherheitsupdates braucht. Nachfrage testen, bevor du mehr investierst.
 
 ## 2) Aktueller Stand (Fakten)
-- Veröffentlicht: `v0.0.9` (Oktober 2026); der Release-Workflow veröffentlicht automatisch, wenn die Version in `main` erhöht wird. Zuletzt: 0.0.6-0.0.7 Oberfläche auf Arabisch, Englisch und Deutsch, 0.0.8 Behebung von Abhängigkeits-Schwachstellen (`npm audit --omit=dev` ohne Funde; offen bleiben nur Werkzeuge für Video, `remotion`), 0.0.9 dreisprachige Website mit neuem Film und korrigiertes Layout des neuen Tabs.
+- Veröffentlicht: `v0.0.10` (Oktober 2026); der Release-Workflow veröffentlicht automatisch, wenn die Version in `main` erhöht wird. Zuletzt: 0.0.6-0.0.7 Oberfläche auf Arabisch, Englisch und Deutsch, 0.0.8 Behebung von Abhängigkeits-Schwachstellen (`npm audit --omit=dev` ohne Funde; offen bleiben nur Werkzeuge für Video, `remotion`), 0.0.9 dreisprachige Website mit neuem Film und korrigiertes Layout des neuen Tabs, 0.0.10 Freigabe für das Absenden von POST-Formularen unabhängig von der Beschriftung, Schwärzung von Zugangsdaten in URLs für den Agenten, Übernahme des Browsers vom Agenten und Rückgabe. Nach 0.0.10 auf `main` ohne Release: echte Eingabe für den Agenten (WP10 Phase 1).
 - Fertig und gemerged: Release-Download repariert; dauerhaftes Aktivitätsprotokoll mit Export; Site-Regeln (fragen/blockieren); Injection-Alarm; Freigabe-Dialog mit Seite und Element; isoliertes Agent-Profil (optional, flüchtig); OpenCode-Button; blockierender Windows-Test in der CI; MCP über Streamable HTTP (`/mcp`) neben dem alten SSE, mit automatischen Tests über die offiziellen SDK-Clients.
 - **Nicht real getestet:** Installer unter Windows, neue Einstellungsoberfläche, Codex (kein Zugang); manuell berichtet, dass OpenCode und Claude Code funktionieren, ohne die Verbindungsart festzuhalten, `browser_login` an echten Seiten.
 - Automatische Tests (über 1300 bestandene Assertions, 0 Fehlschläge), `tsc` und `eslint` (0 Fehler, 1165 Warnungen) sowie die CI sind beim letzten Release grün.
@@ -165,6 +178,18 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 - `electron/main.ts` (ca. 6900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug.
 - ESLint-Warnungen (1081) schrittweise abbauen; macOS in der CI; Electron-Update-Politik (Chromium-Sicherheitsupdates alle paar Wochen sind eine Dauerverpflichtung).
 
+### WP10 — Agent steuert mit echter Eingabe wie ein Mensch (ich) — **Phase 1 umgesetzt und live getestet; Phasen 2-4 nicht begonnen**
+- **Ziel:** Jeder Klick, jede Eingabe, jede Taste und jedes Scrollen läuft über die native Eingabe des Browsers (`sendInputEvent`, `insertText`) und funktioniert damit auf allen Seiten (React, Editoren, Arabisch). **Kein Ziel:** Bot-Erkennung umgehen, CAPTCHAs lösen oder den Fingerabdruck fälschen.
+- **[umgesetzt] Phase 1 — Grundeingabe** (`src/utils/trustedInput.ts`, `src/hooks/useBrowserAgentBridge.ts`): echter Klick, der ein verdecktes Element ablehnt und die Abdeckung benennt; Eingabe mit echten Tasten und `insertText`, danach Prüfung des Ergebnisses in der Seite; Tastenkombinationen wie `Control+A`; echtes Mausrad; echter Zeiger für Hover; nativer Setter für Auswahllisten. Strengere Freigabe: Enter in einem Feld eines POST-Formulars oder Enter/Leertaste auf dessen Absende-Button braucht eine Freigabe.
+  - **Live getestet (Oktober 2026):** TodoMVC (React) mit arabischem Text, POST-Formular auf httpbin (Freigabe erschien und wurde abgelehnt, nichts gesendet), Hover, Tastenkombination, Scrollen, von einem Dialog verdecktes Element. CI grün auf Linux, Windows, macOS und electron-e2e.
+  - **[nicht getestet]** ein echter contenteditable-Editor (Gmail, Slack oder Docs).
+- **Phase 2 — neue Werkzeuge:** Drag and Drop; Datei-Upload (`<input type=file>` über CDP `DOM.setFileInputFiles`, jedes Mal mit Freigabe, da eine Datei das Gerät verlässt); `alert`/`confirm`/`prompt`-Dialoge; Doppel- und Rechtsklick; iframes und Shadow DOM in `browser_snapshot`. Schwierigkeit: mittel-hoch. Zeit: 4-6 Wochen **[Meinung]**.
+- **Phase 3 — Wahrnehmung:** Barrierefreiheitsbaum über CDP `Accessibility.getFullAXTree` statt DOM-Durchlauf, für genauere Rollen und Namen (`wc.debugger` wird in `main.ts` schon für den Ganzseiten-Screenshot genutzt). Schwierigkeit: mittel. Zeit: 2-3 Wochen **[Meinung]**.
+- **Phase 4 — Skills:** ein Skill (SKILL.md) zum Steuern von King für Claude Code und OpenCode, aufgebaut auf Abschnitt 2 von `AGENTS.md` und dem vorhandenen Skill `browser-automation`. Schwierigkeit: niedrig. Zeit: Tage.
+- **Bibliotheken:** keine neuen. Native Electron-Eingabe und CDP reichen. Kein Playwright in der App und keine Eingabe auf Betriebssystemebene (sie bewegt den echten Mauszeiger des Menschen und bricht die menschliche Kontrolle).
+- **Protokolle:** keine neuen. MCP (Streamable HTTP, SSE, stdio) reicht. Optional später: `notifications/tools/list_changed` und Fortschrittsmeldungen.
+- **In jeder Phase:** Test zuerst, dann Live-Prüfung, keine Lockerung des Freigabe-Tors.
+
 ## 4) Einnahmen (Meinung, jetzt nicht darüber nachdenken)
 - Keine Einnahmen vor echten Nutzern. Falls Nachfrage entsteht: Team-Funktionen (gemeinsame Richtlinien, Audit-Export, SSO) auf offenem Kern **[Annahme]**. Vercel Hobby (Website) ist nicht kommerziell.
 
@@ -173,6 +198,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du
 2. WP2, dann WP3 (ich, höchster Nutzen).
 3. WP6, dann WP5, dann WP4.
 4. WP7 und WP8 je nach deinem Ziel und deinen Entscheidungen. WP9 nebenbei.
+5. WP10: Phase 2 nach WP1, weil die echte Nutzung zeigt, welches Werkzeug zuerst kommt; dann 3, dann 4.
 
 ## 6) Was ich nicht ohne Absprache tue
 Funktionen löschen, Version ändern/öffentlich veröffentlichen, auf rote CI mergen, `main.ts` in einem Zug aufteilen, Sicherheitsversprechen ohne Beleg.
