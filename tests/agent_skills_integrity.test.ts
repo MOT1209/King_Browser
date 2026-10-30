@@ -64,3 +64,33 @@ for (const [, indexed] of agentsMd.matchAll(/\| `([a-z0-9-]+)` \|/g)) {
 
 assert.deepEqual(problems, [], 'agent skills are well-formed, indexed and reference real files');
 console.log(`[PASS] ${names.length} skills: frontmatter valid, indexed in AGENTS.md, referenced paths and npm scripts exist`);
+
+// Duplicate detection. Two skills that describe the same job fight over the
+// agent's attention and drift apart; identical or near-identical descriptions
+// are the cheap signal. Threshold 0.8 on word sets leaves the current
+// collection (largest overlap well below it) free of false positives.
+{
+  const words = (text: string) => new Set(text.toLowerCase().match(/[a-z][a-z0-9]{3,}/g) ?? []);
+  const descriptions = new Map<string, Set<string>>();
+  for (const name of names) {
+    const text = fs.readFileSync(path.join(skillsDir, name, 'SKILL.md'), 'utf8');
+    const fm = /^---\nname: [^\n]+\ndescription: ("(?:[^"\\]|\\.)*")\n---\n/.exec(text);
+    if (fm) descriptions.set(name, words(JSON.parse(fm[1]) as string));
+  }
+  const duplicates: string[] = [];
+  const entries = [...descriptions.entries()];
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const [a, wa] = entries[i];
+      const [b, wb] = entries[j];
+      const shared = [...wa].filter((w) => wb.has(w)).length;
+      const similarity = shared / (wa.size + wb.size - shared);
+      if (similarity >= 0.8) duplicates.push(`${a} ~ ${b} (${similarity.toFixed(2)})`);
+    }
+  }
+  assert.deepEqual(duplicates, [], 'no two skills have near-identical descriptions');
+
+  const indexed = [...agentsMd.matchAll(/\| `([a-z0-9-]+)` \|/g)].map((m) => m[1]);
+  assert.equal(new Set(indexed).size, indexed.length, 'AGENTS.md indexes each skill once');
+  console.log('[PASS] skills: no duplicate or near-duplicate descriptions, no duplicate index rows');
+}

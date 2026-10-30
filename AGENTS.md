@@ -139,6 +139,14 @@ Task skills live in `.claude/skills/<name>/SKILL.md` (Markdown with `name` and `
 | `speech-recognition` | Voice input, Whisper, microphone |
 | `privacy-preservation` | Logging, exports, sync fields, new outbound requests |
 | `cross-agent-compatibility` | AGENTS.md, CLAUDE.md, skills, agent configs |
+| `react-engineering` | Components, hooks or renderer state |
+| `element-targeting` | Snapshot refs, click/type behaviour, trusted input |
+| `download-management` | Download paths, filenames, open-file flow |
+| `web-content-extraction` | Reader mode, page text for agents or translation |
+| `prompt-injection-defense` | A tool returns page text, or the detector changes |
+| `mcp-tool-development` | Adding or changing an MCP tool |
+| `mcp-protocol-testing` | MCP transports, sessions, bridge tests |
+| `ci-cd` | Editing workflows or adding a CI check |
 | `unit-testing` | Adding behaviour or fixing a bug |
 | `integration-testing` | Changes spanning modules or processes |
 | `electron-e2e-testing` | Tests against the real Electron app |

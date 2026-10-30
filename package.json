@@ -151,6 +151,7 @@
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.cjs",
     "check:strings": "node scripts/check-hardcoded-strings.cjs",
+    "setup:agents": "node scripts/setup-agent-skills.cjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "verify": "npm run typecheck && npm run lint && npm run check:i18n && npm run check:strings && npm test",
     "build:bridge": "esbuild mcp-bridge.ts --format=esm --platform=node --outfile=mcp-bridge.mjs --log-level=warning",
