@@ -8,7 +8,7 @@ How coding agents find instructions in this repository, which tools back the che
 | :--- | :--- |
 | `AGENTS.md` | Single source of truth for every agent: project, architecture and trust boundaries, hard rules, commands, workflow, routing table, skill index, CI, definition of done, driver-agent (MCP) rules. |
 | `CLAUDE.md` | Adapter for Claude Code: `@AGENTS.md` import plus a few Claude-specific notes. Claude Code reads `CLAUDE.md`, not `AGENTS.md`, so without the import it would miss the shared rules. |
-| `.claude/skills/<name>/SKILL.md` | 47 task skills. YAML frontmatter `name` (equals the directory name) and `description` (what and when), then Purpose / When to use / Files / Workflow / Rules / Verify / Done when. |
+| `.claude/skills/<name>/SKILL.md` | 55 task skills. YAML frontmatter `name` (equals the directory name) and `description` (what and when), then Purpose / When to use / Files / Workflow / Rules / Verify / Done when. |
 | `DESIGN.md` | Visual rules (unchanged). |
 
 Before this change, the hard rules (sender validation, sandbox, secrets, approval gate, i18n, network destinations) were only in `CLAUDE.md`, so agents that read `AGENTS.md` (Codex, OpenCode, Cursor and others) never saw them. They now live in `AGENTS.md`.
@@ -19,13 +19,15 @@ The directory layout `<dir>/<name>/SKILL.md` with `name` / `description` frontma
 
 ### Integration status per agent
 
+Per-agent discovery, setup and troubleshooting now live in [agent-compatibility.md](agent-compatibility.md); the table below is the original summary. The overall map is [agent-ecosystem.md](agent-ecosystem.md).
+
 "Documented" means the vendor documentation describes the mechanism; "tested here" means it was exercised in this repository.
 
 | Agent | Instructions | Skills | Status |
 | :--- | :--- | :--- | :--- |
 | Claude Code | `CLAUDE.md` -> `@AGENTS.md` | `.claude/skills/` native | Documented. Skill frontmatter validated by `tests/agent_skills_integrity.test.ts`; loading in a live Claude Code session not separately tested. |
 | OpenCode | `AGENTS.md` native | `.claude/skills/` native | Documented, not tested here. |
-| OpenAI Codex | `AGENTS.md` native | Native path is `.agents/skills/` (gitignored here). Link locally: `mkdir -p .agents && ln -s ../.claude/skills .agents/skills`, or rely on the AGENTS.md index. | Documented, not tested here. The symlink is not committed (Windows checkouts often lack symlink support). |
+| OpenAI Codex | `AGENTS.md` native | Native path is `.agents/skills/` (gitignored here). Link locally with `npm run setup:agents` (or `mkdir -p .agents && ln -s ../.claude/skills .agents/skills`), or rely on the AGENTS.md index. | Documented, not tested here. The symlink is not committed (Windows checkouts often lack symlink support). |
 | Cursor | `AGENTS.md` | No native skill loading; reads skill files on demand via the index | Documented, not tested here. No `.cursor/rules/` copy was added, to avoid duplicating AGENTS.md. |
 | Windsurf | `AGENTS.md` | Same as Cursor | Documented, not tested here. |
 | GitHub Copilot coding agent | `AGENTS.md` | Same as Cursor | Documented, not tested here. No `.github/copilot-instructions.md` copy was added. |
@@ -35,6 +37,8 @@ If an agent turns out not to read `AGENTS.md` in practice, add a one-line adapte
 ### Maintaining skills
 
 - `tests/agent_skills_integrity.test.ts` (runs in `npm test`) fails when a skill's frontmatter is malformed, the name does not match its folder, the description does not say when to use it, a `## Verify` or `## Done when` section is missing, `AGENTS.md` does not index it, a backticked repository path does not exist, or an `npm run <script>` does not exist in `package.json`.
+- `tests/agent_instructions_consistency.test.ts` keeps `CLAUDE.md` an adapter, rejects copies of skills or rules in other agents' folders, checks skill counts stated in the docs and that relative links in the instruction documents resolve. Skill duplicate detection is in `agent_skills_integrity.test.ts`.
+- `tests/mcp_tool_schemas.test.ts` validates every MCP tool schema and the README tool counts.
 - Rename a file or script -> update the skills that mention it in the same commit (the test lists them).
 
 ## 2. Checks and commands
@@ -45,6 +49,7 @@ If an agent turns out not to read `AGENTS.md` in practice, add a one-line adapte
 | `npm run lint` | `eslint . --quiet` | Unchanged; ignores `test-results/` and `playwright-report/` now. |
 | `npm run check:i18n`, `npm run check:strings` | Dictionary and literal-string checks | Unchanged. |
 | `npm test` | esbuild-bundled `tests/runAll.ts` in Node | Now also runs `ipc_sender_guard_coverage`, `csp_parity`, `agent_skills_integrity`. |
+| `npm run setup:agents` | Links `.agents/skills` to `.claude/skills` for Codex (`-- --check` only reports) | Local, gitignored link |
 | `npm run verify` | typecheck + lint + i18n + strings + test | New; the pre-push check named in AGENTS.md. |
 | `npm run audit:prod` | `npm audit --omit=dev --audit-level=high` | New; blocking CI step. |
 | `npm run test:electron` | Playwright `smoke` project in `tests/electron/` | New; needs `npm run build`, the Electron binary and a display. |

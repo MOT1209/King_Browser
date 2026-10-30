@@ -123,6 +123,7 @@ import './mcp_streamable_http.test';
 import './ai_agent_lazy_load.test';
 import './mcp_server_transports.test';
 import './mcp_tool_catalog.test';
+import './mcp_tool_schemas.test';
 import './element_refs.test';
 import './url_redaction.test';
 import './trusted_input.test';
@@ -146,6 +147,8 @@ import './ipc_sender_guard_coverage.test';
 import './csp_parity.test';
 import './linux_sandbox_fallback.test';
 import './agent_skills_integrity.test';
+import './agent_instructions_consistency.test';
+import './setup_agent_skills.test';
 
 // Very last on purpose. This behaviour-level auth suite (register, login,
 // logout, restore and cross-account isolation driven through the real service
