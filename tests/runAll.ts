@@ -149,6 +149,7 @@ import './linux_sandbox_fallback.test';
 import './agent_skills_integrity.test';
 import './agent_instructions_consistency.test';
 import './setup_agent_skills.test';
+import './release_nightly_cleanup.test';
 
 // Very last on purpose. This behaviour-level auth suite (register, login,
 // logout, restore and cross-account isolation driven through the real service
