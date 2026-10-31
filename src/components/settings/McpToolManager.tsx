@@ -3,6 +3,8 @@ import { Plus, Search, Pencil, Trash2, FlaskConical, Download, Upload, ChevronDo
 import { useTranslation } from '../../services/i18n';
 import { showConfirm } from '../../utils/confirmDialog';
 import { useDialogA11y } from '../../hooks/useDialogA11y';
+import { translateToolError } from '../../utils/toolErrors';
+import { MCP_TOOLS } from './mcpToolCatalog';
 import type {
   McpBuiltInToolView, McpCustomToolInput, McpCustomToolView, McpToolParameter, McpToolRegistry
 } from '../../types/mcpTools';
@@ -34,6 +36,9 @@ interface Row {
   custom_view?: McpCustomToolView;
   builtin_view?: McpBuiltInToolView;
 }
+
+// Short display copy for built-in tools (the registry description is the long, agent-facing one).
+const BUILT_IN_COPY = new Map<string, string>(MCP_TOOLS.map(tool => [tool.name, tool.desc]));
 
 const api = () => (window as any).electronAPI;
 
@@ -178,13 +183,14 @@ const Label: React.FC<{ htmlFor: string; children: React.ReactNode; hint?: strin
   </div>
 );
 
-const ErrorList: React.FC<{ errors: string[] }> = ({ errors }) => (
-  errors.length === 0 ? null : (
+const ErrorList: React.FC<{ errors: string[] }> = ({ errors }) => {
+  const { l } = useTranslation();
+  return errors.length === 0 ? null : (
     <ul role="alert" className="text-xs text-red-600 dark:text-red-400 space-y-0.5 list-disc ps-4">
-      {errors.map((error, index) => <li key={index}>{error}</li>)}
+      {errors.map((error, index) => <li key={index}>{translateToolError(error, l)}</li>)}
     </ul>
-  )
-);
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Add / edit
@@ -414,7 +420,7 @@ const ToolTestDialog: React.FC<{ tool: McpCustomToolView; onClose: () => void; o
     try {
       const result = await api().testMcpCustomTool(tool.id, args);
       setState(result.ok ? 'ok' : 'failed');
-      setText(result.ok ? (result.output || '') : (result.error || ''));
+      setText(result.ok ? (result.output || '') : translateToolError(result.error || '', l));
     } catch {
       setState('failed');
       setText(l({ en: 'The test could not be run.', ar: 'تعذّر تشغيل الاختبار.', de: 'Der Test konnte nicht ausgeführt werden.' }));
@@ -500,7 +506,7 @@ const ImportDialog: React.FC<{ onClose: () => void; onImported: () => void }> = 
                 <code className="text-slate-700 dark:text-slate-200 break-all">{entry.name}</code>
                 <span className={`shrink-0 font-medium ${entry.status === 'new' ? 'text-green-600' : 'text-amber-600'}`}>{statusLabel[entry.status]}</span>
               </div>
-              {entry.errors.length > 0 && <p className="text-red-600 mt-0.5">{entry.errors.join(' ')}</p>}
+              {entry.errors.length > 0 && <p className="text-red-600 mt-0.5">{entry.errors.map(e => translateToolError(e, l)).join(' ')}</p>}
             </li>
           ))}
         </ul>
@@ -543,7 +549,7 @@ export const McpToolManager: React.FC = () => {
   const rows: Row[] = useMemo(() => {
     if (!registry) return [];
     const custom: Row[] = registry.custom.map(tool => ({ key: tool.id, name: tool.name, description: tool.description, custom: true, enabled: tool.enabled, level: 'http', custom_view: tool }));
-    const builtIn: Row[] = registry.builtIn.map(tool => ({ key: tool.name, name: tool.name, description: tool.description, custom: false, enabled: tool.enabled, level: tool.level, builtin_view: tool }));
+    const builtIn: Row[] = registry.builtIn.map(tool => ({ key: tool.name, name: tool.name, description: BUILT_IN_COPY.get(tool.name) ?? tool.description, custom: false, enabled: tool.enabled, level: tool.level, builtin_view: tool }));
     return [...custom, ...builtIn];
   }, [registry]);
 
@@ -574,7 +580,7 @@ export const McpToolManager: React.FC = () => {
     try {
       if (row.custom_view) {
         const result = await api().setMcpCustomToolEnabled(row.custom_view.id, !row.enabled);
-        if (!result.ok) flash(false, result.errors.join(' '));
+        if (!result.ok) flash(false, result.errors.map((e: string) => translateToolError(e, l)).join(' '));
       } else {
         await api().setMcpToolEnabled(row.name, !row.enabled);
       }

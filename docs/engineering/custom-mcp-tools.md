@@ -38,12 +38,18 @@ There is one registry. Built-in tools stay in `TOOLS` / `TOOL_PERMISSIONS`; the 
 - **Import** is all-or-nothing, size-limited (512 KB, 50 tools) and runs every entry through `validateDefinition`.
 - **Built-in tools cannot be deleted**; the manager only toggles them through the existing `setToolEnabled`.
 
+## Built-in tool arguments
+
+`validateToolArguments` (`electron/main/toolSchema.ts`) checks every call to a built-in tool against its declared schema in `executeToolCore`: required arguments, the JSON type of declared properties and `enum`. Undeclared extra arguments are tolerated and `null` counts as absent for optional properties, so existing clients keep working; a malformed call now fails early with `Invalid arguments for <tool>: ...`. It runs after the enabled check and before approval, and does not change any approval decision.
+
 ## Not implemented, and why
 
-- **External MCP server connections.** Safe support needs a client lifecycle, transport and auth handling, tool-schema import with the same description-injection problem, and a per-tool approval mapping for tools we did not classify. None of that can be tested here without a real server and a security review, so it was left out rather than half-built.
-- **Exposing internal browser capabilities under new names.** Aliases already exist (`TOOL_ALIASES`); letting users create more would let them re-label a sensitive tool as a safe one.
-- **Runtime JSON Schema validation for built-in tools.** Custom tools are validated at call time. Built-in handlers validate their own arguments in the renderer bridge, and `tests/mcp_tool_schemas.test.ts` checks the declared schemas. Enforcing the declared schema centrally for built-ins could change what current clients get back, so it needs its own change and compatibility test.
-- **Localised validator messages.** Validation runs in the main process and returns English text.
+- **External MCP server connections.** Safe support needs a client lifecycle, transport and auth handling, tool-schema import with the same description-injection problem, and approval classification for tools King did not define. Left out rather than half-built; it needs a threat model first (`threat-modeling` skill).
+- **Exposing internal browser capabilities under new names.** Declined on security grounds: letting a user re-label a sensitive tool under a harmless name would defeat the approval classification, which keys on the tool name.
+
+## Error messages
+
+Validation runs in the main process and answers in English. `src/utils/toolErrors.ts` maps the messages reachable from the form to the interface language; `tests/tool_errors.test.ts` feeds real validator output through the table. A message with no rule is shown as received, so when you add or reword a validator message, add or update its rule.
 
 ## Extending
 

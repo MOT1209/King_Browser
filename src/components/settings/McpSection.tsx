@@ -16,66 +16,7 @@ export interface McpSectionProps {
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
 }
 
-// Display copy for the Settings list. The levels here must mirror
-// electron/mcpServer.ts TOOL_PERMISSIONS exactly: this list drives the visible
-// badge AND the enable/disable toggle, so a level that disagrees with the
-// server tells the user a tool is harmless while the server classifies it as
-// page-reading or sensitive. tools_mcp_catalog.test.ts fails on any drift.
-export const MCP_TOOLS = [
-  { name: 'king_browser_info', desc: 'Browser version and capabilities', level: 'safe' },
-  { name: 'browser_navigate', desc: 'Navigate to a URL', level: 'medium' },
-  { name: 'browser_read_page', desc: 'Extract full page text + links', level: 'medium' },
-  { name: 'browser_snapshot', desc: 'List interactive elements with refs (e12) for click/type', level: 'medium' },
-  { name: 'browser_screenshot', desc: 'Take a screenshot', level: 'medium' },
-  { name: 'browser_list_tabs', desc: 'List all open tabs', level: 'safe' },
-  { name: 'browser_get_url', desc: 'Get the current tab URL', level: 'safe' },
-  { name: 'browser_scroll', desc: 'Scroll the page up/down/top/bottom', level: 'safe' },
-  { name: 'browser_go_back', desc: 'Navigate back in history', level: 'safe' },
-  { name: 'browser_go_forward', desc: 'Navigate forward in history', level: 'safe' },
-  { name: 'browser_reload', desc: 'Reload the current page', level: 'safe' },
-  { name: 'browser_wait', desc: 'Wait for N milliseconds', level: 'safe' },
-  { name: 'browser_get_element_text', desc: 'Get an element\'s text or form value', level: 'medium' },
-  { name: 'browser_scroll_to_element', desc: 'Scroll until element is visible', level: 'safe' },
-
-  { name: 'browser_click', desc: 'Click an element by CSS selector', level: 'medium' },
-  { name: 'browser_hover', desc: 'Hover over an element', level: 'medium' },
-  { name: 'browser_focus', desc: 'Focus an element', level: 'medium' },
-  { name: 'browser_switch_tab', desc: 'Switch to a tab by ID', level: 'medium' },
-  { name: 'browser_close_tab', desc: 'Close a tab by ID', level: 'medium' },
-  { name: 'browser_new_tab', desc: 'Open a new tab', level: 'medium' },
-  { name: 'browser_mute_tab', desc: 'Mute or unmute the active tab', level: 'medium' },
-  { name: 'browser_pin_tab', desc: 'Pin or unpin the active tab', level: 'medium' },
-  { name: 'browser_duplicate_tab', desc: 'Duplicate the active tab', level: 'medium' },
-  { name: 'browser_zoom', desc: 'Set page zoom level', level: 'medium' },
-
-  { name: 'browser_type', desc: 'Type text into an input', level: 'sensitive' },
-  { name: 'browser_press_key', desc: 'Simulate a keyboard key press', level: 'sensitive' },
-  { name: 'browser_select_option', desc: 'Select a dropdown option', level: 'sensitive' },
-  { name: 'browser_login', desc: 'Sign in with a saved account (always asks you first)', level: 'sensitive' },
-
-  // §9 agent interface (levels mirror electron/mcpServer.ts TOOL_PERMISSIONS).
-  // Engine controls stay 'safe' so STOP NOW / Pause can never be locked out.
-  { name: 'browser_status', desc: 'Get live execution-engine status', level: 'safe' },
-  { name: 'browser_back', desc: 'Go back in history (alias)', level: 'safe' },
-  { name: 'browser_forward', desc: 'Go forward in history (alias)', level: 'safe' },
-  { name: 'browser_request_approval', desc: 'Ask the user to approve a planned action', level: 'safe' },
-  { name: 'browser_next_step', desc: 'Run exactly one action, then pause', level: 'safe' },
-  { name: 'browser_next_phase', desc: 'Report the active phase and actions used', level: 'safe' },
-  { name: 'browser_pause', desc: 'Pause scheduling at a safe boundary', level: 'safe' },
-  { name: 'browser_resume', desc: 'Resume after pause or stop', level: 'safe' },
-  { name: 'browser_stop', desc: 'Emergency stop: cancel queue, block new actions', level: 'safe' },
-
-  { name: 'browser_open', desc: 'Open a URL (alias of navigate)', level: 'medium' },
-  { name: 'browser_get_page_summary', desc: 'Compact page text + links (alias of read_page)', level: 'medium' },
-  { name: 'browser_find_element', desc: 'Find elements by CSS selector or visible text', level: 'medium' },
-
-  { name: 'browser_select', desc: 'Select a dropdown option (alias)', level: 'sensitive' },
-
-  { name: 'browser_wait_for', desc: 'Wait for the page to load or an element/text to appear', level: 'safe' },
-  { name: 'browser_console_messages', desc: 'Read the page console (logs, warnings, errors)', level: 'medium' },
-  { name: 'browser_element_screenshot', desc: 'Screenshot a single element', level: 'medium' },
-  { name: 'browser_fill_form', desc: 'Fill several fields at once (each checked like browser_type)', level: 'sensitive' },
-];
+export { MCP_TOOLS } from './mcpToolCatalog';
 
 export const McpSection: React.FC<McpSectionProps> = ({
   settings,
@@ -86,7 +27,6 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const [mcpStatus, setMcpStatus] = useState<{ running: boolean; port: number; clientCount: number; clients: any[] } | null>(null);
   const [mcpToken, setMcpToken] = useState<string>('');
   const [mcpTokenVisible, setMcpTokenVisible] = useState(false);
-  const [disabledTools, setDisabledTools] = useState<string[]>([]);
   type RecordingState = { recording: boolean; steps: number; replaying: boolean; recordings: Array<{ id: string; name: string; createdAt: string; steps: number }> };
   const [recState, setRecState] = useState<RecordingState>({ recording: false, steps: 0, replaying: false, recordings: [] });
   const [recName, setRecName] = useState('');
@@ -115,9 +55,6 @@ export const McpSection: React.FC<McpSectionProps> = ({
       } else {
         setMcpToken('');
       }
-    }
-    if ((window as any).electronAPI?.getMcpToolSettings) {
-      setDisabledTools(await (window as any).electronAPI.getMcpToolSettings());
     }
     if ((window as any).electronAPI?.getMcpSiteRules) {
       setSiteRules(await (window as any).electronAPI.getMcpSiteRules());
@@ -249,13 +186,6 @@ export const McpSection: React.FC<McpSectionProps> = ({
         setTokenCopied(true);
         setSafeTimeout(() => setTokenCopied(false), 2000);
       }
-    }
-  };
-
-  const handleToggleTool = async (toolName: string, currentlyDisabled: boolean) => {
-    if ((window as any).electronAPI?.setMcpToolEnabled) {
-      await (window as any).electronAPI.setMcpToolEnabled(toolName, currentlyDisabled); // true means enable it, false means disable it
-      fetchMcpStatus();
     }
   };
 
@@ -484,48 +414,6 @@ export const McpSection: React.FC<McpSectionProps> = ({
         </pre>
       </div>
 
-      {/* Tools list & Permissions */}
-      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-orange-500" />
-          <p className="font-semibold text-slate-800 dark:text-slate-100">{l({ en: 'Tool Permissions ({n})', ar: 'أذونات الأدوات ({n})', de: 'Werkzeugberechtigungen ({n})' }, { n: MCP_TOOLS.length })}</p>
-        </div>
-        <p className="text-xs text-slate-500 mb-2">{l({ en: 'Enable or disable specific browser capabilities. Sensitive actions are disabled by default.', ar: 'فعّل أو عطّل قدرات معيّنة في المتصفح. الإجراءات الحساسة معطّلة افتراضياً.', de: 'Bestimmte Browserfunktionen aktivieren oder deaktivieren. Sensible Aktionen sind standardmäßig deaktiviert.' })}</p>
-        <div className="grid grid-cols-1 gap-1.5 max-h-[400px] overflow-y-auto pe-1">
-          {MCP_TOOLS.map(tool => {
-            const isDisabled = disabledTools.includes(tool.name);
-            let badgeClass = "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400";
-            let badgeText = l({ en: 'Safe', ar: 'آمن', de: 'Sicher' });
-            if (tool.level === 'medium') {
-              badgeClass = "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
-              badgeText = l({ en: 'Medium', ar: 'متوسط', de: 'Mittel' });
-            } else if (tool.level === 'sensitive') {
-              badgeClass = "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400";
-              badgeText = l({ en: 'Sensitive', ar: 'حساس', de: 'Sensibel' });
-            }
-
-            return (
-              <div key={tool.name} className={`flex items-center justify-between py-2 px-3 rounded-lg border transition-colors ${isDisabled ? 'bg-slate-50 border-slate-200 dark:bg-slate-800/30 dark:border-slate-700/50 opacity-60' : 'bg-white border-slate-200 dark:bg-slate-800/50 dark:border-slate-700/50'}`}>
-                <div className="flex flex-col gap-1 pe-4 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <code className="text-xs text-blue-600 dark:text-blue-400 font-mono font-medium truncate">{tool.name}</code>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${badgeClass}`}>{badgeText}</span>
-                  </div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{tool.desc}</span>
-                </div>
-                <button
-                  onClick={() => handleToggleTool(tool.name, isDisabled)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${!isDisabled ? (tool.level === 'sensitive' ? 'bg-orange-500' : 'bg-blue-500') : 'bg-slate-200 dark:bg-slate-600'}`}
-                  role="switch"
-                  aria-checked={!isDisabled}
-                >
-                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${!isDisabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
       {/* Persistent agent profile */}
       {settings.agentIsolatedProfile && (
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3">
