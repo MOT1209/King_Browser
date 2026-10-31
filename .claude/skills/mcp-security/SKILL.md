@@ -8,7 +8,7 @@ description: "Security of the King Browser MCP server and stdio bridge: loopback
 ## Controls (`electron/mcpServer.ts` unless noted)
 - Listens on `127.0.0.1` (port 3020, falls back to an ephemeral port if busy). Never bind `0.0.0.0`.
 - Host header must be `localhost`, `127.0.0.1` or `[::1]` (with or without the port): blocks DNS rebinding of the port.
-- CORS answers only local origins; Streamable HTTP validates Origin and sessions in `electron/main/mcpStreamableHttp.ts` (`Mcp-Session-Id` issued on initialize, 400 missing, 404 unknown/expired, idle expiry, max sessions).
+- CORS and the Streamable HTTP Origin check share `isLocalOrigin` (`electron/main/mcpStreamableHttp.ts`): only `http:`/`https:` on `localhost`, `127.0.0.1` or `[::1]`; `king:` and other schemes are refused; Streamable HTTP validates Origin and sessions in `electron/main/mcpStreamableHttp.ts` (`Mcp-Session-Id` issued on initialize, 400 missing, 404 unknown/expired, idle expiry, max sessions).
 - `Authorization: Bearer <token>` only (no query-string token), compared with `timingSafeEqual`; token encrypted at rest.
 - `express-rate-limit`: 120 requests per minute per client, `/health` exempt.
 - Tool tiers in `TOOL_PERMISSIONS`: `safe`, `medium` (hidden from `tools/list` until enabled in Settings -> MCP), `sensitive`. Unknown tools are treated as sensitive.

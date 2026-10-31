@@ -49,7 +49,9 @@ Observation, not changed: the check only reads the Debian-style `unprivileged_us
 
 ### F3. MCP CORS accepts any `king:` origin (informational)
 
-The CORS middleware in `electron/mcpServer.ts` reflects an `Origin` whose protocol is `king:` regardless of host. No web content can present a `king:` origin (internal pages render inside the app's `file://` window), and every request still needs the bearer token, so there is no known exploit path. Tightening it to the exact internal pages would match `trustedSender.ts`. Not changed: it touches the MCP trust model, which AGENTS.md reserves for the owner.
+The CORS middleware in `electron/mcpServer.ts` reflects an `Origin` whose protocol is `king:` regardless of host. No web content can present a `king:` origin (internal pages render inside the app's `file://` window), and every request still needs the bearer token, so there is no known exploit path. Tightening it to the exact internal pages would match `trustedSender.ts`.
+
+Status: fixed 2026-10-31 at the owner's request. No King page calls the MCP port, so `isLocalOrigin` now accepts only `http:`/`https:` on a loopback host and the CORS middleware reuses it instead of its own copy (which also reflected any scheme on a loopback host). Covered by `tests/mcp_streamable_http.test.ts`, which failed before the change.
 
 ### F4. Accessibility defect fixed: tab strip list items without a list
 
@@ -58,6 +60,15 @@ The CORS middleware in `electron/mcpServer.ts` reflects an `Origin` whose protoc
 ### F5. Dev-only dependency advisories (informational)
 
 `zod <4.6.6` (GHSA-mrhx-c7xc-m3w5) inside `@remotion/*` video tooling. Not shipped; production audit is clean.
+
+### F6. Custom MCP tools: dot-segment path escape and approval not bound to the definition (fixed 2026-10-31)
+
+Two defects in the Tool Manager executor (`electron/main/customTools.ts`, `electron/mcpServer.ts`), found in the audit recorded in `docs/security-audit-2026-10-31.md`:
+
+- An agent argument of `..` or `.` in a path placeholder passed through `encodeURIComponent` unchanged, and URL parsing then removed the segment: `https://api.example.com/v1/weather/{city}` with `city=".."` was sent to `/v1/`. The approval dialog shows the template and `city: ..`, which does not make the new path obvious; a read-only tool ran it without a dialog. Impact was limited to other paths on the same approved host. `buildRequest` now refuses a request whose path gains a dot segment, and the check runs before the dialog.
+- The approval was decided from the definition at call time, but the request ran against whatever the store held after the dialog closed. An edit saved while the dialog was open (another host, a credential) ran under the earlier approval. The request now carries `definitionFingerprint(def)` and does not run if it changed.
+
+Covered by `tests/custom_tools.test.ts` and `tests/mcp_custom_tools_integration.test.ts` (both failed before the fix).
 
 ## Changes made with this review
 

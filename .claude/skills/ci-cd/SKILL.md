@@ -13,7 +13,7 @@ CI is the shared definition of green. A step must fail for a real reason, run th
 
 ## Workflow
 1. Add the check as an npm script first, run it locally, then call that script from the workflow so humans and CI share one command.
-2. Pin every action to a commit SHA with the version in a comment; update by hand (Dependabot version updates are off on purpose).
+2. Pin every action to a commit SHA with the version in a comment; update by hand (Dependabot version updates are off on purpose; only security updates may open pull requests).
 3. Keep `permissions: contents: read` at the top; grant more only at job level and only for the job that needs it.
 4. New or flaky jobs start with `continue-on-error: true` and are promoted after several passes, as `electron-e2e` and macOS were.
 5. To reproduce a failure, run the same command on the same Node major (22) with `npm ci --ignore-scripts`.

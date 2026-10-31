@@ -12,7 +12,7 @@ Every package is code that ships to users or runs in CI with their trust. Add on
 - npm with a committed `package-lock.json`; CI installs with `npm ci --ignore-scripts`.
 - `dependencies` holds only what the packaged main process loads at runtime and esbuild leaves external (`@ghostery/*`, `express`, `jsdom`, `electron-updater`, ...). Everything bundled by Vite or esbuild is a `devDependency`, including React.
 - `overrides` pins transitive versions (`sprintf-js`, `playwright-core`).
-- Dependabot version updates are deliberately disabled (`.github/dependabot.yml`); do not re-enable them without the owner.
+- Dependabot version updates are deliberately disabled (`.github/dependabot.yml`, `open-pull-requests-limit: 0`); do not re-enable them without the owner. Security updates are allowed (no `ignore` rule); review such a pull request like any dependency change.
 - The decision record for tooling packages is `docs/engineering/agent-tooling.md` ("Dependency decisions").
 
 ## Before adding a package, record

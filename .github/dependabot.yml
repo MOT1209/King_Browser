@@ -1,5 +1,8 @@
 # Dependabot configuration
-# Configured to completely disable automated PR and branch creation.
+# Version updates are off on purpose (open-pull-requests-limit: 0): pinned
+# action SHAs and dependency ranges are bumped by hand. There is no ignore
+# rule, so Dependabot security updates can still open pull requests for known
+# vulnerabilities when they are enabled in the repository settings.
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -7,21 +10,15 @@ updates:
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 0
-    ignore:
-      - dependency-name: "*"
 
   - package-ecosystem: "npm"
     directory: "/website"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 0
-    ignore:
-      - dependency-name: "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 0
-    ignore:
-      - dependency-name: "*"

@@ -14,7 +14,7 @@ import { ExecutionEngine } from './main/executionEngine.js';
 import { resolveElementRef } from './main/elementRefs.js';
 import { handleJsonRpcMessage, type McpProtocolHandlers } from './main/mcpProtocol.js';
 import { formatToolError } from './main/mcpContent.js';
-import { createStreamableHttpHandlers, type McpHttpSession } from './main/mcpStreamableHttp.js';
+import { createStreamableHttpHandlers, isLocalOrigin, type McpHttpSession } from './main/mcpStreamableHttp.js';
 import { Recorder, RECORDABLE_TOOLS, createRecordingStore, replaySteps, type Recording, type RecordingStore, type ReplayReport } from './main/recordings.js';
 import { createApprovalModeStore, strictModeRequiresApproval, type ApprovalMode, type ApprovalModeStore } from './main/approvalMode.js';
 import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
@@ -27,6 +27,7 @@ import { formatHandoffMessage } from './main/handoffNote.js';
 import { encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity.js';
 import {
   createCustomToolStore, executeHttpTool, CUSTOM_TOOL_PREFIX, formatToolOutput, toInputSchema, validateArguments,
+  buildRequest, definitionFingerprint, UnsafePathArgumentError,
   type CustomToolStore, type CustomToolDefinition, type ExecuteDeps
 } from './main/customTools.js';
 import { validateToolArguments } from './main/toolSchema.js';
@@ -1639,6 +1640,10 @@ export class BrowserMCPServer {
     }
     const problems = validateArguments(def.parameters, args);
     if (problems.length > 0) throw new Error(`Invalid arguments for ${toolName}: ${problems.join(' ')}`);
+    // Refuse a request that cannot be built (for example a ".." path segment) before asking the user.
+    try { buildRequest(def, args); } catch (err) {
+      if (err instanceof UnsafePathArgumentError) throw new Error(`Invalid arguments for ${toolName}: ${err.message}`);
+    }
     // Custom tools always go through the approval engine; without it they do not run.
     if (!this.policyEnforced) throw new Error('Custom tools require the approval policy to be enforced.');
 
@@ -1650,14 +1655,15 @@ export class BrowserMCPServer {
     const sensitive = triggers.length > 0;
     let host: string | undefined;
     try { host = new URL(def.http.urlTemplate.replace(/\{[^}]*\}/g, 'x')).hostname; } catch { /* no host shown */ }
-    const request: ActionRequest & { __mcpResult?: unknown; __customTest?: boolean } = {
+    const request: ActionRequest & { __mcpResult?: unknown; __customTest?: boolean; __customFingerprint?: string } = {
       toolName,
       args,
       risk: sensitive ? 'sensitive' : 'safe',
       domain: host,
       summary: sensitive ? `Call your custom tool ${toolName} (${def.http.method} ${host ?? ''}) — ${def.description.slice(0, 120)}` : undefined,
       details: sensitive ? this.customApprovalDetails(def, args) : undefined,
-      __customTest: isTest
+      __customTest: isTest,
+      __customFingerprint: definitionFingerprint(def)
     };
     const record: ActionRecord = await this.engine().submit(request);
     if (record.status !== 'completed') {
@@ -1673,10 +1679,14 @@ export class BrowserMCPServer {
   }
 
   /** Runs after approval, inside the engine's executor: the only place a custom request is sent. */
-  private async runCustomToolInMain(request: ActionRequest & { __customTest?: boolean }): Promise<string> {
+  private async runCustomToolInMain(request: ActionRequest & { __customTest?: boolean; __customFingerprint?: string }): Promise<string> {
     const store = this.customToolStore();
     const def = store?.get(request.toolName);
     if (!store || !def) throw new Error('This tool was deleted before it could run.');
+    // The approval covered the definition shown at the time; an edit since then is not approved.
+    if (request.__customFingerprint !== definitionFingerprint(def)) {
+      throw new Error('This tool was changed before it could run. Call it again to approve the new version.');
+    }
     // The approval can take a while: the tool may have been disabled or deleted meanwhile.
     if (!request.__customTest && !store.isActive(def.name)) throw new Error('This tool was disabled before it could run.');
     if (!this.customToolNetwork) throw new Error('Custom tool networking is not available.');
@@ -1718,20 +1728,11 @@ export class BrowserMCPServer {
       next();
     });
 
-    // CORS for all routes - restricted to local origins (http://localhost:*, http://127.0.0.1:*, http://[::1]:*)
+    // CORS for all routes - the same local origins the Streamable HTTP check accepts (isLocalOrigin)
     app.use((req, res, next) => {
       const origin = req.headers.origin;
-      if (origin) {
-        try {
-          const url = new URL(origin);
-          if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.protocol === 'king:') {
-            res.header('Access-Control-Allow-Origin', origin);
-          }
-        } catch (_) {
-          if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin)) {
-            res.header('Access-Control-Allow-Origin', origin);
-          }
-        }
+      if (typeof origin === 'string' && isLocalOrigin(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
       }
       res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, Mcp-Session-Id, MCP-Protocol-Version');
       res.header('Access-Control-Expose-Headers', 'Mcp-Session-Id');
