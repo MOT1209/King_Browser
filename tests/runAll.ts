@@ -148,6 +148,7 @@ import './ipc_sender_guard_coverage.test';
 import './csp_parity.test';
 import './fallback_crypto_shared.test';
 import './runall_registration.test';
+import './phishing_block_page.test';
 import './popup_and_guest_event_hardening.test';
 import './webview_partition_hardening_failure.test';
 import './linux_sandbox_fallback.test';

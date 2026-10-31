@@ -7,6 +7,7 @@ import { isLocalOrIntranetHost } from './main/hostPolicy';
 import { isExtensionAllowedInIncognito, setExtensionIncognitoAccess, hasExtensionIncognitoAccess } from './main/incognitoExtensions';
 import { openPageSourceViewer as createPageSourceViewer } from './windows/sourceViewer';
 import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
+import { buildPhishingBlockScript } from './main/phishingBlockPage';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import http from 'http';
@@ -415,6 +416,16 @@ async function applyProxyToAllSessions(rules: string): Promise<void> {
   };
   proxyMutex = proxyMutex.then(op, op);
   return proxyMutex;
+}
+
+/** Replaces a webview's content with the phishing block page (see phishingBlockPage.ts). */
+function showPhishingBlockPage(contents: Electron.WebContents, blockedUrl: string): void {
+  if (contents.isDestroyed()) return;
+  contents.loadURL('about:blank').then(() => {
+    if (!contents.isDestroyed()) {
+      contents.executeJavaScript(buildPhishingBlockScript(blockedUrl)).catch(() => {});
+    }
+  }).catch(() => {});
 }
 
 function hardenIncognitoPartition(partitionName: string): boolean {
@@ -3186,28 +3197,7 @@ app.on('web-contents-created', (_event, contents) => {
       if (checkPhishingDomain(navigationUrl)) {
         e.preventDefault();
         sendToMainWindow('blocked-site', { url: navigationUrl, reason: 'phishing' });
-        const escapedUrl = navigationUrl.substring(0, 500);
-        const safeUrlJson = JSON.stringify(escapedUrl);
-        if (!contents.isDestroyed()) {
-          contents.loadURL('about:blank').then(() => {
-            if (!contents.isDestroyed()) {
-              contents.executeJavaScript(`
-                (() => {
-                  document.title = 'Dangerous Site Blocked';
-                  document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
-                  const h1 = document.createElement('h1');
-                  h1.textContent = 'Dangerous Site Blocked';
-                  h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
-                  const p = document.createElement('p');
-                  p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
-                  p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
-                  document.body.appendChild(h1);
-                  document.body.appendChild(p);
-                })()
-              `).catch(() => {});
-            }
-          }).catch(() => {});
-        }
+        showPhishingBlockPage(contents, navigationUrl);
         return;
       }
 
@@ -3258,28 +3248,7 @@ app.on('web-contents-created', (_event, contents) => {
       if (checkPhishingDomain(redirectUrl)) {
         e.preventDefault();
         sendToMainWindow('blocked-site', { url: redirectUrl, reason: 'phishing' });
-        const escapedUrl = redirectUrl.substring(0, 500);
-        const safeUrlJson = JSON.stringify(escapedUrl);
-        if (!contents.isDestroyed()) {
-          contents.loadURL('about:blank').then(() => {
-            if (!contents.isDestroyed()) {
-              contents.executeJavaScript(`
-                (() => {
-                  document.title = 'Dangerous Site Blocked';
-                  document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
-                  const h1 = document.createElement('h1');
-                  h1.textContent = 'Dangerous Site Blocked';
-                  h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
-                  const p = document.createElement('p');
-                  p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
-                  p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
-                  document.body.appendChild(h1);
-                  document.body.appendChild(p);
-                })()
-              `).catch(() => {});
-            }
-          }).catch(() => {});
-        }
+        showPhishingBlockPage(contents, redirectUrl);
         return;
       }
 
