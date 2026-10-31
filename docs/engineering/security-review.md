@@ -59,6 +59,15 @@ The CORS middleware in `electron/mcpServer.ts` reflects an `Origin` whose protoc
 
 `zod <4.6.6` (GHSA-mrhx-c7xc-m3w5) inside `@remotion/*` video tooling. Not shipped; production audit is clean.
 
+### F6. Custom MCP tools: dot-segment path escape and approval not bound to the definition (fixed 2026-10-31)
+
+Two defects in the Tool Manager executor (`electron/main/customTools.ts`, `electron/mcpServer.ts`), found in the audit recorded in `docs/security-audit-2026-10-31.md`:
+
+- An agent argument of `..` or `.` in a path placeholder passed through `encodeURIComponent` unchanged, and URL parsing then removed the segment: `https://api.example.com/v1/weather/{city}` with `city=".."` was sent to `/v1/`. The approval dialog shows the template and `city: ..`, which does not make the new path obvious; a read-only tool ran it without a dialog. Impact was limited to other paths on the same approved host. `buildRequest` now refuses a request whose path gains a dot segment, and the check runs before the dialog.
+- The approval was decided from the definition at call time, but the request ran against whatever the store held after the dialog closed. An edit saved while the dialog was open (another host, a credential) ran under the earlier approval. The request now carries `definitionFingerprint(def)` and does not run if it changed.
+
+Covered by `tests/custom_tools.test.ts` and `tests/mcp_custom_tools_integration.test.ts` (both failed before the fix).
+
 ## Changes made with this review
 
 - `tests/ipc_sender_guard_coverage.test.ts`: every IPC handler under `electron/` must call a sender guard as its first statement. Self-tests prove it flags an unguarded handler, a late guard and an uninspectable named handler.

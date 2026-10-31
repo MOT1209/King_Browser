@@ -135,6 +135,20 @@ async function run() {
   assert.equal(new URL(built.url).host, 'api.example.com');
   assert.equal(new URL(built.url).pathname, '/v1/weather/..%2F..%2Fadmin%3Fx%3D1%23y');
   assert.equal(new URL(built.url).searchParams.get('units'), 'metric');
+  // encodeURIComponent leaves "." alone, and URL parsing removes dot segments:
+  // "/v1/weather/.." became "/v1/". Prevents an argument climbing out of the
+  // path the user approved.
+  for (const city of ['..', '.']) {
+    assert.throws(() => buildRequest(def, { city }), /path segment/, `"${city}" cannot remove a path segment`);
+  }
+  const twoSlots = okDef({ parameters: [{ name: 'a', type: 'string', description: 'first part' }, { name: 'b', type: 'string', description: 'second part' }], http: { method: 'GET', urlTemplate: 'https://api.example.com/v1/{a}{b}/x' } });
+  assert.throws(() => buildRequest(twoSlots, { a: '.', b: '.' }), /path segment/, 'two adjacent placeholders cannot form ".."');
+  assert.equal(new URL(buildRequest(def, { city: '...' }).url).pathname, '/v1/weather/...', 'three dots are an ordinary name');
+  assert.equal(new URL(buildRequest(def, { city: 'a.b' }).url).pathname, '/v1/weather/a.b');
+  assert.equal(new URL(buildRequest(def, { city: '%2e%2e' }).url).pathname, '/v1/weather/%252e%252e', 'an encoded dot stays literal');
+  const dotted = await executeHttpTool(def, { city: '..' }, undefined, publicDeps(async () => { throw new Error('must not fetch'); }));
+  assert.equal(dotted.ok, false);
+  assert.match((dotted as { error: string }).error, /path segment/, 'the agent is told why the call was refused');
   const postDef = okDef({ parameters: [{ name: 'text', type: 'string', description: 'message text' }, { name: 'n', type: 'integer', description: 'count' }], http: { method: 'POST', urlTemplate: 'https://api.example.com/p', bodyTemplate: { msg: 'say {text}', n: '{n}' }, auth: { type: 'bearer' } } });
   const postReq = buildRequest(postDef, { text: 'hi', n: 3 }, 'sekret-token');
   assert.deepEqual(JSON.parse(postReq.body!), { msg: 'say hi', n: 3 }, 'a whole-value placeholder keeps its type');

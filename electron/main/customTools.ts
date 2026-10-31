@@ -108,6 +108,15 @@ export interface CustomToolDefinition {
   updatedAt: string;
 }
 
+/**
+ * Everything about a definition that decides what a call sends. An approval is
+ * given for this exact request shape; if it differs when the approved call is
+ * about to run (the tool was edited while the dialog was open), the call stops.
+ */
+export function definitionFingerprint(def: CustomToolDefinition): string {
+  return JSON.stringify([def.id, def.name, def.parameters, def.http, def.approval]);
+}
+
 export interface ToolRunSummary { ok: boolean; at: string; message: string }
 
 /** What the renderer sees. Never contains a secret. */
@@ -417,10 +426,28 @@ function substituteBody(value: unknown, args: Record<string, unknown>): unknown 
   return value;
 }
 
-/** Builds the request from validated arguments. Placeholders in the path and query are URL-encoded. */
+/** Thrown when arguments would change the shape of the approved path. */
+export class UnsafePathArgumentError extends Error {}
+
+/** Count of "." / ".." path segments (also percent-encoded) in a URL's path, before parsing removes them. */
+function dotSegmentCount(urlText: string): number {
+  const path = urlText.replace(/^https:\/\/[^/?#]*/i, '').split(/[?#]/)[0];
+  return path.split('/').filter(segment => /^(?:\.|%2e){1,2}$/i.test(segment)).length;
+}
+
+/**
+ * Builds the request from validated arguments. Placeholders in the path and query are URL-encoded.
+ * encodeURIComponent leaves "." untouched and URL parsing drops dot segments, so an argument of
+ * ".." (or two adjacent placeholders of ".") would remove a segment of the approved path; that is
+ * refused instead of sent.
+ */
 export function buildRequest(def: CustomToolDefinition, args: Record<string, unknown>, secret?: string): BuiltRequest {
   const cfg = def.http;
-  const url = new URL(substitute(cfg.urlTemplate, args, encodeURIComponent));
+  const rawUrl = substitute(cfg.urlTemplate, args, encodeURIComponent);
+  if (dotSegmentCount(rawUrl) > dotSegmentCount(cfg.urlTemplate)) {
+    throw new UnsafePathArgumentError('An argument cannot be "." or ".." as a whole path segment.');
+  }
+  const url = new URL(rawUrl);
   for (const [key, v] of Object.entries(cfg.query)) {
     const value = substitute(v, args, s => s);
     if (value !== '') url.searchParams.append(key, value);
@@ -495,7 +522,10 @@ export async function executeHttpTool(def: CustomToolDefinition, args: unknown, 
 
   let built: BuiltRequest;
   try { built = buildRequest(def, (args ?? {}) as Record<string, unknown>, secret); }
-  catch { return { ok: false, error: 'Could not build the request from the arguments.' }; }
+  catch (err) {
+    if (err instanceof UnsafePathArgumentError) return { ok: false, error: err.message };
+    return { ok: false, error: 'Could not build the request from the arguments.' };
+  }
 
   const validated = await deps.validate(built.url);
   if ('error' in validated) return { ok: false, error: validated.error };
