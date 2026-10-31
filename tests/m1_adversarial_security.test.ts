@@ -303,6 +303,11 @@ const webviewPolicySource = fs.readFileSync(
   'utf-8'
 ).replace(/\r\n/g, '\n');
 
+const nativeTtsSource = fs.readFileSync(
+  path.resolve(process.cwd(), 'electron/main/nativeTts.ts'),
+  'utf-8'
+).replace(/\r\n/g, '\n');
+
 const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
   // Section 1: isTrustedAppOrigin (electron/main.ts:347). The old copy trusted
   // devtools: unconditionally; production must keep refusing it.
@@ -344,15 +349,7 @@ const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
     needle: "message.includes('KING_SAVE_PW') || /password|token|secret|apiKey/i.test(message)",
     desc: 'renderer console output is redacted for the password dump marker and credential keywords',
   },
-  // Section 3.6: the language table the old test could never reach.
-  { needle: "if (prefix === 'tr') cleanVoice = 'Yelda';", desc: 'TTS default voice maps tr to Yelda' },
-  { needle: "else if (prefix === 'de') cleanVoice = 'Anna';", desc: 'TTS default voice maps de to Anna' },
-  { needle: "else if (prefix === 'fr') cleanVoice = 'Thomas';", desc: 'TTS default voice maps fr to Thomas' },
-  { needle: "else if (prefix === 'es') cleanVoice = 'Mónica';", desc: 'TTS default voice maps es to Mónica' },
-  { needle: "else if (prefix === 'it') cleanVoice = 'Alice';", desc: 'TTS default voice maps it to Alice' },
-  { needle: "else if (prefix === 'ja') cleanVoice = 'Kyoko';", desc: 'TTS default voice maps ja to Kyoko' },
-  { needle: "else if (prefix === 'ru') cleanVoice = 'Milena';", desc: 'TTS default voice maps ru to Milena' },
-  { needle: "else cleanVoice = 'Samantha';", desc: 'TTS falls back to Samantha for unmapped languages' },
+  // Section 3.6: the language table moved to electron/main/nativeTts.ts; native_tts.test.ts now asserts every mapping by behaviour.
   // Section 3.6: the flag-injection guard that is not exported.
   {
     needle: "if (/^[a-zA-Z0-9\\s]+$/.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {",
@@ -370,7 +367,9 @@ for (const guard of MAIN_SOURCE_GUARDS) {
     ? trustedSenderSource
     : guard.desc.startsWith('the Web Store popup handler')
       ? webviewPolicySource
-      : mainSource;
+      : guard.desc.startsWith('TTS voice names')
+        ? nativeTtsSource
+        : mainSource;
   assert(
     source.includes(guard.needle),
     'Shipped Guard Present',
