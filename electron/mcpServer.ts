@@ -100,7 +100,9 @@ export const TOOLS: McpTool[] = [
       type: 'object',
       properties: {
         ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
-        selector: { type: 'string', description: 'CSS selector of the element to click (e.g., #submit-btn, .nav-link, a[href*="github"])' }
+        selector: { type: 'string', description: 'CSS selector of the element to click (e.g., #submit-btn, .nav-link, a[href*="github"])' },
+        button: { type: 'string', enum: ['left', 'right'], description: 'Mouse button. "right" opens the page context menu. Default "left".' },
+        doubleClick: { type: 'boolean', description: 'Send a double click (left button only). Default false.' }
       }
     }
   },

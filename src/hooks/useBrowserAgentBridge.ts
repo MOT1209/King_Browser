@@ -13,7 +13,7 @@ import { buildSnapshotScript } from '../utils/elementSnapshot';
 import { redactSnapshotUrls, redactUrlForAgent, redactUrlParamsInText } from '../utils/urlRedaction';
 import { getConsoleMessages } from '../utils/consoleBuffer';
 import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS, MCP_POLICY_CONTEXT_ACTION } from '../utils/mcpActionTiming';
-import { buildLocateScript, keyEventSequence, parseKeyCombo, selectAllCombo, wheelDelta, type KeyCombo } from '../utils/trustedInput';
+import { buildLocateScript, keyEventSequence, parseKeyCombo, selectAllCombo, wheelDelta, parseClickOptions, clickEventSequence, type ClickOptions, type KeyCombo } from '../utils/trustedInput';
 
 // Native input. `guest` is the guarded webview proxy, so every event re-checks
 // that the document is still the one the action was approved for.
@@ -21,10 +21,8 @@ async function sendKeyCombo(guest: any, combo: KeyCombo): Promise<void> {
   for (const event of keyEventSequence(combo)) await guest.sendInputEvent(event);
 }
 
-async function nativeClickAt(guest: any, x: number, y: number): Promise<void> {
-  await guest.sendInputEvent({ type: 'mouseMove', x, y });
-  await guest.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
-  await guest.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+async function nativeClickAt(guest: any, x: number, y: number, options: ClickOptions = { button: 'left', clickCount: 1 }): Promise<void> {
+  for (const event of clickEventSequence(x, y, options)) await guest.sendInputEvent(event);
 }
 
 // Page CSS pixels to input-event pixels: they differ by the tab's zoom.
@@ -366,8 +364,10 @@ export function useBrowserAgentBridge({
           }
           return "Error: No active webview available.";
 
-        case 'browser_click':
+        case 'browser_click': {
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
+          const clickOptions = parseClickOptions(safeArgs);
+          if ('error' in clickOptions) return `Error: ${clickOptions.error}`;
           if (activeWebview && activeWebview.executeJavaScript) {
             if (!await previewTarget(safeArgs.selector)) return "Error: MCP action was cancelled or expired.";
             // userGesture (executeAction): Chromium marks the entry of a page
@@ -388,14 +388,15 @@ export function useBrowserAgentBridge({
               return `Error: The element is covered by ${located.covering || 'another element'}. Close or scroll past it, then take a new snapshot.`;
             }
             const point = toGuestPoint(activeWebview, located.x, located.y);
-            await nativeClickAt(activeWebview, point.x, point.y);
+            await nativeClickAt(activeWebview, point.x, point.y, clickOptions);
             const bounds = activeWebview.getBoundingClientRect();
             window.dispatchEvent(new CustomEvent('ai-cursor', {
               detail: { x: bounds.left + point.x, y: bounds.top + point.y, action: 'click' }
             }));
-            return "Successfully clicked element.";
+            return clickOptions.clickCount === 2 ? 'Successfully double-clicked element.' : clickOptions.button === 'right' ? 'Successfully right-clicked element.' : "Successfully clicked element.";
           }
           return "Error: No active webview available.";
+        }
 
         case 'browser_type': {
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";

@@ -136,6 +136,7 @@ Task skills live in `.claude/skills/<name>/SKILL.md` (Markdown with `name` and `
 | `mcp-security` | MCP server, bridge, tool registration |
 | `agent-tool-governance` | What the agent may do without approval |
 | `browser-automation` | Agent workflows over MCP, automated UI tests |
+| `driving-king-browser` | You are the driver agent operating a running King through MCP |
 | `local-ai` | WebLLM, transformers.js, model cache |
 | `speech-recognition` | Voice input, Whisper, microphone |
 | `privacy-preservation` | Logging, exports, sync fields, new outbound requests |

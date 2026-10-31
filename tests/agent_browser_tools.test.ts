@@ -107,7 +107,8 @@ check('executeAction passes userGesture=true', /key === 'executeAction'[\s\S]{0,
 const trustedInput = readFileSync(join(__dirname, '..', 'src', 'utils', 'trustedInput.ts'), 'utf8');
 check('browser_click hit-tests the element and sends a real mouse click',
   caseBody('browser_click').includes('buildLocateScript(') && caseBody('browser_click').includes('nativeClickAt(') &&
-  bridge.includes("type: 'mouseDown'") && trustedInput.includes('elementFromPoint'));
+  // The press/release events are built by clickEventSequence (trustedInput.ts), which the bridge sends.
+  bridge.includes('clickEventSequence(') && bridge.includes('sendInputEvent(event)') && trustedInput.includes("type: 'mouseDown'") && trustedInput.includes('elementFromPoint'));
 check('browser_click never clicks a covered element through el.click()',
   !caseBody('browser_click').includes('el.click()') && caseBody('browser_click').includes('covered by'));
 // Real keys replace the old synthetic events: the browser itself performs the
