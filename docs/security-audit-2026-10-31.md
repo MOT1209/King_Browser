@@ -37,16 +37,21 @@ Run in a Linux container, Node 22.23.4.
 | A1 | P1 (medium) | `electron/main/customTools.ts` `buildRequest` | Dot-segment path escape in custom MCP tools: an argument of `..` or `.` survives `encodeURIComponent`, and URL parsing removes the segment, so a call could reach another path on the approved host. A read-only tool ran this without a dialog. | Fixed; regression tests in `tests/custom_tools.test.ts` and `tests/mcp_custom_tools_integration.test.ts` |
 | A2 | P2 (low) | `electron/mcpServer.ts` `executeCustomTool` / `runCustomToolInMain` | Approval was not bound to the definition: an edit saved while the approval dialog was open ran under the earlier approval. Only the local user can edit tools, which limits the impact. | Fixed; regression test in `tests/mcp_custom_tools_integration.test.ts` |
 
-Details: `docs/engineering/security-review.md`, F6.
+| A3 | P2 (low) | `electron/main/mcpStreamableHttp.ts` `isLocalOrigin`, CORS in `electron/mcpServer.ts` | MCP Origin and CORS checks accepted any `king:` origin and any scheme on a loopback host; no King page calls the MCP port. The token was still required, so no exploit path is known. | Fixed at the owner's request; regression test in `tests/mcp_streamable_http.test.ts` (review item F3) |
+
+Details: `docs/engineering/security-review.md`, F3 and F6.
 
 Reviewed with no defect found: the custom-tool SSRF path (DNS pinning works because `cross-fetch` uses node-fetch, which honours `agent`; redirects refused; header and auth-header names checked against a deny list), the main-window `window.open` routing, `syncCrypto.ts`, the RLS policies and pairing function in `supabase_schema.sql` (`security definer` with a fixed `search_path`; atomic single-use consumption), and `updateIntegrity.ts`.
 
+Second pass, no defect found: CRX extraction in `crxInstaller.ts` (entries checked for drive, UNC, absolute and `..` paths before extraction, a containment and symlink sweep after it, atomic staging), downloads in `downloads.ts` (realpath before the Downloads containment test, filename sanitising including DOS device names), and engine IPC in `engineIpc.ts` (allowlisted commands, typed payloads). Observation, not changed: `registerEngineIpc` treats `isTrustedSender` as optional so tests can omit it, which fails open if a future caller forgets it; `main.ts` passes it today. Making it required touches the IPC trust model.
+
 ## 4. Owner decisions (not code defects)
 
-- **Dependabot is muted** (`open-pull-requests-limit: 0`, all dependencies ignored). The production audit runs in CI, but nothing proposes security updates. Enabling security-only updates is a policy choice.
+- **Dependabot**: decided 2026-10-31. Version updates stay off; the `ignore` rules that also blocked security updates were removed. Security updates must still be enabled in the repository settings (not checked from here).
 - **Sync rollback.** The envelope is not bound to a version counter or the user id (no AES-GCM associated data), so whoever controls the server row could serve an older envelope of the same user. Changing this changes the sync encryption format, which AGENTS.md reserves for the owner.
 - **Update trust root.** `updateIntegrity.ts` proves the download matches the release metadata, not who published it; that depends on code signing, whose status was not checked here.
-- **Legacy SSE MCP transport** remains as extra surface; keeping it is a compatibility decision.
+- **Legacy SSE MCP transport** remains as extra surface; removing it would break clients that use `/sse`, so it is a compatibility decision and was not changed.
+- **Sync rollback** was not addressed in this pass: it needs a new envelope format and a migration for existing vaults, which should not be rushed.
 
 ## 5. Not verified
 
