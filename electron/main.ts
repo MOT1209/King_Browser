@@ -8,6 +8,7 @@ import { isExtensionAllowedInIncognito, setExtensionIncognitoAccess, hasExtensio
 import { openPageSourceViewer as createPageSourceViewer } from './windows/sourceViewer';
 import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
 import { buildPhishingBlockScript } from './main/phishingBlockPage';
+import { isAllowedWebviewPartition, evaluateWebviewSrc } from './main/webviewPolicy';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import http from 'http';
@@ -2979,7 +2980,7 @@ app.on('web-contents-created', (_event, contents) => {
     // Security: Validate partition to prevent unauthorized partitions (e.g. persist:admin)
     const part = (webPreferences as any).partition || (params as any).partition;
     if (part && typeof part === 'string') {
-      if (part !== '' && part !== AGENT_PERSIST_PARTITION && !/^incognito-[a-zA-Z0-9_-]+$/.test(part)) {
+      if (!isAllowedWebviewPartition(part, AGENT_PERSIST_PARTITION)) {
         console.warn(`[Security] Blocked unauthorized webview partition: ${part}`);
         event.preventDefault();
         return;
@@ -3000,33 +3001,17 @@ app.on('web-contents-created', (_event, contents) => {
     // or valid chrome-extension. Block file:, javascript:, data:, vbscript:, blob:, etc.
     let isAuthorizedWebstore = false;
     if (params.src) {
-      try {
-        const parsed = new URL(params.src);
-        const allowedProtocols = ['http:', 'https:'];
-        const isAllowedAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
-        // An extension-shaped id is not enough: a page can window.open any
-        // chrome-extension://<id> and this accepted it, so the isInstalled gate
-        // the other two entry points enforce was skipped. Shape AND existence.
-        const isAllowedExtension = parsed.protocol === 'chrome-extension:' &&
-          /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) &&
-          (loadedExtensions.some(ext => ext.id === parsed.hostname) ||
-            Boolean(session.defaultSession.getExtension(parsed.hostname)));
-
-        if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank && !isAllowedExtension) ||
-            parsed.username || parsed.password) {
-          console.warn(`[Security] Blocked unauthorized webview scheme in src: ${params.src}`);
-          event.preventDefault();
-          return;
-        }
-
-        if (parsed.protocol === 'https:' && (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com') && (parsed.hostname === 'chromewebstore.google.com' || parsed.pathname.startsWith('/webstore/'))) {
-          isAuthorizedWebstore = true;
-        }
-      } catch {
-        console.warn(`[Security] Blocked malformed webview src: ${params.src}`);
+      // An extension-shaped id is not enough: a page can window.open any
+      // chrome-extension://<id>, so existence is checked too (the isInstalled
+      // gate the other two entry points enforce).
+      const srcVerdict = evaluateWebviewSrc(params.src, (id) =>
+        loadedExtensions.some(ext => ext.id === id) || Boolean(session.defaultSession.getExtension(id)));
+      if (!srcVerdict.allowed) {
+        console.warn(`[Security] Blocked unauthorized webview src: ${params.src}`);
         event.preventDefault();
         return;
       }
+      isAuthorizedWebstore = srcVerdict.isWebstore;
     }
 
     if (isAuthorizedWebstore) {
