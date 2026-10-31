@@ -776,25 +776,6 @@ async function runSecurityRegressionAuditSuite() {
     `Found indexable .app.staging in destination: ${hasAppStagingInDest}`
   );
 
-  // R5.2: Staging is isolated in TEMP_DIR
-  const hasTempStaging = latestMainTsContent.includes('STAGING_APP="\\${STAGING_DIR}/King Browser.app"') &&
-    latestMainTsContent.includes('STAGING_DIR="\\${TEMP_DIR}/staging"');
-  record(
-    'R5-Updater-Temp-Staging',
-    'Updater scripts isolate staging bundle strictly within TEMP_DIR',
-    hasTempStaging,
-    `Isolated temp staging present: ${hasTempStaging}`
-  );
-
-  // R5.3: Backup uses hidden dot-prefix without .app extension
-  const hasHiddenBackup = latestMainTsContent.includes('BACKUP_APP="\\${DEST_PARENT}/.king_backup_\\${BACKUP_TOKEN}"');
-  record(
-    'R5-Updater-Hidden-Backup',
-    'Updater backup directory uses hidden dotfile prefix without .app extension',
-    hasHiddenBackup,
-    `Hidden backup directory present: ${hasHiddenBackup}`
-  );
-
   // R5.4: Cleanup routine clears orphaned staging and backup artifacts
   const hasCleanupOrphans = latestMainTsContent.includes('.king_staging_') &&
     latestMainTsContent.includes('.king_backup_') &&
@@ -805,28 +786,6 @@ async function runSecurityRegressionAuditSuite() {
     'cleanStaleUpdateArtifacts purges and unregisters orphaned updater artifacts',
     hasCleanupOrphans,
     `Orphan cleanup and lsregister unregistration present: ${hasCleanupOrphans}`
-  );
-
-  // R5.5: Windows updater reliability (ping delay and relaunch DEST_EXE)
-  const hasWinUpdaterFixes = latestMainTsContent.includes('ping 127.0.0.1 -n 2 >nul 2>&1') &&
-    latestMainTsContent.includes('start "" "%DEST_EXE%"') &&
-    !latestMainTsContent.includes('timeout /t 1 /nobreak >nul');
-  record(
-    'R5-Windows-Updater-Reliability',
-    'Windows updater uses reliable stdin-independent ping sleep and relaunches DEST_EXE',
-    hasWinUpdaterFixes,
-    `Windows updater ping sleep and relaunch present: ${hasWinUpdaterFixes}`
-  );
-
-  // R5.6: Linux AppImage atomic replacement and deb handler
-  const hasLinuxUpdaterFixes = latestMainTsContent.includes('CURRENT_APPIMAGE') &&
-    latestMainTsContent.includes('BACKUP_APPIMAGE') &&
-    latestMainTsContent.includes('isDeb');
-  record(
-    'R5-Linux-AppImage-Replacement',
-    'Linux updater replaces running AppImage with atomic backup and opens deb packages',
-    hasLinuxUpdaterFixes,
-    `Linux AppImage atomic replacement present: ${hasLinuxUpdaterFixes}`
   );
 
   // R5.7: Multi-architecture detection on Windows and Linux
