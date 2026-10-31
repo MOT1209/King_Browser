@@ -25,7 +25,7 @@ assert.doesNotMatch(step.replace(/nightly/g, ''), /\$\{\{ steps\.tag/, 'the step
 assert.ok(!/delete-asset\s+(?!nightly)/.test(step), 'delete-asset only addresses the nightly release');
 
 // Run the real script body against a stub gh and a fake release-files folder.
-const script = /run: \|\n((?:          .*\n?)+)/.exec(step)?.[1].replace(/^ {10}/gm, '');
+const script = /run: \|\n((?: {10}.*\n?)+)/.exec(step)?.[1].replace(/^ {10}/gm, '');
 assert.ok(script, 'the step has a run script');
 
 function prune(files: string[], remote: string[]): { deleted: string[]; status: number } {
