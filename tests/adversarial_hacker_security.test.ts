@@ -186,7 +186,13 @@ const webstorePreloadSource = fs.readFileSync(
   "utf-8"
 ).replace(/\r\n/g, "\n");
 
-const SHIPPED_GUARDS: Array<{ source: "main" | "preload"; needle: string; desc: string }> = [
+// The preview-fetch SSRF rules moved from main.ts to electron/main/previewFetch.ts (behaviourally tested in preview_fetch.test.ts).
+const previewFetchSource = fs.readFileSync(
+  path.resolve(process.cwd(), "electron/main/previewFetch.ts"),
+  "utf-8"
+).replace(/\r\n/g, "\n");
+
+const SHIPPED_GUARDS: Array<{ source: "main" | "preload" | "previewFetch"; needle: string; desc: string }> = [
   // Section 1: deep link validation (electron/main.ts:1181).
   {
     source: "main",
@@ -242,12 +248,12 @@ const SHIPPED_GUARDS: Array<{ source: "main" | "preload"; needle: string; desc: 
   },
   // Section 4: MCP port SSRF block (electron/main.ts:4945).
   {
-    source: "main",
+    source: "previewFetch",
     needle: "return { error: 'Requests to MCP server port are blocked.' };",
     desc: "requests to the default and live MCP port are refused",
   },
   {
-    source: "main",
+    source: "previewFetch",
     needle: "if (port === '3020' || port === activeMcpPort) {",
     desc: "both the hardcoded default port and the live port are blocked",
   },
@@ -270,10 +276,10 @@ const SHIPPED_GUARDS: Array<{ source: "main" | "preload"; needle: string; desc: 
 ];
 
 for (const guard of SHIPPED_GUARDS) {
-  const haystack = guard.source === "main" ? mainSource : webstorePreloadSource;
+  const haystack = guard.source === "main" ? mainSource : guard.source === "previewFetch" ? previewFetchSource : webstorePreloadSource;
   assert.ok(
     haystack.includes(guard.needle),
-    `[Hacker-Defense-9] shipped ${guard.source === "main" ? "electron/main.ts" : "electron/webstore-preload.ts"} guard: ${guard.desc}`,
+    `[Hacker-Defense-9] shipped ${guard.source === "main" ? "electron/main.ts" : guard.source === "previewFetch" ? "electron/main/previewFetch.ts" : "electron/webstore-preload.ts"} guard: ${guard.desc}`,
     `expected to find: ${guard.needle.slice(0, 90)}`
   );
 }

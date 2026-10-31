@@ -308,6 +308,11 @@ const nativeTtsSource = fs.readFileSync(
   'utf-8'
 ).replace(/\r\n/g, '\n');
 
+const previewFetchSource = fs.readFileSync(
+  path.resolve(process.cwd(), 'electron/main/previewFetch.ts'),
+  'utf-8'
+).replace(/\r\n/g, '\n');
+
 const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
   // Section 1: isTrustedAppOrigin (electron/main.ts:347). The old copy trusted
   // devtools: unconditionally; production must keep refusing it.
@@ -369,7 +374,9 @@ for (const guard of MAIN_SOURCE_GUARDS) {
       ? webviewPolicySource
       : guard.desc.startsWith('TTS voice names')
         ? nativeTtsSource
-        : mainSource;
+        : guard.desc.startsWith('requests to the default and the live MCP port')
+          ? previewFetchSource
+          : mainSource;
   assert(
     source.includes(guard.needle),
     'Shipped Guard Present',
