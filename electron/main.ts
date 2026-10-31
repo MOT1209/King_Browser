@@ -3359,7 +3359,12 @@ app.on('web-contents-created', (_event, contents) => {
         return;
       }
       if (part.startsWith('incognito-') || part === AGENT_PERSIST_PARTITION) {
-        hardenIncognitoPartition(part);
+        if (!hardenIncognitoPartition(part)) {
+          // Fail closed: an unhardened session has no permission handlers.
+          console.warn(`[Security] Blocked webview attach: could not harden partition ${part}`);
+          event.preventDefault();
+          return;
+        }
       }
     }
 

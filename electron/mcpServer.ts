@@ -1778,16 +1778,28 @@ export class BrowserMCPServer {
       // Security: Tighten JSON body limit to 1MB (prevents memory exhaustion DoS)
       app.use(express.json({ limit: '1mb' }));
 
-      // Rate limiter: exempt /health so liveness checks are never locked out
-      const apiLimiter = rateLimit({
+      // Rate limiting uses two separate buckets. Every loopback caller shares one
+      // IP, so a single bucket let any local process that sent unauthenticated
+      // requests exhaust the budget of the real agent. /health is exempt so
+      // liveness checks are never locked out.
+      const unauthenticatedLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: 60,
+        message: 'Too many requests',
+        standardHeaders: true,
+        legacyHeaders: false,
+        skip: (req) => req.path === '/health' || this.isAuthenticated(req)
+      });
+      const authenticatedLimiter = rateLimit({
         windowMs: 60 * 1000,
         max: 120,
         message: 'Too many requests',
         standardHeaders: true,
         legacyHeaders: false,
-        skip: (req) => req.path === '/health'
+        skip: (req) => req.path === '/health' || !this.isAuthenticated(req)
       });
-      app.use(apiLimiter);
+      app.use(unauthenticatedLimiter);
+      app.use(authenticatedLimiter);
       this.setupRoutes(app);
 
       return await new Promise<void>((resolve, reject) => {
