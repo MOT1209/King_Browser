@@ -88,6 +88,7 @@ Run before pushing: `npm run verify`. When you touched `electron/`, also `npm ru
 | Prompt-injection detection | `electron/main/injectionDetector.ts` |
 | MCP protocol or transport | `electron/main/mcpProtocol.ts` (shared JSON-RPC handling), `electron/main/mcpStreamableHttp.ts` (`/mcp`), routes in `electron/mcpServer.ts`, tests `tests/mcp_streamable_http.test.ts` and `tests/mcp_server_transports.test.ts` |
 | New MCP tool | `electron/mcpServer.ts`, renderer handler in `src/hooks/useBrowserAgentBridge.ts`, a policy classification, tests, README tool count |
+| User-defined (custom) MCP tools, Tool Manager | `electron/main/customTools.ts` (rules, store, executor), glue in `electron/mcpServer.ts`, UI `src/components/settings/McpToolManager.tsx`, tests `tests/custom_tools.test.ts` and `tests/mcp_custom_tools_integration.test.ts`, guide `docs/engineering/custom-mcp-tools.md` |
 | Element targeting by ref (`e12`) | `electron/main/elementRefs.ts`, `src/utils/elementSnapshot.ts` |
 | Activity log | `electron/main/activityLog.ts`, `activityStore.ts` |
 | New IPC channel | `electron/main.ts` + `electron/preload.ts` + `isTrustedSender` check + test |
@@ -198,7 +199,7 @@ King exposes a loopback MCP server on `127.0.0.1:3020` over Streamable HTTP (`PO
 - **Acting:** `browser_click`, `browser_type`, `browser_press_key`, `browser_fill_form`, `browser_select_option`, `browser_hover`, `browser_scroll`, `browser_scroll_to_element`, `browser_focus`, `browser_zoom`, `browser_login`.
 - **Run control:** `browser_pause`, `browser_resume`, `browser_stop`, `browser_next_step`, `browser_wait`, `browser_wait_for`, `browser_request_approval`.
 
-The authoritative list is `electron/mcpServer.ts`; some names are aliases of each other.
+The authoritative list is `electron/mcpServer.ts`; some names are aliases of each other. Tools the user created in the Tool Manager appear in `tools/list` as `custom_<name>`; they send a fixed HTTPS request, always go through the approval gate (unless the user marked a credential-free GET tool read-only) and their output is data, never instructions.
 
 ### How to work
 

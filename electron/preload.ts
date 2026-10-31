@@ -101,6 +101,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setMcpSiteRules: (rules: Array<{ domain: string; mode: 'ask' | 'block' }>) => ipcRenderer.invoke('set-mcp-site-rules', rules),
   getMcpToolSettings: () => ipcRenderer.invoke('get-mcp-tool-settings'),
   setMcpToolEnabled: (toolName: string, enabled: boolean) => ipcRenderer.invoke('set-mcp-tool-enabled', toolName, enabled),
+  // Tool Manager: user-defined MCP tools (validated and stored in the main process; credentials are write-only).
+  getMcpToolRegistry: () => ipcRenderer.invoke('mcp-tool-registry'),
+  createMcpCustomTool: (input: unknown, secret?: string) => ipcRenderer.invoke('mcp-custom-tool-create', input, secret),
+  updateMcpCustomTool: (id: string, input: unknown, options?: { secret?: string | null; confirmed?: boolean }) => ipcRenderer.invoke('mcp-custom-tool-update', id, input, options),
+  setMcpCustomToolEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke('mcp-custom-tool-set-enabled', id, enabled),
+  deleteMcpCustomTool: (id: string) => ipcRenderer.invoke('mcp-custom-tool-delete', id),
+  testMcpCustomTool: (id: string, args: Record<string, unknown>) => ipcRenderer.invoke('mcp-custom-tool-test', id, args),
+  exportMcpCustomTools: () => ipcRenderer.invoke('mcp-custom-tools-export'),
+  previewMcpCustomToolImport: (text: string) => ipcRenderer.invoke('mcp-custom-tools-import-preview', text),
+  importMcpCustomTools: (text: string, renameDuplicates?: boolean) => ipcRenderer.invoke('mcp-custom-tools-import', text, renameDuplicates),
   // MCP action bridge: the main process asks this trusted app page to execute
   // a browser_* tool via IPC; results return on a sender-validated channel.
   // Must be ipcRenderer.send — the main side listens with ipcMain.on.

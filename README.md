@@ -78,6 +78,7 @@ King has no telemetry endpoint, but these built-in features contact third-party 
 | Ad-block filter lists | Filter-list hosts | Start-up / list refresh |
 | King Sync (opt-in) | Your Supabase project | Only after King Cloud sign-in, and only when a project is configured; otherwise the vault stays on this device and nothing is sent. Data is end-to-end encrypted |
 | Fonts | `fonts.googleapis.com`, `fonts.gstatic.com` | UI start-up |
+| Custom MCP tools (opt-in) | Only the `https` hosts you configure in Settings -> MCP -> Tool Manager | When an agent (or you, via Test) runs one of your own tools, after approval. Public addresses only; none exist until you add one |
 
 ---
 
