@@ -1,6 +1,6 @@
 # Skills guide
 
-A skill is a Markdown playbook in `.claude/skills/<name>/SKILL.md`. Claude Code and OpenCode load it by name; other agents open it from the index in `AGENTS.md`. There are 55 skills. This guide covers adding, changing and checking them.
+A skill is a Markdown playbook in `.claude/skills/<name>/SKILL.md`. Claude Code and OpenCode load it by name; other agents open it from the index in `AGENTS.md`. There are 56 skills. This guide covers adding, changing and checking them.
 
 ## Required shape
 

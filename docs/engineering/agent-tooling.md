@@ -8,7 +8,7 @@ How coding agents find instructions in this repository, which tools back the che
 | :--- | :--- |
 | `AGENTS.md` | Single source of truth for every agent: project, architecture and trust boundaries, hard rules, commands, workflow, routing table, skill index, CI, definition of done, driver-agent (MCP) rules. |
 | `CLAUDE.md` | Adapter for Claude Code: `@AGENTS.md` import plus a few Claude-specific notes. Claude Code reads `CLAUDE.md`, not `AGENTS.md`, so without the import it would miss the shared rules. |
-| `.claude/skills/<name>/SKILL.md` | 55 task skills. YAML frontmatter `name` (equals the directory name) and `description` (what and when), then Purpose / When to use / Files / Workflow / Rules / Verify / Done when. |
+| `.claude/skills/<name>/SKILL.md` | 56 task skills. YAML frontmatter `name` (equals the directory name) and `description` (what and when), then Purpose / When to use / Files / Workflow / Rules / Verify / Done when. |
 | `DESIGN.md` | Visual rules (unchanged). |
 
 Before this change, the hard rules (sender validation, sandbox, secrets, approval gate, i18n, network destinations) were only in `CLAUDE.md`, so agents that read `AGENTS.md` (Codex, OpenCode, Cursor and others) never saw them. They now live in `AGENTS.md`.

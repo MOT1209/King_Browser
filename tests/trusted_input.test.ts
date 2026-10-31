@@ -18,7 +18,9 @@ import {
   selectAllCombo,
   keyEventSequence,
   wheelDelta,
-  buildLocateScript
+  buildLocateScript,
+  parseClickOptions,
+  clickEventSequence
 } from '../src/utils/trustedInput';
 
 // jsdom is loaded at run time (it reads files next to itself), not bundled:
@@ -109,5 +111,30 @@ console.log('[PASS] Trusted input — wheel deltas');
   assert.equal(win.eval(buildLocateScript('[[bad')).error !== undefined, true, 'invalid selector is reported');
 }
 console.log('[PASS] Trusted input — locate script hit-tests and describes covers');
+
+
+// Right and double clicks (plan.md WP10 phase 2). Prevents: a misspelt button
+// silently becoming a left click, a clickCount above 2 reaching the page, and
+// the double click sending its first press without the second.
+{
+  assert.deepEqual(parseClickOptions({}), { button: 'left', clickCount: 1 });
+  assert.deepEqual(parseClickOptions({ button: 'right' }), { button: 'right', clickCount: 1 });
+  assert.deepEqual(parseClickOptions({ doubleClick: true }), { button: 'left', clickCount: 2 });
+  assert.deepEqual(parseClickOptions({ button: 'left', doubleClick: false }), { button: 'left', clickCount: 1 });
+  assert.deepEqual(parseClickOptions({ button: null, doubleClick: undefined }), { button: 'left', clickCount: 1 });
+  assert.equal('error' in (parseClickOptions({ button: 'middle' }) as object), true, 'unsupported button is an error, not a left click');
+  assert.equal('error' in (parseClickOptions({ button: 3 }) as object), true);
+  assert.equal('error' in (parseClickOptions({ doubleClick: 'yes' }) as object), true, 'doubleClick must be a boolean');
+  assert.equal('error' in (parseClickOptions({ button: 'right', doubleClick: true }) as object), true, 'a double right click is not offered');
+
+  const single = clickEventSequence(10, 20, { button: 'left', clickCount: 1 });
+  assert.deepEqual(single.map(e => e.type), ['mouseMove', 'mouseDown', 'mouseUp']);
+  assert.ok(single.slice(1).every(e => e.button === 'left' && e.clickCount === 1));
+  const dbl = clickEventSequence(10, 20, { button: 'left', clickCount: 2 });
+  assert.deepEqual(dbl.map(e => `${e.type}:${e.clickCount ?? ''}`), ['mouseMove:', 'mouseDown:1', 'mouseUp:1', 'mouseDown:2', 'mouseUp:2'], 'a double click is two press/release pairs counted 1 then 2');
+  const right = clickEventSequence(5, 6, { button: 'right', clickCount: 1 });
+  assert.ok(right.slice(1).every(e => e.button === 'right' && e.x === 5 && e.y === 6));
+}
+console.log('[PASS] Trusted input — right and double click options');
 
 console.log('[PASS] Trusted input suite complete');

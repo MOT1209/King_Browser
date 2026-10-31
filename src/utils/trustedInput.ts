@@ -117,6 +117,33 @@ export function wheelDelta(direction: string, amount: unknown): { deltaX: number
   }
 }
 
+export interface ClickOptions { button: 'left' | 'right'; clickCount: 1 | 2 }
+export interface MouseInputEvent { type: 'mouseMove' | 'mouseDown' | 'mouseUp'; x: number; y: number; button?: 'left' | 'right'; clickCount?: number }
+
+/**
+ * Validates browser_click's optional `button` and `doubleClick`. Anything else
+ * is an error rather than a silent left click, so a typo cannot act differently
+ * from what the agent asked for. A double right click is not offered.
+ */
+export function parseClickOptions(args: Record<string, unknown>): ClickOptions | { error: string } {
+  const button = args.button === undefined || args.button === null ? 'left' : args.button;
+  if (button !== 'left' && button !== 'right') return { error: "Invalid 'button': use \"left\" or \"right\"." };
+  const dbl = args.doubleClick === undefined || args.doubleClick === null ? false : args.doubleClick;
+  if (typeof dbl !== 'boolean') return { error: "Invalid 'doubleClick': use true or false." };
+  if (dbl && button === 'right') return { error: 'A double right click is not supported.' };
+  return { button, clickCount: dbl ? 2 : 1 };
+}
+
+/** Native mouse events for a click at a point: move, then one press/release pair per click, counted from 1. */
+export function clickEventSequence(x: number, y: number, options: ClickOptions): MouseInputEvent[] {
+  const events: MouseInputEvent[] = [{ type: 'mouseMove', x, y }];
+  for (let count = 1; count <= options.clickCount; count++) {
+    events.push({ type: 'mouseDown', x, y, button: options.button, clickCount: count });
+    events.push({ type: 'mouseUp', x, y, button: options.button, clickCount: count });
+  }
+  return events;
+}
+
 export interface LocateResult {
   found: boolean;
   /** Centre in CSS pixels of the page viewport. */

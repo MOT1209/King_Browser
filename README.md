@@ -189,7 +189,7 @@ curl -s -H "Authorization: Bearer $MCP_TOKEN" http://127.0.0.1:3020/tools
 | `browser_snapshot` | - | Lists interactive elements as `e12 button "Save"`; pass the ref to the element tools instead of guessing a CSS selector. Refs last until the next snapshot or navigation |
 | `browser_screenshot` | - | Returns the active viewport as a PNG image (internal `king://` pages cannot be captured) |
 | `browser_element_screenshot` | `ref?`, `selector?` | Returns a PNG image of one element, scrolled into view |
-| `browser_click` | `ref?`, `selector?` | Clicks an element by snapshot ref or CSS selector with a real mouse click; a covered element returns an error naming the cover |
+| `browser_click` | `ref?`, `selector?`, `button?` (left or right), `doubleClick?` | Clicks an element by snapshot ref or CSS selector with a real mouse click; a covered element returns an error naming the cover |
 | `browser_type` | `text`, `ref?`, `selector?`, `pressEnter?` | Types with native keyboard input (works with React forms and contenteditable editors) and checks the result; `pressEnter` sends a real Enter, which needs approval in a form that sends data |
 | `browser_fill_form` | `fields`, `submit?` | Fills several fields in order; each field is checked and approved exactly like `browser_type` |
 | `browser_press_key` | `key`, `selector?` | Presses a real key or shortcut (`Enter`, `Tab`, `Escape`, `ArrowDown`, `Control+A`, ...), optionally focusing a selector first |

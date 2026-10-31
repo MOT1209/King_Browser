@@ -5,7 +5,7 @@ How the pieces that let coding agents work on, and drive, King Browser fit toget
 | Part | What it is | Source of truth | Guide |
 | :--- | :--- | :--- | :--- |
 | Instructions | Rules, architecture, commands, workflow for any contributor agent | `AGENTS.md` (Claude Code reaches it through `CLAUDE.md` -> `@AGENTS.md`) | [agent-compatibility.md](agent-compatibility.md) |
-| Skills | 55 task playbooks, one folder each | `.claude/skills/<name>/SKILL.md`, indexed in `AGENTS.md` | [skills-guide.md](skills-guide.md) |
+| Skills | 56 task playbooks, one folder each | `.claude/skills/<name>/SKILL.md`, indexed in `AGENTS.md` | [skills-guide.md](skills-guide.md) |
 | MCP server | The tools a driver agent uses to control the browser | `electron/mcpServer.ts`, `electron/main/mcpProtocol.ts` | [mcp-development.md](mcp-development.md) |
 | Approval gate | Human decision for sensitive actions | `electron/main/policyEngine.ts` | `agent-tool-governance` skill |
 | Checks | Tests that keep all of the above consistent | `tests/` (registered in `tests/runAll.ts`) | below |
