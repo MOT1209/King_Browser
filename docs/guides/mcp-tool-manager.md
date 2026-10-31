@@ -6,7 +6,7 @@ Settings -> MCP -> Tool Manager lets you give your AI agent extra tools without 
 
 The dashboard shows the number of tools (total, active, disabled, custom, built-in), a search box, a filter and a sort order. Each row shows the name, description, type (Built-in, or Custom with an `HTTP` badge), status, the result of the last test, and the actions you may use.
 
-- **Built-in tools** are King Browser's own functions (`browser_*`). You can switch them off, but you cannot delete them: they are part of the browser.
+- **Built-in tools** (listed here with short descriptions; the former separate permissions list was merged into this dashboard) are King Browser's own functions (`browser_*`). You can switch them off, but you cannot delete them: they are part of the browser.
 - **Custom tools** are yours. You can add, edit, test, switch off, export and delete them.
 - A **disabled** tool is not listed to agents and is refused if an agent calls it anyway. This is enforced in the main process, not only in the interface.
 
@@ -62,8 +62,8 @@ Editing the description alone saves directly. If an edit changes what the tool c
 | "Custom tools require the approval policy to be enforced" | The app is running without its policy engine (a development setup). |
 | A tool is missing from the agent's list | It is disabled, invalid (edit it), or the client has not refreshed `tools/list`. |
 | Test says *Failed: rejected* | You rejected the approval dialog, or it timed out after 60 s. |
-| Messages from the validator are in English | The checks run in the main process; they are not translated yet. |
+| A message appears in English in Arabic or German | It is a validator message without a translation rule yet; the meaning is unchanged. |
 
 ## Not supported
 
-Connecting an external MCP server and exposing internal browser actions under a new name are **not** implemented; see `docs/engineering/custom-mcp-tools.md` for why.
+Connecting an external MCP server is not implemented yet, and exposing internal browser actions under a new name is deliberately refused; see `docs/engineering/custom-mcp-tools.md` for why.

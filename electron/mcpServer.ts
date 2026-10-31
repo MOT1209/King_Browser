@@ -29,6 +29,7 @@ import {
   createCustomToolStore, executeHttpTool, CUSTOM_TOOL_PREFIX, formatToolOutput, toInputSchema, validateArguments,
   type CustomToolStore, type CustomToolDefinition, type ExecuteDeps
 } from './main/customTools.js';
+import { validateToolArguments } from './main/toolSchema.js';
 import type { ApprovalDetailLine } from './main/approvalDetails.js';
 
 // Secrets of user-defined tools: same fallback scheme, distinct magic so the blobs cannot be confused.
@@ -1259,6 +1260,14 @@ export class BrowserMCPServer {
           ? `Permission denied: Tool '${toolName}' is disabled in MCP security settings.`
           : `Permission denied: Tool '${label}' is not a known MCP tool.`
       );
+    }
+
+    // Declared schemas are enforced at call time for built-in tools too (undeclared
+    // extras are tolerated; see main/toolSchema.ts). Custom tools check their own.
+    const declared = TOOLS.find((tool) => tool.name === toolName);
+    if (declared) {
+      const problems = validateToolArguments(declared.inputSchema, args);
+      if (problems.length > 0) throw new Error(`Invalid arguments for ${toolName}: ${problems.join(' ')}`);
     }
 
     // User-defined tools run in the main process through the same approval

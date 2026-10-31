@@ -61,6 +61,7 @@ async function run() {
   const proxySecurityModule = loadSource('electron/main/proxySecurity.ts', { Buffer, URL, process }, { crypto: withDefault(crypto), os: withDefault(os), fs: withDefault(fs), path: withDefault(path) });
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const customToolsModule = loadSource('electron/main/customTools.ts', { Buffer, URL, AbortController, AbortSignal }, { 'node:fs': fs, 'node:https': withDefault(https), './injectionDetector.js': injectionDetectorModule });
+  const toolSchemaModule = loadSource('electron/main/toolSchema.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
   const approvalDetailsModule = loadSource('electron/main/approvalDetails.ts', {}, {});
@@ -97,6 +98,7 @@ async function run() {
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
     './main/customTools.js': customToolsModule,
+    './main/toolSchema.js': toolSchemaModule,
     './main/elementRefs.js': elementRefsModule,
     './main/mcpContent.js': mcpContentModule,
     './main/mcpProtocol.js': mcpProtocolModule,
