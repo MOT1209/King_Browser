@@ -16,8 +16,6 @@ import {
 } from './main/permissionStore';
 import fetch from 'cross-fetch';
 import dns from 'dns';
-import http from 'http';
-import https from 'https';
 import { promisify } from 'util';
 import { once } from 'events';
 import fs from 'fs';
@@ -142,6 +140,7 @@ import { registerEngineIpc } from './main/engineIpc.js';
 import { decideLinuxSandbox, readLinuxSandboxInput } from './main/linuxSandbox.js';
 import { translateBatch, detectLanguage, type TranslationDeps } from './main/translation';
 import { NativeTts, type SayProcess } from './main/nativeTts';
+import { validatePreviewUrl as validatePreviewUrlWith, readResponseTextWithLimit, fetchPageHtml, type PreviewValidationDeps } from './main/previewFetch';
 import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, getGoogleSigninCompatUserAgent, isGoogleAccountsUrl, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
@@ -4617,198 +4616,29 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
 
 const dnsLookup = promisify(dns.lookup);
 
-interface ValidatedPreviewTarget {
-  url: URL;
-  pinnedIp: string;
-}
+// The SSRF rules (scheme, local hosts, DNS pinning, MCP port, redirects, body limit) live in main/previewFetch.ts.
+const previewValidationDeps = (): PreviewValidationDeps => ({
+  lookup: (hostname) => dnsLookup(hostname, { all: true }) as Promise<any>,
+  getMcpPort: () => mcpServer?.getPort?.() || 3020
+});
 
-async function validatePreviewUrl(rawUrl: string): Promise<ValidatedPreviewTarget | { error: string }> {
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(rawUrl);
-    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-      return { error: 'Only HTTP/HTTPS protocols are allowed for this operation.' };
-    }
-    if (parsedUrl.username || parsedUrl.password) {
-      return { error: 'URLs with embedded credentials are not allowed.' };
-    }
-  } catch {
-    return { error: 'Invalid URL format' };
-  }
-
-  const hostname = parsedUrl.hostname.toLowerCase();
-  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
-    return { error: 'Requests to local hostnames are blocked.' };
-  }
-
-  let pinnedIp = '';
-  let dnsTimeoutTimer: NodeJS.Timeout | undefined;
-  try {
-    const lookupPromise = dnsLookup(hostname, { all: true }) as Promise<any>;
-    lookupPromise.catch(() => {});
-    const addresses = await Promise.race([
-      lookupPromise,
-      new Promise<never>((_, reject) => {
-        dnsTimeoutTimer = setTimeout(() => reject(new Error('DNS lookup timeout')), 3000);
-      })
-    ]);
-    const addrList = Array.isArray(addresses) ? addresses : [addresses];
-    if (addrList.length === 0 || addrList.some((entry: any) => isPrivateIP(entry?.address))) {
-      return { error: 'Requests to private/internal IP addresses are blocked.' };
-    }
-    pinnedIp = String(addrList[0]?.address || '');
-    if (!pinnedIp) {
-      return { error: 'DNS resolution returned empty address.' };
-    }
-  } catch {
-    return { error: 'DNS resolution failed.' };
-  } finally {
-    if (dnsTimeoutTimer) clearTimeout(dnsTimeoutTimer);
-  }
-
-  const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
-  const activeMcpPort = String(mcpServer?.getPort?.() || 3020);
-  if (port === '3020' || port === activeMcpPort) {
-    return { error: 'Requests to MCP server port are blocked.' };
-  }
-  return { url: parsedUrl, pinnedIp };
-}
-
-const MAX_PREVIEW_HTML_BYTES = 5 * 1024 * 1024;
-
-// Read a response body with a hard byte limit even when the server omits
-// Content-Length. This keeps the SSRF-protected preview endpoint bounded for
-// chunked/streaming responses as well as normal buffered responses.
-async function readResponseTextWithLimit(response: any, maxBytes: number): Promise<string> {
-  const body = response?.body;
-  if (body && typeof body.on === 'function') {
-    return await new Promise<string>((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      let received = 0;
-      let settled = false;
-      const fail = (error: Error) => {
-        if (settled) return;
-        settled = true;
-        try { body.destroy?.(); } catch (_) {}
-        reject(error);
-      };
-      body.on('data', (chunk: Buffer | string) => {
-        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        received += buffer.length;
-        if (received > maxBytes) {
-          fail(new Error(`Response body exceeds ${maxBytes} byte size limit`));
-          return;
-        }
-        chunks.push(buffer);
-      });
-      body.on('end', () => {
-        if (settled) return;
-        settled = true;
-        resolve(Buffer.concat(chunks).toString('utf8'));
-      });
-      body.on('error', (error: Error) => fail(error));
-    });
-  }
-
-  if (body && typeof body.getReader === 'function') {
-    const reader = body.getReader();
-    const chunks: Buffer[] = [];
-    let received = 0;
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const buffer = Buffer.from(value);
-        received += buffer.length;
-        if (received > maxBytes) {
-          try { await reader.cancel(); } catch (_) {}
-          throw new Error(`Response body exceeds ${maxBytes} byte size limit`);
-        }
-        chunks.push(buffer);
-      }
-      return Buffer.concat(chunks).toString('utf8');
-    } finally {
-      try { reader.releaseLock?.(); } catch (_) {}
-    }
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
-  if (arrayBuffer.byteLength > maxBytes) {
-    throw new Error(`Response body exceeds ${maxBytes} byte size limit`);
-  }
-  return Buffer.from(arrayBuffer).toString('utf8');
+async function validatePreviewUrl(rawUrl: string) {
+  return validatePreviewUrlWith(rawUrl, previewValidationDeps());
 }
 
 // IPC Handler to fetch raw HTML (Bypasses CORS for Link Preview with SSRF protection)
 ipcMain.handle('fetch-page-html', async (event, url: string) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
-  if (!url || typeof url !== 'string') return { error: 'Invalid URL' };
-
-  let currentUrl = url;
-  const MAX_REDIRECTS = 3;
-
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    // Validate every hop. Redirects can cross from a public host to localhost,
-    // a private IP, a mapped IPv4 address, or the local MCP port.
-    const validated = await validatePreviewUrl(currentUrl);
-    if ('error' in validated) return validated;
-    const { url: parsedUrl, pinnedIp } = validated;
-    currentUrl = parsedUrl.href;
-
-    try {
-      const isHttps = parsedUrl.protocol === 'https:';
-      const agentOptions = {
-        lookup: (_hostname: string, _opts: any, cb: any) => {
-          cb(null, pinnedIp, pinnedIp.includes(':') ? 6 : 4);
-        }
-      };
-      const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
-
-      const res = await fetch(currentUrl, {
-        headers: {
-          'User-Agent': getStandardUserAgent(),
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-        },
-        agent,
-        redirect: 'manual',
-        signal: AbortSignal.timeout(5000)
-      } as any);
-
-      if (res.status >= 300 && res.status < 400) {
-        const location = res.headers.get('location');
-        if (!location) return { error: 'Redirect without Location header' };
-        currentUrl = new URL(location, currentUrl).href;
-        continue;
-      }
-
-      if (res.ok) {
-        const contentLength = res.headers.get('content-length');
-        if (contentLength && parseInt(contentLength, 10) > MAX_PREVIEW_HTML_BYTES) {
-          return { error: 'Response body exceeds 5MB size limit' };
-        }
-        const rawHtml = await readResponseTextWithLimit(res, MAX_PREVIEW_HTML_BYTES);
-        // Security: Robust AST-based DOMPurify sanitization in main process
-        let html = getMainDOMPurify().sanitize(rawHtml, {
-          WHOLE_DOCUMENT: true,
-          FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'svg', 'base', 'math', 'form', 'meta', 'link'],
-          FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'formaction', 'ontoggle', 'oninput', 'onchange', 'onsubmit', 'onkeydown', 'onkeyup', 'onkeypress', 'onmouseenter', 'onmouseleave', 'onmousedown', 'onmouseup', 'ondblclick', 'oncontextmenu', 'onwheel', 'onscroll', 'ondragstart', 'srcdoc']
-        });
-        // Security: Cap sanitized output at 3MB (also bounds the ReaderMode
-        // outerHTML -> fetchPageHtml fallback path at the main-process boundary).
-        const MAX_SANITIZED_HTML_CHARS = 3 * 1024 * 1024;
-        if (html.length > MAX_SANITIZED_HTML_CHARS) {
-          console.warn(`[fetch-page-html] Sanitized HTML exceeds 3MB (${html.length} chars), truncating`);
-          html = html.slice(0, MAX_SANITIZED_HTML_CHARS);
-        }
-        return { success: true, html };
-      }
-      return { error: 'HTTP ' + res.status };
-    } catch (err: any) {
-      return { error: err.message };
-    }
-  }
-
-  return { error: 'Too many redirects' };
+  return fetchPageHtml(url, {
+    validate: validatePreviewUrl,
+    fetch: (target, init) => fetch(target, init),
+    userAgent: getStandardUserAgent(),
+    sanitize: (rawHtml) => getMainDOMPurify().sanitize(rawHtml, {
+      WHOLE_DOCUMENT: true,
+      FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'svg', 'base', 'math', 'form', 'meta', 'link'],
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'formaction', 'ontoggle', 'oninput', 'onchange', 'onsubmit', 'onkeydown', 'onkeyup', 'onkeypress', 'onmouseenter', 'onmouseleave', 'onmousedown', 'onmouseup', 'ondblclick', 'oncontextmenu', 'onwheel', 'onscroll', 'ondragstart', 'srcdoc']
+    })
+  });
 });
 
 // IPC Handlers for One-Click Page Translation (limits, chunking and the service calls live in main/translation.ts)
