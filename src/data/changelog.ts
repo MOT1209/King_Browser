@@ -47,6 +47,31 @@ export interface ReleaseVersion {
  */
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '0.0.11',
+    date: 'November 2026',
+    title: 'Your own tools for the agent, and real input',
+    badge: 'Pre-release',
+    lede: 'Define your own HTTPS tools for the agent in the Tool Manager, and the agent now clicks and types with real mouse and keyboard input.',
+    highlights: [
+      'Tool Manager: add your own HTTPS tools for the agent in Settings > MCP. Each call asks for your approval unless you mark a credential-free GET tool as read-only.',
+      'The agent clicks, types and scrolls with real input, and can right-click and double-click.',
+      'Security fixes for custom tools, the MCP server and the Linux sandbox.',
+    ],
+    changes: [
+      { category: 'feature', text: 'Tool Manager in Settings > MCP: user-defined HTTPS tools with an approval gate, encrypted credentials, import and export, and a test button.' },
+      { category: 'feature', text: 'Agent: real mouse and keyboard input instead of page scripts; a covered element is reported by name; typed text is checked afterwards.' },
+      { category: 'feature', text: 'Agent: browser_click supports right click and double click.' },
+      { category: 'improvement', text: 'Built-in MCP tool arguments are checked against their declared schema, and Tool Manager errors follow the interface language.' },
+      { category: 'security', text: 'Custom tools: an argument of ".." can no longer leave the approved path, and a tool edited while its approval was open does not run.' },
+      { category: 'security', text: 'MCP server: only http(s) pages on this computer pass the Origin and CORS checks.' },
+      { category: 'security', text: 'Linux: the setuid sandbox helper is kept when user namespaces are off, instead of turning the sandbox off.' },
+      { category: 'security', text: 'Session hardening fails closed, sign-in popups are guarded, and guest page events are trust-checked.' },
+      { category: 'security', text: 'Electron updated to 43.8.6.' },
+      { category: 'fix', text: 'Read aloud: a newer request is no longer stopped by the timer of the one it replaced.' },
+      { category: 'fix', text: 'Accessibility: tab strip items are announced correctly by screen readers.' },
+    ],
+  },
+  {
     version: '0.0.10',
     date: 'October 2026',
     title: 'More control over what the agent does',
