@@ -298,6 +298,11 @@ const trustedSenderSource = fs.readFileSync(
   'utf-8'
 ).replace(/\r\n/g, '\n');
 
+const webviewPolicySource = fs.readFileSync(
+  path.resolve(process.cwd(), 'electron/main/webviewPolicy.ts'),
+  'utf-8'
+).replace(/\r\n/g, '\n');
+
 const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
   // Section 1: isTrustedAppOrigin (electron/main.ts:347). The old copy trusted
   // devtools: unconditionally; production must keep refusing it.
@@ -315,7 +320,8 @@ const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
   },
   // Section 4: Web Store host (electron/main.ts:3373).
   {
-    needle: "parsed.protocol === 'https:' && (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com')",
+    // The rule moved from main.ts to electron/main/webviewPolicy.ts (behaviourally tested in webview_policy.test.ts).
+    needle: "parsed.protocol === 'https:' && (\n    parsed.hostname === 'chromewebstore.google.com' ||\n    (parsed.hostname === 'chrome.google.com' && parsed.pathname.startsWith('/webstore/'))",
     desc: 'the Web Store popup handler requires https and an exact host match, not a suffix',
   },
   // Section 5: isTrustedSender (electron/main.ts:330).
@@ -362,7 +368,9 @@ const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
 for (const guard of MAIN_SOURCE_GUARDS) {
   const source = guard.desc.startsWith('isTrustedAppOrigin') || guard.desc.startsWith('isTrustedSender')
     ? trustedSenderSource
-    : mainSource;
+    : guard.desc.startsWith('the Web Store popup handler')
+      ? webviewPolicySource
+      : mainSource;
   assert(
     source.includes(guard.needle),
     'Shipped Guard Present',

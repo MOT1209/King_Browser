@@ -7,6 +7,13 @@ import { isLocalOrIntranetHost } from './main/hostPolicy';
 import { isExtensionAllowedInIncognito, setExtensionIncognitoAccess, hasExtensionIncognitoAccess } from './main/incognitoExtensions';
 import { openPageSourceViewer as createPageSourceViewer } from './windows/sourceViewer';
 import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
+import { buildPhishingBlockScript } from './main/phishingBlockPage';
+import { isAllowedWebviewPartition, evaluateWebviewSrc } from './main/webviewPolicy';
+import {
+  PERMISSION_TTL_MS, permissionKeys, permissionOriginFor, rememberedDecision,
+  parseRememberedPermissions, writeRememberedPermissions, purgeExpiredPermissions,
+  type PermissionDecisions
+} from './main/permissionStore';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import http from 'http';
@@ -415,6 +422,16 @@ async function applyProxyToAllSessions(rules: string): Promise<void> {
   };
   proxyMutex = proxyMutex.then(op, op);
   return proxyMutex;
+}
+
+/** Replaces a webview's content with the phishing block page (see phishingBlockPage.ts). */
+function showPhishingBlockPage(contents: Electron.WebContents, blockedUrl: string): void {
+  if (contents.isDestroyed()) return;
+  contents.loadURL('about:blank').then(() => {
+    if (!contents.isDestroyed()) {
+      contents.executeJavaScript(buildPhishingBlockScript(blockedUrl)).catch(() => {});
+    }
+  }).catch(() => {});
 }
 
 function hardenIncognitoPartition(partitionName: string): boolean {
@@ -1563,78 +1580,22 @@ app.whenReady().then(async () => {
 
   const MAX_PENDING_PERMISSIONS = 20;
   const pendingPermissions = new Map<string, PendingPermission>();
-  // Origin -> (Permission -> { allow, ts }) — TTL: 30 days
-  const PERMISSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-  const rememberedPermissions = new Map<string, Map<string, { allow: boolean; ts: number }>>();
+  // Origin -> (Permission -> { allow, ts }); answers live PERMISSION_TTL_MS (permissionStore.ts)
+  const rememberedPermissions: PermissionDecisions = new Map();
   // Origin -> Rate limit record (max 5 requests per 10s)
   const permissionRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
   const PERMISSIONS_FILE = path.join(app.getPath('userData'), 'remembered_permissions.json');
 
-  // Camera and microphone are separate capabilities. Old `media` records do
-  // not identify what was approved and deliberately require a fresh prompt.
-  function permissionKeys(permission: string, mediaTypes?: unknown): string[] | null {
-    if (permission !== 'media') return [permission];
-    if (!Array.isArray(mediaTypes) || mediaTypes.length === 0 ||
-        mediaTypes.some(type => type !== 'audio' && type !== 'video')) return null;
-    return [...new Set(mediaTypes as string[])].map(type => `media:${type}`);
-  }
-
   function permissionOrigin(url: string): string {
-    if (isTrustedAppOrigin(url)) return 'app';
-    try {
-      const parsed = new URL(url);
-      if (parsed.username || parsed.password) return '';
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.origin;
-      // WHATWG URL.origin serializes every extension as "null". Keep each
-      // installed extension's identity separate; opaque origins get no grants.
-      if (parsed.protocol === 'chrome-extension:' && /^[a-p]{32}$/.test(parsed.hostname)) {
-        return `chrome-extension://${parsed.hostname}`;
-      }
-    } catch (_) {}
-    return '';
-  }
-
-  function rememberedDecision(
-    decisions: typeof rememberedPermissions, origin: string, keys: string[]
-  ): boolean | undefined {
-    const entries = decisions.get(origin);
-    if (!entries) return undefined;
-    const now = Date.now();
-    const values = keys.map(key => {
-      const entry = entries.get(key);
-      if (!entry) return undefined;
-      if (!Number.isFinite(entry.ts) || entry.ts > now || now - entry.ts >= PERMISSION_TTL_MS) {
-        entries.delete(key);
-        return undefined;
-      }
-      return entry.allow;
-    });
-    if (entries.size === 0) decisions.delete(origin);
-    if (values.some(value => value === false)) return false;
-    return values.every(value => value === true) ? true : undefined;
+    return permissionOriginFor(url, isTrustedAppOrigin);
   }
 
   function loadRememberedPermissionsFromDisk(): void {
     try {
       if (fs.existsSync(PERMISSIONS_FILE)) {
-        const raw = fs.readFileSync(PERMISSIONS_FILE, 'utf8');
-        const data = JSON.parse(raw);
-        if (data && typeof data === 'object') {
-          const cutoff = Date.now() - PERMISSION_TTL_MS;
-          for (const [origin, perms] of Object.entries(data)) {
-            if (typeof origin === 'string' && perms && typeof perms === 'object') {
-              const permMap = new Map<string, { allow: boolean; ts: number }>();
-              for (const [perm, entry] of Object.entries(perms as Record<string, any>)) {
-                if (entry && typeof entry.allow === 'boolean' && typeof entry.ts === 'number' && entry.ts >= cutoff) {
-                  permMap.set(perm, { allow: entry.allow, ts: entry.ts });
-                }
-              }
-              if (permMap.size > 0) {
-                rememberedPermissions.set(origin, permMap);
-              }
-            }
-          }
+        for (const [origin, perms] of parseRememberedPermissions(fs.readFileSync(PERMISSIONS_FILE, 'utf8'))) {
+          rememberedPermissions.set(origin, perms);
         }
       }
     } catch (err) {
@@ -1644,31 +1605,7 @@ app.whenReady().then(async () => {
 
   function saveRememberedPermissionsToDisk(): void {
     try {
-      const obj: Record<string, Record<string, { allow: boolean; ts: number }>> = {};
-      for (const [origin, perms] of rememberedPermissions.entries()) {
-        obj[origin] = {};
-        for (const [perm, entry] of perms.entries()) {
-          obj[origin][perm] = entry;
-        }
-      }
-      // Write to a sibling temp file, then rename. A crash or ENOSPC mid-write
-      // used to leave a truncated PERMISSIONS_FILE: the next JSON.parse throws,
-      // the load catch swallows it, and every remembered permission decision is
-      // silently forgotten (users get re-prompted for mic/camera/geolocation).
-      // rename is atomic on the same volume, so the file holds either the old
-      // contents or the new ones, never a half-written prefix. The mode is forced
-      // because writeFileSync's `mode` only applies when it CREATES the file — and
-      // this file enumerates which origins were granted camera/microphone/
-      // geolocation, so it must never be left world-readable.
-      const tmpFile = PERMISSIONS_FILE + '.tmp';
-      try {
-        fs.writeFileSync(tmpFile, JSON.stringify(obj, null, 2), { encoding: 'utf8', mode: 0o600 });
-        try { fs.chmodSync(tmpFile, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
-        fs.renameSync(tmpFile, PERMISSIONS_FILE);
-      } catch (writeErr) {
-        try { fs.unlinkSync(tmpFile); } catch (_) {}
-        throw writeErr;
-      }
+      writeRememberedPermissions(PERMISSIONS_FILE, rememberedPermissions);
     } catch (err) {
       console.warn('[Permissions] Failed to save permissions to disk:', err);
     }
@@ -1678,13 +1615,7 @@ app.whenReady().then(async () => {
 
   /** Purge all remembered permission entries older than PERMISSION_TTL_MS. */
   function purgeExpiredRememberedPermissions(): void {
-    const cutoff = Date.now() - PERMISSION_TTL_MS;
-    for (const [origin, perms] of rememberedPermissions) {
-      for (const [perm, entry] of perms) {
-        if (entry.ts < cutoff) perms.delete(perm);
-      }
-      if (perms.size === 0) rememberedPermissions.delete(origin);
-    }
+    purgeExpiredPermissions(rememberedPermissions);
   }
 
   ipcMain.handle('permission-response', async (_event, payload: unknown) => {
@@ -2968,7 +2899,7 @@ app.on('web-contents-created', (_event, contents) => {
     // Security: Validate partition to prevent unauthorized partitions (e.g. persist:admin)
     const part = (webPreferences as any).partition || (params as any).partition;
     if (part && typeof part === 'string') {
-      if (part !== '' && part !== AGENT_PERSIST_PARTITION && !/^incognito-[a-zA-Z0-9_-]+$/.test(part)) {
+      if (!isAllowedWebviewPartition(part, AGENT_PERSIST_PARTITION)) {
         console.warn(`[Security] Blocked unauthorized webview partition: ${part}`);
         event.preventDefault();
         return;
@@ -2989,33 +2920,17 @@ app.on('web-contents-created', (_event, contents) => {
     // or valid chrome-extension. Block file:, javascript:, data:, vbscript:, blob:, etc.
     let isAuthorizedWebstore = false;
     if (params.src) {
-      try {
-        const parsed = new URL(params.src);
-        const allowedProtocols = ['http:', 'https:'];
-        const isAllowedAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
-        // An extension-shaped id is not enough: a page can window.open any
-        // chrome-extension://<id> and this accepted it, so the isInstalled gate
-        // the other two entry points enforce was skipped. Shape AND existence.
-        const isAllowedExtension = parsed.protocol === 'chrome-extension:' &&
-          /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) &&
-          (loadedExtensions.some(ext => ext.id === parsed.hostname) ||
-            Boolean(session.defaultSession.getExtension(parsed.hostname)));
-
-        if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank && !isAllowedExtension) ||
-            parsed.username || parsed.password) {
-          console.warn(`[Security] Blocked unauthorized webview scheme in src: ${params.src}`);
-          event.preventDefault();
-          return;
-        }
-
-        if (parsed.protocol === 'https:' && (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com') && (parsed.hostname === 'chromewebstore.google.com' || parsed.pathname.startsWith('/webstore/'))) {
-          isAuthorizedWebstore = true;
-        }
-      } catch {
-        console.warn(`[Security] Blocked malformed webview src: ${params.src}`);
+      // An extension-shaped id is not enough: a page can window.open any
+      // chrome-extension://<id>, so existence is checked too (the isInstalled
+      // gate the other two entry points enforce).
+      const srcVerdict = evaluateWebviewSrc(params.src, (id) =>
+        loadedExtensions.some(ext => ext.id === id) || Boolean(session.defaultSession.getExtension(id)));
+      if (!srcVerdict.allowed) {
+        console.warn(`[Security] Blocked unauthorized webview src: ${params.src}`);
         event.preventDefault();
         return;
       }
+      isAuthorizedWebstore = srcVerdict.isWebstore;
     }
 
     if (isAuthorizedWebstore) {
@@ -3186,28 +3101,7 @@ app.on('web-contents-created', (_event, contents) => {
       if (checkPhishingDomain(navigationUrl)) {
         e.preventDefault();
         sendToMainWindow('blocked-site', { url: navigationUrl, reason: 'phishing' });
-        const escapedUrl = navigationUrl.substring(0, 500);
-        const safeUrlJson = JSON.stringify(escapedUrl);
-        if (!contents.isDestroyed()) {
-          contents.loadURL('about:blank').then(() => {
-            if (!contents.isDestroyed()) {
-              contents.executeJavaScript(`
-                (() => {
-                  document.title = 'Dangerous Site Blocked';
-                  document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
-                  const h1 = document.createElement('h1');
-                  h1.textContent = 'Dangerous Site Blocked';
-                  h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
-                  const p = document.createElement('p');
-                  p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
-                  p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
-                  document.body.appendChild(h1);
-                  document.body.appendChild(p);
-                })()
-              `).catch(() => {});
-            }
-          }).catch(() => {});
-        }
+        showPhishingBlockPage(contents, navigationUrl);
         return;
       }
 
@@ -3258,28 +3152,7 @@ app.on('web-contents-created', (_event, contents) => {
       if (checkPhishingDomain(redirectUrl)) {
         e.preventDefault();
         sendToMainWindow('blocked-site', { url: redirectUrl, reason: 'phishing' });
-        const escapedUrl = redirectUrl.substring(0, 500);
-        const safeUrlJson = JSON.stringify(escapedUrl);
-        if (!contents.isDestroyed()) {
-          contents.loadURL('about:blank').then(() => {
-            if (!contents.isDestroyed()) {
-              contents.executeJavaScript(`
-                (() => {
-                  document.title = 'Dangerous Site Blocked';
-                  document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
-                  const h1 = document.createElement('h1');
-                  h1.textContent = 'Dangerous Site Blocked';
-                  h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
-                  const p = document.createElement('p');
-                  p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
-                  p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
-                  document.body.appendChild(h1);
-                  document.body.appendChild(p);
-                })()
-              `).catch(() => {});
-            }
-          }).catch(() => {});
-        }
+        showPhishingBlockPage(contents, redirectUrl);
         return;
       }
 
