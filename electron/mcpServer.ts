@@ -14,7 +14,7 @@ import { ExecutionEngine } from './main/executionEngine.js';
 import { resolveElementRef } from './main/elementRefs.js';
 import { handleJsonRpcMessage, type McpProtocolHandlers } from './main/mcpProtocol.js';
 import { formatToolError } from './main/mcpContent.js';
-import { createStreamableHttpHandlers, type McpHttpSession } from './main/mcpStreamableHttp.js';
+import { createStreamableHttpHandlers, isLocalOrigin, type McpHttpSession } from './main/mcpStreamableHttp.js';
 import { Recorder, RECORDABLE_TOOLS, createRecordingStore, replaySteps, type Recording, type RecordingStore, type ReplayReport } from './main/recordings.js';
 import { createApprovalModeStore, strictModeRequiresApproval, type ApprovalMode, type ApprovalModeStore } from './main/approvalMode.js';
 import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
@@ -1717,20 +1717,11 @@ export class BrowserMCPServer {
       next();
     });
 
-    // CORS for all routes - restricted to local origins (http://localhost:*, http://127.0.0.1:*, http://[::1]:*)
+    // CORS for all routes - the same local origins the Streamable HTTP check accepts (isLocalOrigin)
     app.use((req, res, next) => {
       const origin = req.headers.origin;
-      if (origin) {
-        try {
-          const url = new URL(origin);
-          if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.protocol === 'king:') {
-            res.header('Access-Control-Allow-Origin', origin);
-          }
-        } catch (_) {
-          if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin)) {
-            res.header('Access-Control-Allow-Origin', origin);
-          }
-        }
+      if (typeof origin === 'string' && isLocalOrigin(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
       }
       res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, Mcp-Session-Id, MCP-Protocol-Version');
       res.header('Access-Control-Expose-Headers', 'Mcp-Session-Id');

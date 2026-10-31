@@ -12,7 +12,7 @@ import {
   SUPPORTED_PROTOCOL_VERSIONS,
   type McpProtocolHandlers
 } from '../electron/main/mcpProtocol';
-import { createStreamableHttpHandlers, type McpHttpSession } from '../electron/main/mcpStreamableHttp';
+import { createStreamableHttpHandlers, isLocalOrigin, type McpHttpSession } from '../electron/main/mcpStreamableHttp';
 
 console.log('\n--- MCP Protocol and Streamable HTTP Test Suite ---');
 
@@ -225,6 +225,17 @@ async function wireSuite() {
       const r = await rpc(h.url, INITIALIZE, { Origin: origin });
       assert.equal(r.status, 403, `origin ${origin} is refused`);
     }
+    // Only http(s) on a loopback host. No King page talks to the MCP port, so a
+    // king: origin and other schemes on a loopback host have no reason to pass.
+    // Prevents: an extension, custom-scheme or king:// context reading responses.
+    for (const origin of ['king://settings', 'king://evil', 'ftp://localhost', 'chrome-extension://localhost', 'file://localhost']) {
+      assert.equal(isLocalOrigin(origin), false, `origin ${origin} is not local`);
+    }
+    for (const origin of ['http://localhost:1234', 'https://127.0.0.1', 'http://[::1]:3020']) {
+      assert.equal(isLocalOrigin(origin), true, `origin ${origin} is local`);
+    }
+    const kingOrigin = await rpc(h.url, INITIALIZE, { Origin: 'king://settings' });
+    assert.equal(kingOrigin.status, 403, 'a king: origin is refused');
     const local = await rpc(h.url, INITIALIZE, { Origin: 'http://localhost:5173' });
     assert.equal(local.status, 200, 'a local origin is accepted');
 

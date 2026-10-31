@@ -57,14 +57,18 @@ export const MCP_SESSION_HEADER = 'mcp-session-id';
 export const DEFAULT_MAX_SESSIONS = 32;
 export const DEFAULT_SESSION_IDLE_MS = 60 * 60 * 1000;
 
-/** Origins that may talk to the server: this machine, or King's own king:// pages. */
+/**
+ * Origins that may talk to the server: http(s) pages on this machine. No King
+ * page calls the MCP port (the shell is file://), so king: origins and other
+ * schemes on a loopback host are refused.
+ */
 export function isLocalOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
     return url.hostname === 'localhost'
       || url.hostname === '127.0.0.1'
-      || url.hostname === '[::1]'
-      || url.protocol === 'king:';
+      || url.hostname === '[::1]';
   } catch (_) {
     return false;
   }

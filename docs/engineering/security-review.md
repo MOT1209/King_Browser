@@ -49,7 +49,9 @@ Observation, not changed: the check only reads the Debian-style `unprivileged_us
 
 ### F3. MCP CORS accepts any `king:` origin (informational)
 
-The CORS middleware in `electron/mcpServer.ts` reflects an `Origin` whose protocol is `king:` regardless of host. No web content can present a `king:` origin (internal pages render inside the app's `file://` window), and every request still needs the bearer token, so there is no known exploit path. Tightening it to the exact internal pages would match `trustedSender.ts`. Not changed: it touches the MCP trust model, which AGENTS.md reserves for the owner.
+The CORS middleware in `electron/mcpServer.ts` reflects an `Origin` whose protocol is `king:` regardless of host. No web content can present a `king:` origin (internal pages render inside the app's `file://` window), and every request still needs the bearer token, so there is no known exploit path. Tightening it to the exact internal pages would match `trustedSender.ts`.
+
+Status: fixed 2026-10-31 at the owner's request. No King page calls the MCP port, so `isLocalOrigin` now accepts only `http:`/`https:` on a loopback host and the CORS middleware reuses it instead of its own copy (which also reflected any scheme on a loopback host). Covered by `tests/mcp_streamable_http.test.ts`, which failed before the change.
 
 ### F4. Accessibility defect fixed: tab strip list items without a list
 
