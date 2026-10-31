@@ -5,7 +5,7 @@
   # King Browser
 
   **Open-Source Desktop Browser for Developers & Coding Agents**  
-  *Built with Electron, React, TypeScript & Vite — Featuring Native MCP Server, On-Device WebGPU & Whisper STT, and Zero-Knowledge E2EE Sync*
+  *Built with Electron, React, TypeScript & Vite — Featuring Native MCP Server, On-Device WebGPU & Whisper STT, and Client-Side Encrypted Sync*
 
   <br/>
 
@@ -46,7 +46,7 @@ Rather than bloated cloud telemetry or generic hype, King focuses on concrete de
 
 - **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local MCP server (Streamable HTTP and legacy SSE) exposing 45 browser automation, inspection, and execution-control tools (19 safe ones enabled by default) directly to coding agents (OpenCode, Claude Code, Cursor, Windsurf). Agents authenticate with a bearer token copied from Settings → MCP.
 - **On-Device Whisper Voice & Neural Execution**: Run multilingual speech-to-text locally via Transformers.js (`whisper-tiny`, ~41 MB) and on-device LLMs via WebGPU (Llama 3.2, Phi 3.5 Vision, Qwen 2.5). Exactly 0 KB of voice audio or model prompt data is transmitted to cloud servers.
-- **No Analytics SDK, Network-Level Privacy Shield**: Ships no analytics or crash-reporting SDK (see [Network connections](#network-connections) for the services King does contact). Employs `@ghostery/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
+- **No Analytics SDK, Network-Level Privacy Shield**: Ships no analytics or crash-reporting SDK (see [Network connections](#network-connections) for the services King does contact). Employs `@ghostery/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM encrypted cloud sync.
 - **Tab Hibernation & Memory Eviction**: Dormant background tabs automatically suspend active rendering execution via an LRU pool (capping live webviews to 6) while preserving complete navigation state, preventing Chromium process explosion regardless of tab count.
 - **Hardened Security Architecture**: TOCTOU-safe file descriptor operations, strict context isolation, and SSRF/DNS rebinding defense. These controls are covered by the automated test suite; no independent security audit has been performed yet.
 
@@ -54,7 +54,7 @@ Rather than bloated cloud telemetry or generic hype, King focuses on concrete de
 
 ## Overview
 
-**King Browser** is an open-source, sovereign desktop web browser built with Electron, React, TypeScript, and Vite. Designed for developers, researchers, and privacy-conscious users, King pairs standard Chromium rendering with a native **Model Context Protocol (MCP) server**, **on-device WebGPU neural execution**, **local Whisper speech recognition**, **zero-knowledge encrypted multi-device sync**, **Chrome Web Store extension support**, and a **dual-view split screen**.
+**King Browser** is an open-source, sovereign desktop web browser built with Electron, React, TypeScript, and Vite. Designed for developers, researchers, and privacy-conscious users, King pairs standard Chromium rendering with a native **Model Context Protocol (MCP) server**, **on-device WebGPU neural execution**, **local Whisper speech recognition**, **client-side encrypted multi-device sync**, **Chrome Web Store extension support**, and a **dual-view split screen**.
 
 ---
 
@@ -121,9 +121,9 @@ Current English interface in Clean Minimalist mode with the light theme.
 
 ## Key Features
 
-### King Cloud Sync (Zero-Knowledge E2EE)
+### King Cloud Sync (Client-Side Encrypted)
 - **End-to-End Encryption (AES-256-GCM)**: Saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted locally with PBKDF2 (600,000 iterations) and 256-bit AES-GCM before transmission.
-- **Encrypted Multi-Device Sync**: Sign in with your King Cloud account to synchronize bookmarks, passwords, and preferences across your computers in real-time over Supabase Realtime WebSockets. Encryption keys stay on your local device; the cloud server only ever receives encrypted ciphertext.
+- **Encrypted Multi-Device Sync**: Sign in with your King Cloud account to synchronize bookmarks, passwords, and preferences across your computers in real-time over Supabase Realtime WebSockets. The cloud server receives only encrypted ciphertext and the key is never uploaded, but the key is derived from your account password, which the provider also receives at sign-in (see Security & Privacy Commitment for the limit of this model).
 - **Local Vault Mode**: When no King Cloud project is configured, signing up still creates a vault protected by your password (PBKDF2 600,000 iterations, AES-256-GCM) but it is stored on this device only. The sign-in form says so explicitly and nothing is uploaded, so a local account is never presented as synced.
 - **Password Recovery**: King Cloud accounts can request a password-reset email from the sign-in form ("Forgot password?"). Local-vault accounts have no recovery path by design — the password is the encryption key.
 - **Code-Based Pairing (Roadmap)**: Accountless 1-click device pairing via temporary sync codes is in active development for a future release. Until the join flow exists, the UI states that pairing is unavailable instead of offering a code that cannot be redeemed.
@@ -146,7 +146,7 @@ Current English interface in Clean Minimalist mode with the light theme.
 - **Zip-Slip & Path Traversal Neutralization**: All CRX archive extractions are validated in-memory before decompression to prevent directory traversal attacks.
 
 ### Native `king://` Internal Pages
-- **`king://settings`**: Complete browser preferences, theme toggles, search engine picker, shortcuts, zero-knowledge password vault, and sync controls.
+- **`king://settings`**: Complete browser preferences, theme toggles, search engine picker, shortcuts, encrypted password vault, and sync controls.
 - **`king://history`**: Grouped timeline search, date filtering, and quick item deletion.
 - **`king://downloads`**: Live progress indicators, pause/resume, folder shortcuts, and file launching.
 - **`king://newtab`**: Start page with quick dials, customizable animated background, and tasks widget.
@@ -529,7 +529,7 @@ King Browser runs fully offline out of the box with zero required configuration.
 
 | Variable | Required | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `VITE_SUPABASE_URL` | Optional | `""` | Supabase project URL for zero-knowledge cloud sync |
+| `VITE_SUPABASE_URL` | Optional | `""` | Supabase project URL for encrypted cloud sync |
 | `VITE_SUPABASE_ANON_KEY` | Optional | `""` | Supabase anonymous public API key |
 | `MCP_PORT` | Optional | `3020` | Local port for the Model Context Protocol server (Streamable HTTP `/mcp` and legacy SSE `/sse`) |
 | `MCP_TOKEN` | Optional | Auto-generated | Bearer token for authenticating external MCP clients |
@@ -684,7 +684,7 @@ flowchart TB
     subgraph Neural["On-Device AI & Sync Vault"]
         whisperEngine["Local Whisper STT<br/>ONNX whisper-tiny / 0 KB to Cloud"]
         webgpuEngine["WebGPU Neural Runtime<br/>Llama 3.2 / Phi 3.5 / Qwen 2.5"]
-        syncVault["Zero-Knowledge E2EE Vault<br/>AES-256-GCM / Supabase Realtime"]
+        syncVault["Client-Side Encrypted Vault<br/>AES-256-GCM / Supabase Realtime"]
     end
 
     agentClient <-->|"JSON-RPC over HTTP (/mcp) or SSE"| mcp
@@ -735,7 +735,7 @@ flowchart TB
 | **Preload Bridge** | Context bridge barrier (`contextIsolation: true`) | Selective unidirectional API exposure via `window.electronAPI`, guest webview isolation | `electron/preload.ts`, `electron/guest-preload.ts` |
 | **Renderer Process** | Sandboxed Chromium UI (`nodeIntegration: false`) | React 18 UI shell, 27 modular state hooks, tab virtualization, dual split-screen geometry | `src/App.tsx`, `src/hooks/*`, `src/components/*` |
 | **AI Web Worker** | Isolated worker thread | Off-thread WebGPU neural inference (Llama 3.2, Phi 3.5, Qwen 2.5), local Whisper ONNX speech recognition | `src/workers/aiWorker.ts`, `src/services/localSpeechRecognition.ts` |
-| **Encrypted Vault** | Zero-knowledge client-side encryption | PBKDF2 (600k) + AES-256-GCM encrypted cloud sync over Supabase Realtime WebSockets | `src/services/syncService.ts`, `src/services/syncCrypto.ts` |
+| **Encrypted Vault** | Client-side encryption | PBKDF2 (600k) + AES-256-GCM encrypted cloud sync over Supabase Realtime WebSockets | `src/services/syncService.ts`, `src/services/syncCrypto.ts` |
 | **External Agents** | Authenticated JSON-RPC over port 3020 | Autonomous agent navigation, DOM interaction, and inspection via 45 built-in tools | Claude Desktop, Cursor, Windsurf, Antigravity, OpenCode |
 
 ### Architectural Subsystem Breakdown
@@ -764,7 +764,7 @@ flowchart TB
    - **Autonomous ReAct Agent & Visual Cursor**: Multi-step reasoning loop with live DOM tree inspection and an animated virtual glowing cursor overlay (`AICursorOverlay.tsx`) for real-time visual execution tracking.
    - **Memory Vault (`aiMemory.ts`)**: Categorized persistent memory (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`) with LRU eviction and quota-safe storage management.
 
-5. **Client-Side Zero-Knowledge E2EE Sync Engine (`src/services/syncService.ts`, `src/services/syncCrypto.ts`)**:
+5. **Client-Side Client-Side Encrypted Sync Engine (`src/services/syncService.ts`, `src/services/syncCrypto.ts`)**:
    - **Client-Side Cryptography**: Passwords, bookmarks, history, and workspace configurations are encrypted locally using PBKDF2 (600,000 iterations) with cryptographic salt and 256-bit AES-GCM before transmission.
    - **Realtime Encrypted Sync**: Synchronizes client-encrypted vaults across devices over Supabase Realtime WebSockets without centralized plaintext storage. Remote property injection protections ensure settings deserialization cannot tamper with Object prototypes.
 
@@ -808,7 +808,7 @@ flowchart TB
 - [x] On-Device Whisper Voice Navigation & Speech Recognition
 - [x] Modern UI with Vertical Tabs & Workspaces
 - [x] Native MCP Autonomous AI Agent Protocol (26 Built-in Tools) & Virtual Glowing Cursor
-- [x] Zero-Knowledge Encrypted Cloud Sync (AES-256-GCM via King Cloud)
+- [x] Client-Side Encrypted Cloud Sync (AES-256-GCM via King Cloud)
 - [x] Direct Chrome Web Store 1-Click Extension Installation
 - [x] Built-in Privacy Shield (AdBlock & Tracker Protection)
 - [x] Dual-View Split Screen with Drag-to-Resize Divider
@@ -823,7 +823,7 @@ flowchart TB
 
 ## Security & Privacy Commitment
 
-- **Zero-Knowledge Architecture**: Encryption keys never leave your device. All passwords and confidential sync data are encrypted client-side with 256-bit AES-GCM and PBKDF2 (600,000 iterations).
+- **Client-Side Encryption (not zero-knowledge)**: Sync data is encrypted on your device with 256-bit AES-GCM before upload, and the vault key itself is never uploaded. However, the vault key is derived from your King Cloud account password with PBKDF2 (600,000 iterations), and that same password is sent to the sync provider (Supabase) to sign in. A provider that is malicious or compromised, and captures your password, could derive the key and decrypt your vault. A separate passphrase that never leaves the device is not implemented. Use a strong, unique password.
 - **Strict Context Isolation & Sandboxing**: Renderer code has no direct access to Node.js APIs or disk. Every IPC event enforces `isTrustedSender` frame verification.
 - **Atomic File Descriptors**: File operations on crash logs, bookmarks, and caching avoid path-based TOCTOU checks, utilizing atomic descriptor calls.
 - **Zero Telemetry & Tracking**: We do not collect, store, or monetize your browsing history. No analytics, error telemetry, or tracking beacons are bundled. (Transparent disclosure: direct network connections occur only when explicitly using specific features, such as opt-in Supabase sync, downloading local model weights from HuggingFace, fetching wallpapers from Unsplash/Bing, or page translation via Google Translate).
