@@ -122,6 +122,7 @@ import './mcp_client_config.test';
 import './mcp_streamable_http.test';
 import './ai_agent_lazy_load.test';
 import './mcp_server_transports.test';
+import './mcp_rate_limit_auth.test';
 import './mcp_tool_catalog.test';
 import './mcp_tool_schemas.test';
 import './element_refs.test';
@@ -145,6 +146,10 @@ import './agent_control_panel.test';
 // Static guards: every IPC handler under electron/, the shipped CSP, agent skills.
 import './ipc_sender_guard_coverage.test';
 import './csp_parity.test';
+import './fallback_crypto_shared.test';
+import './runall_registration.test';
+import './popup_and_guest_event_hardening.test';
+import './webview_partition_hardening_failure.test';
 import './linux_sandbox_fallback.test';
 import './agent_skills_integrity.test';
 import './agent_instructions_consistency.test';

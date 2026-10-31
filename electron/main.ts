@@ -16,7 +16,7 @@ import { once } from 'events';
 import fs from 'fs';
 import createDOMPurify from 'dompurify';
 import { checkPhishingDomain, matchesExtensionHostPermission } from '../src/utils/securityUtils.js';
-import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity';
+import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback, isWeakSafeStorageBackend } from './main/proxySecurity';
 export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt };
 export { isSafeSubframeNavigation } from './main/windowOpenPolicy';
 export { isExtensionAllowedInIncognito } from './main/incognitoExtensions';
@@ -1505,6 +1505,10 @@ function cleanStaleUpdateArtifacts(): void {
 
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
+  if (isWeakSafeStorageBackend(safeStorage)) {
+    // Linux without a keyring: safeStorage reports itself available but protects nothing.
+    console.warn('[Security] safeStorage is using the basic_text backend (no OS keyring). Stored secrets are only obfuscated on this system.');
+  }
   loadExtensionDiagnostics();
   await loadPersistentExtensions();
   createWindow();
@@ -2238,392 +2242,7 @@ app.whenReady().then(async () => {
     releaseName?: string;
     publishedAt?: string;
   } | null = null;
-  const downloadedUpdateFilePath: string | null = null;
   let isDownloadingUpdate = false;
-
-  async function performSelfUpdateAndRelaunch(filePath: string): Promise<{ success: boolean; error?: string }> {
-    const platform = process.platform;
-    const currentPid = process.pid;
-
-    const resolvedFilePath = path.resolve(filePath);
-    if (!fs.existsSync(resolvedFilePath)) {
-      return { success: false, error: 'Update package does not exist on disk' };
-    }
-
-    console.log('[Updater] Starting self-update and relaunch with package:', resolvedFilePath);
-    updateInstallInProgress = true;
-    markQuitting();
-
-    if (mcpServer && mcpServer.isRunning()) {
-      try { mcpServer.stop(); } catch (_) {}
-    }
-
-    // 1. macOS (darwin)
-    if (platform === 'darwin') {
-      const isDmg = resolvedFilePath.toLowerCase().endsWith('.dmg');
-      const isZip = resolvedFilePath.toLowerCase().endsWith('.zip');
-
-      if (isDmg || isZip) {
-        let destinationApp = '/Applications/King Browser.app';
-        try {
-          const exePath = app.getPath('exe');
-          const appMatch = exePath.match(/^(.*?\.app)\/Contents\/MacOS\//);
-          if (appMatch && appMatch[1]) {
-            destinationApp = appMatch[1];
-          }
-        } catch (_) {}
-
-        const backupToken = crypto.randomBytes(16).toString('hex');
-        const tempDir = path.join(app.getPath('temp'), `king_update_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`);
-        fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
-        if (process.platform !== 'win32') {
-          try { fs.chmodSync(tempDir, 0o700); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
-        }
-        const scriptPath = path.join(tempDir, 'update_and_relaunch.sh');
-
-        let scriptBody = '';
-        if (isDmg) {
-          const mountPoint = path.join(tempDir, 'mount');
-          fs.mkdirSync(mountPoint, { recursive: true, mode: 0o700 });
-          scriptBody = `#!/bin/bash
-FILE_PATH="$1"
-DEST_APP="$2"
-TARGET_PID="$3"
-TEMP_DIR="$4"
-BACKUP_TOKEN="$5"
-DEST_PARENT="$(dirname "\${DEST_APP}")"
-MOUNT_POINT="\${TEMP_DIR}/mount"
-STAGING_DIR="\${TEMP_DIR}/staging"
-STAGING_APP="\${STAGING_DIR}/King Browser.app"
-BACKUP_APP="\${DEST_PARENT}/.king_backup_\${BACKUP_TOKEN}"
-
-cleanup_mount() {
-  hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
-  rm -rf "\${TEMP_DIR}" 2>/dev/null
-}
-
-mkdir -p "\${STAGING_DIR}" 2>/dev/null
-
-hdiutil attach "\${FILE_PATH}" -mountpoint "\${MOUNT_POINT}" -nobrowse -quiet -noautoopen
-SOURCE_APP=$(find "\${MOUNT_POINT}" -maxdepth 2 -name "*.app" | head -n 1)
-if [ -z "$SOURCE_APP" ]; then
-  cleanup_mount
-  open "\${FILE_PATH}"
-  exit 1
-fi
-
-# Bundle integrity & signature verification
-if [ ! -f "$SOURCE_APP/Contents/Info.plist" ] || [ ! -d "$SOURCE_APP/Contents/MacOS" ]; then
-  cleanup_mount
-  open "\${FILE_PATH}"
-  exit 1
-fi
-
-# Stage app cleanly inside isolated temp directory (never in /Applications)
-rm -rf "\${STAGING_APP}" 2>/dev/null
-if ! ditto "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null; then
-  cleanup_mount
-  open "\${FILE_PATH}"
-  exit 1
-fi
-
-if [ ! -f "\${STAGING_APP}/Contents/Info.plist" ] || [ ! -d "\${STAGING_APP}/Contents/MacOS" ]; then
-  cleanup_mount
-  open "\${FILE_PATH}"
-  exit 1
-fi
-
-if command -v codesign >/dev/null 2>&1; then
-  if ! codesign -v --deep "\${STAGING_APP}" 2>/dev/null; then
-    cleanup_mount
-    exit 1
-  fi
-fi
-
-while kill -0 "\${TARGET_PID}" 2>/dev/null; do
-  sleep 0.3
-done
-
-# Atomically backup old app to hidden directory without .app extension so LaunchServices ignores it
-if [ -d "\${DEST_APP}" ]; then
-  mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
-fi
-
-if ditto "\${STAGING_APP}" "\${DEST_APP}" 2>/dev/null && [ -f "\${DEST_APP}/Contents/Info.plist" ]; then
-  rm -rf "\${BACKUP_APP}" 2>/dev/null
-  rm -f "\${FILE_PATH}" 2>/dev/null
-  cleanup_mount
-  LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-  if [ -x "$LSREGISTER" ]; then
-    "$LSREGISTER" -f "\${DEST_APP}" 2>/dev/null
-  fi
-  open -a "\${DEST_APP}"
-else
-  rm -rf "\${DEST_APP}" 2>/dev/null
-  if [ -d "\${BACKUP_APP}" ]; then
-    mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
-  fi
-  cleanup_mount
-  open "\${FILE_PATH}"
-fi
-`;
-        } else {
-          const extractDir = path.join(tempDir, 'extracted');
-          fs.mkdirSync(extractDir, { recursive: true, mode: 0o700 });
-          scriptBody = `#!/bin/bash
-FILE_PATH="$1"
-DEST_APP="$2"
-TARGET_PID="$3"
-TEMP_DIR="$4"
-BACKUP_TOKEN="$5"
-DEST_PARENT="$(dirname "\${DEST_APP}")"
-EXTRACT_DIR="\${TEMP_DIR}/extracted"
-BACKUP_APP="\${DEST_PARENT}/.king_backup_\${BACKUP_TOKEN}"
-
-ditto -xk "\${FILE_PATH}" "\${EXTRACT_DIR}"
-SOURCE_APP=$(find "\${EXTRACT_DIR}" -maxdepth 2 -name "*.app" | head -n 1)
-if [ -z "$SOURCE_APP" ]; then
-  rm -rf "\${TEMP_DIR}" 2>/dev/null
-  exit 1
-fi
-
-# Bundle integrity & signature verification
-if [ ! -f "$SOURCE_APP/Contents/Info.plist" ] || [ ! -d "$SOURCE_APP/Contents/MacOS" ]; then
-  rm -rf "\${TEMP_DIR}" 2>/dev/null
-  exit 1
-fi
-if command -v codesign >/dev/null 2>&1; then
-  if ! codesign -v --deep "$SOURCE_APP" 2>/dev/null; then
-    rm -rf "\${TEMP_DIR}" 2>/dev/null
-    exit 1
-  fi
-fi
-
-while kill -0 "\${TARGET_PID}" 2>/dev/null; do
-  sleep 0.3
-done
-
-# Atomically backup old app to hidden directory without .app extension so LaunchServices ignores it
-if [ -d "\${DEST_APP}" ]; then
-  mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
-fi
-
-if ditto "$SOURCE_APP" "\${DEST_APP}" 2>/dev/null && [ -f "\${DEST_APP}/Contents/Info.plist" ]; then
-  rm -rf "\${BACKUP_APP}" 2>/dev/null
-  rm -f "\${FILE_PATH}" 2>/dev/null
-  rm -rf "\${TEMP_DIR}" 2>/dev/null
-  LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-  if [ -x "$LSREGISTER" ]; then
-    "$LSREGISTER" -f "\${DEST_APP}" 2>/dev/null
-  fi
-  open -a "\${DEST_APP}"
-else
-  rm -rf "\${DEST_APP}" 2>/dev/null
-  if [ -d "\${BACKUP_APP}" ]; then
-    mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
-  fi
-  rm -rf "\${TEMP_DIR}" 2>/dev/null
-  open "\${DEST_APP}" 2>/dev/null || open -a "King Browser"
-fi
-`;
-        }
-
-        try {
-          fs.writeFileSync(scriptPath, scriptBody, { mode: 0o755 });
-          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, destinationApp, String(currentPid), tempDir, backupToken], {
-            detached: true,
-            stdio: 'ignore'
-          });
-          runner.unref();
-
-          const allWindows = BrowserWindow.getAllWindows();
-          for (const win of allWindows) {
-            try { win.destroy(); } catch (_) {}
-          }
-          setTimeout(() => {
-            try { app.quit(); } catch (_) { app.exit(0); }
-          }, 300);
-
-          return { success: true };
-        } catch (scriptErr: any) {
-          console.warn('[Updater] Failed to launch bash updater script:', scriptErr);
-        }
-      }
-    }
-
-    // 2. Windows (win32)
-    if (platform === 'win32') {
-      if (resolvedFilePath.toLowerCase().endsWith('.exe')) {
-        const tempDir = app.getPath('temp');
-        const randomSuffix = crypto.randomBytes(8).toString('hex');
-        const updateDir = path.join(tempDir, `king_update_${Date.now()}_${randomSuffix}`);
-        fs.mkdirSync(updateDir, { recursive: true });
-        const batPath = path.join(updateDir, 'update.bat');
-        const destinationExe = app.getPath('exe');
-        // The batch reads its arguments from the environment (FILE_PATH /
-        // TARGET_PID / DEST_EXE) instead of %~1..%~3. `cmd` re-parses the whole
-        // string after /c with its own quote rules: with a username containing a
-        // space the OS temp path gets quoted, and because the command line then
-        // holds more than two quote characters cmd falls back to "strip the first
-        // quote, drop the last quote" — truncating the batch path. The batch never
-        // runs, yet `cmd.exe` itself started, so the caller still calls app.quit()
-        // and the browser disappears with no relaunch and no error. The
-        // environment is not parsed by cmd's command-line rules, so paths with
-        // spaces, quotes or metacharacters survive intact.
-        // `setlocal` below must therefore stay plain: enabling delayed expansion
-        // makes cmd expand every `!` in the inherited environment as it parses,
-        // so an install path containing one (C:\Users\Bob!\...) is silently
-        // mangled in %FILE_PATH% / %DEST_EXE% — the installer is not found, not
-        // deleted and the app does not relaunch, i.e. the same "browser
-        // disappears" symptom the env-variable change fixed, for a different
-        // username. No `!`-delayed read exists in the script to justify it.
-        const batContent = `@echo off
-rem Delayed expansion MUST stay disabled: with it enabled cmd consumes every
-rem "!" in the inherited environment while parsing, so an install path holding
-rem one (C:\\Users\\Bob!\\...) is silently mangled in %FILE_PATH% / %DEST_EXE%.
-rem Nothing in this script reads a "!"-delayed variable, so keep it off.
-setlocal
-set "UPDATE_DIR=%~dp0"
-
-:wait_loop
-if not "%TARGET_PID%"=="" (
-  tasklist /FI "PID eq %TARGET_PID%" 2>nul | findstr /i "%TARGET_PID%" >nul
-  if not errorlevel 1 (
-    ping 127.0.0.1 -n 2 >nul 2>&1
-    goto wait_loop
-  )
-)
-
-start /wait "" "%FILE_PATH%" /S
-del /f /q "%FILE_PATH%" 2>nul
-
-if not "%DEST_EXE%"=="" (
-  if exist "%DEST_EXE%" (
-    start "" "%DEST_EXE%"
-  ) else (
-    start "" "%LOCALAPPDATA%\\Programs\\King Browser\\King Browser.exe" 2>nul
-  )
-)
-
-cd /d "%TEMP%"
-rmdir /s /q "%UPDATE_DIR%" 2>nul
-exit
-`;
-        try {
-          fs.writeFileSync(batPath, batContent);
-          // Only the batch path is passed on the command line. A single argv entry
-          // makes libuv quote it as one token, so cmd's "exactly two quotes" rule
-          // preserves the path verbatim even when it contains spaces; every
-          // payload that used to travel as an argument now travels in the env.
-          const runner = child_process.spawn('cmd.exe', ['/c', batPath], {
-            detached: true,
-            stdio: 'ignore',
-            env: { ...process.env, FILE_PATH: resolvedFilePath, TARGET_PID: String(currentPid), DEST_EXE: destinationExe }
-          });
-          runner.unref();
-
-          const allWindows = BrowserWindow.getAllWindows();
-          for (const win of allWindows) {
-            try { win.destroy(); } catch (_) {}
-          }
-          setTimeout(() => {
-            try { app.quit(); } catch (_) { app.exit(0); }
-          }, 300);
-
-          return { success: true };
-        } catch (batErr: any) {
-          console.warn('[Updater] Failed to run bat installer:', batErr);
-        }
-      }
-    }
-
-    // 3. Linux
-    if (platform === 'linux') {
-      const isAppImage = resolvedFilePath.toLowerCase().endsWith('.appimage');
-      const isDeb = resolvedFilePath.toLowerCase().endsWith('.deb');
-
-      if (isAppImage) {
-        try {
-          fs.chmodSync(resolvedFilePath, 0o755);
-          const currentAppImage = process.env.APPIMAGE || '';
-          const tempDir = path.join(app.getPath('temp'), `king_update_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`);
-          fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
-          try { fs.chmodSync(tempDir, 0o700); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
-          const scriptPath = path.join(tempDir, 'update_and_relaunch.sh');
-          const scriptContent = `#!/bin/bash
-FILE_PATH="$1"
-TARGET_PID="$2"
-TEMP_DIR="$3"
-CURRENT_APPIMAGE="$4"
-
-while kill -0 "\${TARGET_PID}" 2>/dev/null; do
-  sleep 0.3
-done
-
-chmod +x "\${FILE_PATH}" 2>/dev/null
-
-if [ -n "\${CURRENT_APPIMAGE}" ] && [ -f "\${CURRENT_APPIMAGE}" ]; then
-  BACKUP_APPIMAGE="\${CURRENT_APPIMAGE}.old"
-  mv "\${CURRENT_APPIMAGE}" "\${BACKUP_APPIMAGE}" 2>/dev/null
-  if cp "\${FILE_PATH}" "\${CURRENT_APPIMAGE}" 2>/dev/null || mv "\${FILE_PATH}" "\${CURRENT_APPIMAGE}" 2>/dev/null; then
-    chmod +x "\${CURRENT_APPIMAGE}" 2>/dev/null
-    rm -f "\${BACKUP_APPIMAGE}" 2>/dev/null
-    rm -rf "\${TEMP_DIR}" 2>/dev/null
-    "\${CURRENT_APPIMAGE}" &
-  else
-    if [ -f "\${BACKUP_APPIMAGE}" ]; then
-      mv "\${BACKUP_APPIMAGE}" "\${CURRENT_APPIMAGE}" 2>/dev/null
-    fi
-    rm -rf "\${TEMP_DIR}" 2>/dev/null
-    "\${CURRENT_APPIMAGE}" &
-  fi
-else
-  TARGET_RUN="\${FILE_PATH}"
-  "\${TARGET_RUN}" &
-fi
-`;
-          fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
-          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, String(currentPid), tempDir, currentAppImage], {
-            detached: true,
-            stdio: 'ignore'
-          });
-          runner.unref();
-
-          const allWindows = BrowserWindow.getAllWindows();
-          for (const win of allWindows) {
-            try { win.destroy(); } catch (_) {}
-          }
-          setTimeout(() => {
-            try { app.quit(); } catch (_) { app.exit(0); }
-          }, 300);
-
-          return { success: true };
-        } catch (linuxErr) {
-          console.warn('[Updater] Failed to launch Linux updater script:', linuxErr);
-        }
-      } else if (isDeb) {
-        try {
-          shell.openPath(resolvedFilePath);
-          setTimeout(() => {
-            try { app.quit(); } catch (_) { app.exit(0); }
-          }, 1000);
-          return { success: true };
-        } catch (debErr) {
-          console.warn('[Updater] Failed to open Linux .deb package:', debErr);
-        }
-      }
-    }
-
-    // Fallback: show item, open with default handler and exit
-    try {
-      shell.showItemInFolder(resolvedFilePath);
-    } catch (_) {}
-    const openRes = await shell.openPath(resolvedFilePath);
-    setTimeout(() => {
-      try { app.quit(); } catch (_) { app.exit(0); }
-    }, 1200);
-    return { success: !openRes, error: openRes || undefined };
-  }
 
   type UpdateCheckResult = { success: boolean; version?: string; isAvailable?: boolean; error?: string };
   // In-flight update check, mirroring the isDownloadingUpdate lock lifecycle
@@ -2937,10 +2556,6 @@ fi
     try {
       updateInstallInProgress = true;
       markQuitting();
-      if (downloadedUpdateFilePath && fs.existsSync(downloadedUpdateFilePath)) {
-        return await performSelfUpdateAndRelaunch(downloadedUpdateFilePath);
-      }
-
       if (mcpServer && mcpServer.isRunning()) {
         try { mcpServer.stop(); } catch (_) {}
       }
@@ -3359,7 +2974,12 @@ app.on('web-contents-created', (_event, contents) => {
         return;
       }
       if (part.startsWith('incognito-') || part === AGENT_PERSIST_PARTITION) {
-        hardenIncognitoPartition(part);
+        if (!hardenIncognitoPartition(part)) {
+          // Fail closed: an unhardened session has no permission handlers.
+          console.warn(`[Security] Blocked webview attach: could not harden partition ${part}`);
+          event.preventDefault();
+          return;
+        }
       }
     }
 
@@ -3473,6 +3093,22 @@ app.on('web-contents-created', (_event, contents) => {
         return;
       }
       child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      // Same navigation policy as webviews: web schemes only, no credentials in
+      // the URL, and no known phishing host, for both direct and redirected loads.
+      const guardPopupNavigation = (event: { preventDefault: () => void }, destUrl: string) => {
+        if (!isSafeSubframeNavigation(destUrl)) {
+          event.preventDefault();
+          console.warn('[Security] Blocked sign-in popup navigation to a forbidden URL:', destUrl.slice(0, 200));
+          return;
+        }
+        if (checkPhishingDomain(destUrl)) {
+          event.preventDefault();
+          console.warn('[Security] Blocked sign-in popup navigation to a phishing domain:', destUrl.slice(0, 200));
+          if (!child.isDestroyed()) child.destroy();
+        }
+      };
+      child.webContents.on('will-navigate', (event, destUrl) => guardPopupNavigation(event, destUrl));
+      child.webContents.on('will-redirect', (event, destUrl) => guardPopupNavigation(event, destUrl));
     } catch (err) {
       console.error('[Security] Failed to harden a sign-in popup:', err);
     }
@@ -3915,12 +3551,6 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
   ]);
 
   return results;
-});
-
-// Legacy alias for compatibility
-ipcMain.handle('fetch-unsplash-photos', async (event, query: string) => {
-  if (!isTrustedSender(event)) return [];
-  return [];
 });
 
 // Set theme source for dark mode rendering on pages
@@ -4750,33 +4380,9 @@ ipcMain.handle('purge-system-memory', async (event) => {
   }
 });
 
-// Password Manager: save-password channel (fire-and-forget, validated with isTrustedSender)
-ipcMain.on('save-password', (event, data: { hostname: string; username: string; password: string }) => {
-  if (!isTrustedSender(event)) return;
-  if (!data || typeof data !== 'object') return;
-  const { hostname, username, password } = data;
-  if (typeof hostname !== 'string' || typeof username !== 'string' || typeof password !== 'string') return;
-  const cleanUser = username.trim();
-  let cleanHost = hostname.trim().toLowerCase();
-  try {
-    if (cleanHost.includes('://')) {
-      cleanHost = new URL(cleanHost).hostname.toLowerCase();
-    } else {
-      cleanHost = new URL(`https://${cleanHost}`).hostname.toLowerCase();
-    }
-  } catch {
-    cleanHost = cleanHost.replace(/:\d+$/, '').replace(/\.+$/, '');
-  }
-  if (!cleanHost || !cleanUser || !password) return;
-  // Emit event to the main window to trigger password prompt
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('password-form-submitted', { hostname: cleanHost, username: cleanUser, password });
-  }
-});
-
 // Generic Secure Storage API (for future password manager, etc.)
 // Mutex: serialize concurrent secure-store operations to prevent read-modify-write races
-// when multiple tabs call save-password / secure-store-set simultaneously.
+// when multiple tabs call secure-store-set simultaneously.
 let secureStoreMutexChain: Promise<unknown> = Promise.resolve();
 function withSecureStoreMutex<T>(fn: () => Promise<T>): Promise<T> {
   const next = secureStoreMutexChain.then(fn, fn) as Promise<T>;
@@ -4814,38 +4420,8 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
         try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
       } else {
         console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
-        const getFallbackKey = (): Buffer => {
-          const secretPath = path.join(app.getPath('userData'), '.machine_secret');
-          let secret: Buffer;
-          try {
-            secret = fs.readFileSync(secretPath);
-            if (secret.length !== 32) {
-              throw new Error(
-                `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
-                'Values encrypted with it cannot be recovered; restore a backup or clear secure storage.'
-              );
-            }
-          } catch (err: any) {
-            if (err?.code === 'ENOENT') {
-              secret = crypto.randomBytes(32);
-              fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-              if (process.platform !== 'win32') {
-                try { fs.chmodSync(secretPath, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
-              }
-            } else {
-              throw err;
-            }
-          }
-          // K-3: Bind salt to machine identity so copying userData to another machine/account fails
-          const machineSalt = getMachineSalt('nova-secure-salt');
-          return crypto.scryptSync(secret, machineSalt, 32);
-        };
-        const keyBuf = getFallbackKey();
-        const iv = crypto.randomBytes(12);
-        const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv);
-        const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-        const tag = cipher.getAuthTag();
-        const payload = Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
+        // K-3: the shared fallback binds the salt to machine identity so copying userData to another machine/account fails
+        const payload = encryptDataWithFallback(value, app.getPath('userData'));
         // Same reasoning as the safeStorage branch above: O_TRUNC in place turns a
         // crash mid-write into unreadable ciphertext that then reads as null.
         const nencTmp = `${keyPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
@@ -4884,23 +4460,9 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
           return safeStorage.decryptString(raw);
         } catch (_) {}
       }
-      // Check for fallback AES-256-GCM format
-      if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
-        try {
-          const secretPath = path.join(app.getPath('userData'), '.machine_secret');
-          if (fs.existsSync(secretPath)) {
-            const secret = fs.readFileSync(secretPath);
-            const machineSalt = getMachineSalt('nova-secure-salt');
-            const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
-            const iv = raw.subarray(4, 16);
-            const tag = raw.subarray(16, 32);
-            const enc = raw.subarray(32);
-            const decipher = crypto.createDecipheriv('aes-256-gcm', keyBuf, iv);
-            decipher.setAuthTag(tag);
-            return decipher.update(enc) + decipher.final('utf8');
-          }
-        } catch (_) {}
-      }
+      // Fallback AES-256-GCM format (NENC), same shared implementation as the writer
+      const fallbackPlain = decryptDataWithFallback(raw, app.getPath('userData'));
+      if (fallbackPlain !== null) return fallbackPlain;
       // K-4: Fail closed: do NOT read unauthenticated plaintext
       return null;
     } catch {

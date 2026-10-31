@@ -97,7 +97,7 @@ for (const [channel, rule] of Object.entries(DELEGATED)) {
   assert.match(moduleSource, rule.check, `${channel}: ${rule.why}`);
 }
 
-assert.ok(handlerCount >= 90, `expected the full IPC surface to be scanned, found only ${handlerCount} handlers`);
+assert.ok(handlerCount >= 88, `expected the full IPC surface to be scanned, found only ${handlerCount} handlers`);
 assert.deepEqual(
   allFindings.map((f) => `${f.file}:${f.line} ${f.channel} - ${f.reason}`),
   [],

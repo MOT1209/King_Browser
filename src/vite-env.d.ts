@@ -215,7 +215,6 @@ export interface ElectronAPI {
   setGoogleSigninCompat: (enabled: boolean) => Promise<boolean>;
   getSuggestions: (query: string, engine?: string, locale?: string) => Promise<string[]>;
   fetchWallpaperPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;
-  fetchUnsplashPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;
   fetchPageHtml: (url: string) => Promise<{ success: boolean; html?: string; error?: string }>;
   captureFullPage: (webContentsId: number) => Promise<string | null>;
   // Translation
@@ -321,7 +320,6 @@ export interface ElectronAPI {
   modelCacheGet: (url: string) => Promise<ArrayBuffer | null>;
   modelCacheSet: (url: string, data: ArrayBuffer | ArrayBufferView) => Promise<boolean>;
   // Password manager: fire-and-forget send channel (not invoke)
-  savePassword: (data: { hostname: string; username: string; password: string }) => void;
   storeSet: (key: string, value: string) => Promise<boolean | { error: string }>;
   storeGet: (key: string) => Promise<string | null>;
   showConfirmDialog: (options: {

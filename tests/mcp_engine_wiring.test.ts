@@ -39,6 +39,7 @@ async function run() {
   const mcpContentModule = loadSource('electron/main/mcpContent.ts', {}, {});
   const mcpProtocolModule = loadSource('electron/main/mcpProtocol.ts', {}, { './mcpContent.js': mcpContentModule });
   const mcpStreamableHttpModule = loadSource('electron/main/mcpStreamableHttp.ts', {}, { 'node:crypto': crypto, './mcpProtocol.js': mcpProtocolModule });
+  const proxySecurityModule = loadSource('electron/main/proxySecurity.ts', { Buffer, URL, process }, { crypto, os, fs, path });
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
@@ -92,6 +93,7 @@ async function run() {
     './main/mcpContent.js': mcpContentModule,
     './main/mcpProtocol.js': mcpProtocolModule,
     './main/mcpStreamableHttp.js': mcpStreamableHttpModule,
+    './main/proxySecurity.js': proxySecurityModule,
     './main/approvalMode.js': approvalModeModule,
     './main/recordings.js': recordingsModule,
     './main/activityStore.js': { createActivityStore: () => ({ append() {}, readAll: () => [] }) }
