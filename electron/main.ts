@@ -9,6 +9,11 @@ import { openPageSourceViewer as createPageSourceViewer } from './windows/source
 import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
 import { buildPhishingBlockScript } from './main/phishingBlockPage';
 import { isAllowedWebviewPartition, evaluateWebviewSrc } from './main/webviewPolicy';
+import {
+  PERMISSION_TTL_MS, permissionKeys, permissionOriginFor, rememberedDecision,
+  parseRememberedPermissions, writeRememberedPermissions, purgeExpiredPermissions,
+  type PermissionDecisions
+} from './main/permissionStore';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import http from 'http';
@@ -1575,78 +1580,22 @@ app.whenReady().then(async () => {
 
   const MAX_PENDING_PERMISSIONS = 20;
   const pendingPermissions = new Map<string, PendingPermission>();
-  // Origin -> (Permission -> { allow, ts }) — TTL: 30 days
-  const PERMISSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-  const rememberedPermissions = new Map<string, Map<string, { allow: boolean; ts: number }>>();
+  // Origin -> (Permission -> { allow, ts }); answers live PERMISSION_TTL_MS (permissionStore.ts)
+  const rememberedPermissions: PermissionDecisions = new Map();
   // Origin -> Rate limit record (max 5 requests per 10s)
   const permissionRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
   const PERMISSIONS_FILE = path.join(app.getPath('userData'), 'remembered_permissions.json');
 
-  // Camera and microphone are separate capabilities. Old `media` records do
-  // not identify what was approved and deliberately require a fresh prompt.
-  function permissionKeys(permission: string, mediaTypes?: unknown): string[] | null {
-    if (permission !== 'media') return [permission];
-    if (!Array.isArray(mediaTypes) || mediaTypes.length === 0 ||
-        mediaTypes.some(type => type !== 'audio' && type !== 'video')) return null;
-    return [...new Set(mediaTypes as string[])].map(type => `media:${type}`);
-  }
-
   function permissionOrigin(url: string): string {
-    if (isTrustedAppOrigin(url)) return 'app';
-    try {
-      const parsed = new URL(url);
-      if (parsed.username || parsed.password) return '';
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.origin;
-      // WHATWG URL.origin serializes every extension as "null". Keep each
-      // installed extension's identity separate; opaque origins get no grants.
-      if (parsed.protocol === 'chrome-extension:' && /^[a-p]{32}$/.test(parsed.hostname)) {
-        return `chrome-extension://${parsed.hostname}`;
-      }
-    } catch (_) {}
-    return '';
-  }
-
-  function rememberedDecision(
-    decisions: typeof rememberedPermissions, origin: string, keys: string[]
-  ): boolean | undefined {
-    const entries = decisions.get(origin);
-    if (!entries) return undefined;
-    const now = Date.now();
-    const values = keys.map(key => {
-      const entry = entries.get(key);
-      if (!entry) return undefined;
-      if (!Number.isFinite(entry.ts) || entry.ts > now || now - entry.ts >= PERMISSION_TTL_MS) {
-        entries.delete(key);
-        return undefined;
-      }
-      return entry.allow;
-    });
-    if (entries.size === 0) decisions.delete(origin);
-    if (values.some(value => value === false)) return false;
-    return values.every(value => value === true) ? true : undefined;
+    return permissionOriginFor(url, isTrustedAppOrigin);
   }
 
   function loadRememberedPermissionsFromDisk(): void {
     try {
       if (fs.existsSync(PERMISSIONS_FILE)) {
-        const raw = fs.readFileSync(PERMISSIONS_FILE, 'utf8');
-        const data = JSON.parse(raw);
-        if (data && typeof data === 'object') {
-          const cutoff = Date.now() - PERMISSION_TTL_MS;
-          for (const [origin, perms] of Object.entries(data)) {
-            if (typeof origin === 'string' && perms && typeof perms === 'object') {
-              const permMap = new Map<string, { allow: boolean; ts: number }>();
-              for (const [perm, entry] of Object.entries(perms as Record<string, any>)) {
-                if (entry && typeof entry.allow === 'boolean' && typeof entry.ts === 'number' && entry.ts >= cutoff) {
-                  permMap.set(perm, { allow: entry.allow, ts: entry.ts });
-                }
-              }
-              if (permMap.size > 0) {
-                rememberedPermissions.set(origin, permMap);
-              }
-            }
-          }
+        for (const [origin, perms] of parseRememberedPermissions(fs.readFileSync(PERMISSIONS_FILE, 'utf8'))) {
+          rememberedPermissions.set(origin, perms);
         }
       }
     } catch (err) {
@@ -1656,31 +1605,7 @@ app.whenReady().then(async () => {
 
   function saveRememberedPermissionsToDisk(): void {
     try {
-      const obj: Record<string, Record<string, { allow: boolean; ts: number }>> = {};
-      for (const [origin, perms] of rememberedPermissions.entries()) {
-        obj[origin] = {};
-        for (const [perm, entry] of perms.entries()) {
-          obj[origin][perm] = entry;
-        }
-      }
-      // Write to a sibling temp file, then rename. A crash or ENOSPC mid-write
-      // used to leave a truncated PERMISSIONS_FILE: the next JSON.parse throws,
-      // the load catch swallows it, and every remembered permission decision is
-      // silently forgotten (users get re-prompted for mic/camera/geolocation).
-      // rename is atomic on the same volume, so the file holds either the old
-      // contents or the new ones, never a half-written prefix. The mode is forced
-      // because writeFileSync's `mode` only applies when it CREATES the file — and
-      // this file enumerates which origins were granted camera/microphone/
-      // geolocation, so it must never be left world-readable.
-      const tmpFile = PERMISSIONS_FILE + '.tmp';
-      try {
-        fs.writeFileSync(tmpFile, JSON.stringify(obj, null, 2), { encoding: 'utf8', mode: 0o600 });
-        try { fs.chmodSync(tmpFile, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
-        fs.renameSync(tmpFile, PERMISSIONS_FILE);
-      } catch (writeErr) {
-        try { fs.unlinkSync(tmpFile); } catch (_) {}
-        throw writeErr;
-      }
+      writeRememberedPermissions(PERMISSIONS_FILE, rememberedPermissions);
     } catch (err) {
       console.warn('[Permissions] Failed to save permissions to disk:', err);
     }
@@ -1690,13 +1615,7 @@ app.whenReady().then(async () => {
 
   /** Purge all remembered permission entries older than PERMISSION_TTL_MS. */
   function purgeExpiredRememberedPermissions(): void {
-    const cutoff = Date.now() - PERMISSION_TTL_MS;
-    for (const [origin, perms] of rememberedPermissions) {
-      for (const [perm, entry] of perms) {
-        if (entry.ts < cutoff) perms.delete(perm);
-      }
-      if (perms.size === 0) rememberedPermissions.delete(origin);
-    }
+    purgeExpiredPermissions(rememberedPermissions);
   }
 
   ipcMain.handle('permission-response', async (_event, payload: unknown) => {

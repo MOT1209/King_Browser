@@ -7,6 +7,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { encryptDataWithFallback, decryptDataWithFallback } from '../electron/main/proxySecurity';
 import { isStorageAccessPermission } from '../electron/main/windowOpenPolicy';
+import * as permissionStore from '../electron/main/permissionStore';
 
 // Execute the actual main-process permission handlers, not a duplicate policy.
 const source = fs.readFileSync(path.resolve('electron/main.ts'), 'utf8');
@@ -18,6 +19,8 @@ const timers = new Set<ReturnType<typeof setTimeout>>();
 const defaultSession: any = {};
 const context: any = {
   fs, path, crypto, URL, Map, Set, Date, console, process,
+  // The block under test calls the real extracted rules, not copies.
+  ...permissionStore,
   app: { getPath: () => userData },
   session: { defaultSession },
   ipcMain: { handle: (name: string, fn: Function) => handlers.set(name, fn) },
