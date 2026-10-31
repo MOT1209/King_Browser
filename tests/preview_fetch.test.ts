@@ -133,12 +133,13 @@ async function run() {
           return { url: new URL(u), pinnedIp: '93.184.216.34' };
         },
         fetch: async (u: string, init: any) => { calls.push({ url: u, agent: init.agent, redirect: init.redirect }); return script.shift()!; },
-        sanitize: (html: string) => html.replace(/<script[\s\S]*?<\/script>/gi, '')
+        // Stand-in for DOMPurify: it only has to show that the output goes through the injected sanitiser (it removes a marker, not HTML).
+        sanitize: (html: string) => html.split('[[unsafe]]').join('')
       }
     };
   };
 
-  const good = makeDeps([respond({ text: '<p>hi</p><script>evil()</script>' })]);
+  const good = makeDeps([respond({ text: '<p>hi</p>[[unsafe]]' })]);
   assert.deepEqual(await fetchPageHtml('https://example.com/', good.d), { success: true, html: '<p>hi</p>' }, 'output is sanitised');
   assert.equal(good.calls[0].redirect, 'manual', 'redirects are never followed by fetch itself');
   assert.equal(await new Promise((resolve) => good.calls[0].agent.options.lookup('example.com', {}, (_e: unknown, ip: string) => resolve(ip))), '93.184.216.34', 'the connection is pinned to the validated IP');
