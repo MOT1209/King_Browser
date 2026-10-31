@@ -64,7 +64,34 @@ export function getMachineSalt(saltContext = 'nova-secure-salt', mockUserInfoErr
  * Encrypts sensitive configuration using safeStorage (DPAPI on Windows, Keychain on macOS)
  * or falls back to an authenticated AES-256-GCM cipher bound to the machine salt.
  */
-export function encryptDataWithFallback(plainText: string, userDataPath: string, safeStorageRef?: any): Buffer {
+export interface FallbackCryptoOptions {
+  /** Four ASCII bytes that tag the blob format (default 'NENC'; the MCP token file uses 'NMCP'). */
+  magic?: string;
+  /** Context mixed into the machine-bound salt (default 'nova-secure-salt'; MCP uses 'king-mcp-salt'). */
+  saltContext?: string;
+}
+
+const DEFAULT_FALLBACK_MAGIC = 'NENC';
+const DEFAULT_FALLBACK_SALT_CONTEXT = 'nova-secure-salt';
+
+/**
+ * On Linux, Electron's safeStorage can select the `basic_text` backend when no
+ * keyring is available. isEncryptionAvailable() still returns true, but the key
+ * is hard-coded, so the "encrypted" data is only obfuscated.
+ */
+export function isWeakSafeStorageBackend(safeStorageRef?: any): boolean {
+  try {
+    return !!safeStorageRef
+      && typeof safeStorageRef.getSelectedStorageBackend === 'function'
+      && safeStorageRef.getSelectedStorageBackend() === 'basic_text';
+  } catch {
+    return false;
+  }
+}
+
+export function encryptDataWithFallback(plainText: string, userDataPath: string, safeStorageRef?: any, options: FallbackCryptoOptions = {}): Buffer {
+  const magic = options.magic ?? DEFAULT_FALLBACK_MAGIC;
+  const saltContext = options.saltContext ?? DEFAULT_FALLBACK_SALT_CONTEXT;
   if (safeStorageRef && typeof safeStorageRef.isEncryptionAvailable === 'function' && safeStorageRef.isEncryptionAvailable()) {
     try {
       return safeStorageRef.encryptString(plainText);
@@ -94,21 +121,23 @@ export function encryptDataWithFallback(plainText: string, userDataPath: string,
     }
   }
 
-  const machineSalt = getMachineSalt('nova-secure-salt');
+  const machineSalt = getMachineSalt(saltContext);
   const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv);
   const enc = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
-  return Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
+  return Buffer.concat([Buffer.from(magic, 'utf8'), iv, tag, enc]);
 }
 
 /**
  * Decrypts sensitive configuration encrypted with encryptDataWithFallback.
  * Returns null if data is corrupt or authentication fails.
  */
-export function decryptDataWithFallback(raw: Buffer, userDataPath: string, safeStorageRef?: any): string | null {
+export function decryptDataWithFallback(raw: Buffer, userDataPath: string, safeStorageRef?: any, options: FallbackCryptoOptions = {}): string | null {
   if (!raw || raw.length === 0) return null;
+  const magic = options.magic ?? DEFAULT_FALLBACK_MAGIC;
+  const saltContext = options.saltContext ?? DEFAULT_FALLBACK_SALT_CONTEXT;
 
   if (safeStorageRef && typeof safeStorageRef.isEncryptionAvailable === 'function' && safeStorageRef.isEncryptionAvailable()) {
     try {
@@ -116,13 +145,13 @@ export function decryptDataWithFallback(raw: Buffer, userDataPath: string, safeS
     } catch (_) {}
   }
 
-  if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
+  if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === magic) {
     try {
       const secretPath = path.join(userDataPath, '.machine_secret');
       if (fs.existsSync(secretPath)) {
         const secret = fs.readFileSync(secretPath);
         if (secret.length !== 32) return null;
-        const machineSalt = getMachineSalt('nova-secure-salt');
+        const machineSalt = getMachineSalt(saltContext);
         const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
         const iv = raw.subarray(4, 16);
         const tag = raw.subarray(16, 32);

@@ -1,7 +1,6 @@
 import type { Express, Request } from 'express';
 import { BrowserWindow, safeStorage, dialog, powerMonitor, app as electronApp } from 'electron';
-import { randomUUID, createHash, timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
-import os from 'os';
+import { randomUUID, createHash, timingSafeEqual, randomBytes } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 // Security: browser_* tools are forwarded to the renderer over a
@@ -25,6 +24,10 @@ import type { ActionRequest, ActionRecord, EngineEvent, PendingApproval } from '
 import { classifyAction, buildApprovalSummary, redactArgs } from './main/policyEngine.js';
 import { describeApprovalArgs, previewSelectorFor } from './main/approvalDetails.js';
 import { formatHandoffMessage } from './main/handoffNote.js';
+import { encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity.js';
+
+// Token file format used when safeStorage is unavailable: kept distinct from the secure store's NENC blobs.
+const MCP_TOKEN_FALLBACK = { magic: 'NMCP', saltContext: 'king-mcp-salt' } as const;
 import { approvalDialogStrings, buildApprovalDialogDetail, type UiLanguage } from './main/uiStrings.js';
 
 // Security: Screen-lock tracking prevents MCP execution while user is away
@@ -661,36 +664,6 @@ export class BrowserMCPServer {
     }
   }
 
-  private getFallbackMcpKey(): Buffer {
-    const secretPath = path.join(electronApp.getPath('userData'), '.machine_secret');
-    let secret: Buffer;
-    try {
-      secret = fs.readFileSync(secretPath);
-    } catch (err: any) {
-      if (err?.code === 'ENOENT') {
-        secret = randomBytes(32);
-        try {
-          fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-          if (process.platform !== 'win32') {
-            fs.chmodSync(secretPath, 0o600);
-          }
-        } catch (_) {}
-      } else {
-        throw err;
-      }
-    }
-    let username = 'unknown';
-    try {
-      username = os.userInfo().username;
-    } catch (_) {
-      username = process.env.USER || process.env.USERNAME || 'unknown';
-    }
-    const machineSalt = createHash('sha256')
-      .update(`${os.hostname()}:${username}:${os.homedir()}:king-mcp-salt`)
-      .digest();
-    return scryptSync(secret, machineSalt, 32);
-  }
-
   private loadOrGenerateToken(): string {
     try {
       if (this.tokenFilePath && fs.existsSync(this.tokenFilePath)) {
@@ -702,19 +675,9 @@ export class BrowserMCPServer {
               if (decrypted && decrypted.length >= 16) return decrypted;
             } catch (_) {}
           }
-          // Check for fallback AES-256-GCM authenticated format
-          if (raw.length >= 36 && raw.subarray(0, 4).toString('utf8') === 'NMCP') {
-            try {
-              const keyBuf = this.getFallbackMcpKey();
-              const iv = raw.subarray(4, 16);
-              const tag = raw.subarray(16, 32);
-              const enc = raw.subarray(32);
-              const decipher = createDecipheriv('aes-256-gcm', keyBuf, iv);
-              decipher.setAuthTag(tag);
-              const decrypted = decipher.update(enc) + decipher.final('utf8');
-              if (decrypted && decrypted.length >= 16) return decrypted;
-            } catch (_) {}
-          }
+          // Fallback AES-256-GCM authenticated format (NMCP), shared implementation
+          const fallbackToken = decryptDataWithFallback(raw, electronApp.getPath('userData'), undefined, MCP_TOKEN_FALLBACK);
+          if (fallbackToken && fallbackToken.length >= 16) return fallbackToken;
         }
       }
     } catch (err) {
@@ -737,12 +700,7 @@ export class BrowserMCPServer {
             try { fs.chmodSync(this.tokenFilePath, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
           }
         } else {
-          const keyBuf = this.getFallbackMcpKey();
-          const iv = randomBytes(12);
-          const cipher = createCipheriv('aes-256-gcm', keyBuf, iv);
-          const enc = Buffer.concat([cipher.update(newToken, 'utf8'), cipher.final()]);
-          const tag = cipher.getAuthTag();
-          const payload = Buffer.concat([Buffer.from('NMCP', 'utf8'), iv, tag, enc]);
+          const payload = encryptDataWithFallback(newToken, electronApp.getPath('userData'), undefined, MCP_TOKEN_FALLBACK);
           fs.writeFileSync(this.tokenFilePath, payload, { mode: 0o600 });
           if (process.platform !== 'win32') {
             try { fs.chmodSync(this.tokenFilePath, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }

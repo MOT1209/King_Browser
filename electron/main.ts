@@ -16,7 +16,7 @@ import { once } from 'events';
 import fs from 'fs';
 import createDOMPurify from 'dompurify';
 import { checkPhishingDomain, matchesExtensionHostPermission } from '../src/utils/securityUtils.js';
-import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity';
+import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback, isWeakSafeStorageBackend } from './main/proxySecurity';
 export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt };
 export { isSafeSubframeNavigation } from './main/windowOpenPolicy';
 export { isExtensionAllowedInIncognito } from './main/incognitoExtensions';
@@ -1505,6 +1505,10 @@ function cleanStaleUpdateArtifacts(): void {
 
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
+  if (isWeakSafeStorageBackend(safeStorage)) {
+    // Linux without a keyring: safeStorage reports itself available but protects nothing.
+    console.warn('[Security] safeStorage is using the basic_text backend (no OS keyring). Stored secrets are only obfuscated on this system.');
+  }
   loadExtensionDiagnostics();
   await loadPersistentExtensions();
   createWindow();
@@ -3478,6 +3482,22 @@ app.on('web-contents-created', (_event, contents) => {
         return;
       }
       child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      // Same navigation policy as webviews: web schemes only, no credentials in
+      // the URL, and no known phishing host, for both direct and redirected loads.
+      const guardPopupNavigation = (event: { preventDefault: () => void }, destUrl: string) => {
+        if (!isSafeSubframeNavigation(destUrl)) {
+          event.preventDefault();
+          console.warn('[Security] Blocked sign-in popup navigation to a forbidden URL:', destUrl.slice(0, 200));
+          return;
+        }
+        if (checkPhishingDomain(destUrl)) {
+          event.preventDefault();
+          console.warn('[Security] Blocked sign-in popup navigation to a phishing domain:', destUrl.slice(0, 200));
+          if (!child.isDestroyed()) child.destroy();
+        }
+      };
+      child.webContents.on('will-navigate', (event, destUrl) => guardPopupNavigation(event, destUrl));
+      child.webContents.on('will-redirect', (event, destUrl) => guardPopupNavigation(event, destUrl));
     } catch (err) {
       console.error('[Security] Failed to harden a sign-in popup:', err);
     }
@@ -4819,38 +4839,8 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
         try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
       } else {
         console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
-        const getFallbackKey = (): Buffer => {
-          const secretPath = path.join(app.getPath('userData'), '.machine_secret');
-          let secret: Buffer;
-          try {
-            secret = fs.readFileSync(secretPath);
-            if (secret.length !== 32) {
-              throw new Error(
-                `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
-                'Values encrypted with it cannot be recovered; restore a backup or clear secure storage.'
-              );
-            }
-          } catch (err: any) {
-            if (err?.code === 'ENOENT') {
-              secret = crypto.randomBytes(32);
-              fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-              if (process.platform !== 'win32') {
-                try { fs.chmodSync(secretPath, 0o600); } catch (err) { console.warn('[Security] Could not restrict permissions on a private file; it may be readable by other users:', err); }
-              }
-            } else {
-              throw err;
-            }
-          }
-          // K-3: Bind salt to machine identity so copying userData to another machine/account fails
-          const machineSalt = getMachineSalt('nova-secure-salt');
-          return crypto.scryptSync(secret, machineSalt, 32);
-        };
-        const keyBuf = getFallbackKey();
-        const iv = crypto.randomBytes(12);
-        const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv);
-        const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-        const tag = cipher.getAuthTag();
-        const payload = Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
+        // K-3: the shared fallback binds the salt to machine identity so copying userData to another machine/account fails
+        const payload = encryptDataWithFallback(value, app.getPath('userData'));
         // Same reasoning as the safeStorage branch above: O_TRUNC in place turns a
         // crash mid-write into unreadable ciphertext that then reads as null.
         const nencTmp = `${keyPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
@@ -4889,23 +4879,9 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
           return safeStorage.decryptString(raw);
         } catch (_) {}
       }
-      // Check for fallback AES-256-GCM format
-      if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
-        try {
-          const secretPath = path.join(app.getPath('userData'), '.machine_secret');
-          if (fs.existsSync(secretPath)) {
-            const secret = fs.readFileSync(secretPath);
-            const machineSalt = getMachineSalt('nova-secure-salt');
-            const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
-            const iv = raw.subarray(4, 16);
-            const tag = raw.subarray(16, 32);
-            const enc = raw.subarray(32);
-            const decipher = crypto.createDecipheriv('aes-256-gcm', keyBuf, iv);
-            decipher.setAuthTag(tag);
-            return decipher.update(enc) + decipher.final('utf8');
-          }
-        } catch (_) {}
-      }
+      // Fallback AES-256-GCM format (NENC), same shared implementation as the writer
+      const fallbackPlain = decryptDataWithFallback(raw, app.getPath('userData'));
+      if (fallbackPlain !== null) return fallbackPlain;
       // K-4: Fail closed: do NOT read unauthenticated plaintext
       return null;
     } catch {

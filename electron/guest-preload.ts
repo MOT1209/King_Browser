@@ -147,6 +147,7 @@ if (protocol === 'https:' || protocol === 'http:') {
 
   const setupPasswordCapture = () => {
     document.addEventListener('input', (e) => {
+      if (!e.isTrusted) return;
       const target = e.target as HTMLInputElement;
       if (target && target.tagName === 'INPUT') {
         const type = (target.type || '').toLowerCase();
@@ -172,11 +173,13 @@ if (protocol === 'https:' || protocol === 'http:') {
     }, true);
 
     document.addEventListener('submit', (e) => {
+      if (!e.isTrusted) return;
       const form = e.target as HTMLFormElement;
       checkAndSubmitCredentials(form);
     }, true);
 
     document.addEventListener('keydown', (e) => {
+      if (!e.isTrusted) return;
       if (e.key === 'Enter') {
         const target = e.target as HTMLElement;
         if (target && target.tagName === 'INPUT') {
@@ -186,6 +189,7 @@ if (protocol === 'https:' || protocol === 'http:') {
     }, true);
 
     document.addEventListener('click', (e) => {
+      if (!e.isTrusted) return;
       const target = e.target as HTMLElement;
       if (!target) return;
       const btn = target.closest('button, input[type="submit"], input[type="button"], a[role="button"], div[role="button"]');
@@ -206,6 +210,7 @@ if (protocol === 'https:' || protocol === 'http:') {
     let currentHoveredLink: HTMLElement | null = null;
 
     document.addEventListener('mouseover', (e) => {
+      if (!e.isTrusted) return;
       const a = (e.target as HTMLElement)?.closest?.('a');
       if (a && a.href && (a.href.startsWith('https://') || a.href.startsWith('http://'))) {
         if (currentHoveredLink === a) return;
@@ -286,6 +291,7 @@ if (protocol === 'https:' || protocol === 'http:') {
 
   const setupPasswordFocusDetection = () => {
     document.addEventListener('focusin', (e) => {
+      if (!e.isTrusted) return;
       const target = e.target as HTMLInputElement;
       if (target && target.tagName === 'INPUT') {
         const type = (target.type || '').toLowerCase();

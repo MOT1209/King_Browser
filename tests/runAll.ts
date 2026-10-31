@@ -146,6 +146,8 @@ import './agent_control_panel.test';
 // Static guards: every IPC handler under electron/, the shipped CSP, agent skills.
 import './ipc_sender_guard_coverage.test';
 import './csp_parity.test';
+import './fallback_crypto_shared.test';
+import './popup_and_guest_event_hardening.test';
 import './webview_partition_hardening_failure.test';
 import './linux_sandbox_fallback.test';
 import './agent_skills_integrity.test';
