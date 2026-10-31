@@ -82,6 +82,12 @@ async function run() {
   assert.equal(Number(defines[1]), TOOLS.length, 'README "King Browser defines N tools" matches the registry');
   assert.equal(Number(exposes[1]), TOOLS.length, 'README "Exposes N tools" matches the registry');
   assert.equal(Number(exposes[2]), safeCount, 'README safe-by-default count matches TOOL_PERMISSIONS');
+  // Every other place the README states a total ("exposing 45 ... tools",
+  // "Port 3020 / 45 Tools" in the architecture diagram). Prevents a stale count
+  // that the two sentences above do not cover.
+  for (const m of readme.matchAll(/(?:exposing|\/)\s*(\d+)\s+(?:[a-z,-]+\s+){0,6}?tools/gi)) {
+    assert.equal(Number(m[1]), TOOLS.length, `README "${m[0]}" matches the registry`);
+  }
   console.log(`[PASS] [MCPSchema] README counts (${TOOLS.length} tools, ${safeCount} safe by default) match the registry`);
 
   // Every registered tool is handled by the renderer bridge or the engine, so

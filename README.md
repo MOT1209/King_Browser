@@ -665,7 +665,7 @@ flowchart TB
     end
 
     subgraph Main["Electron Main Process (Privileged Host)"]
-        mcp["Native MCP Server<br/>Port 3020 / 41 Tools"]
+        mcp["Native MCP Server<br/>Port 3020 / 45 Tools"]
         ipcMain["IPC Hub & Dispatcher<br/>isTrustedSender Origin Guard"]
         netShield["Privacy Shield & AdBlock<br/>EasyList Network Filter & Anti-SSRF"]
         osBridge["Native OS & Storage<br/>safeStorage Keychain / CRX3 / TTS"]
