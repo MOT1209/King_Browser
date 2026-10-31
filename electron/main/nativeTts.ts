@@ -8,7 +8,10 @@
  *  - each speak request invalidates the previous one (generation counter), so a
  *    killed request's close handler can never spawn a voice fallback over the
  *    newer request;
- *  - a watchdog guarantees the IPC call settles even if `say` hangs.
+ *  - a watchdog guarantees the IPC call settles even if `say` hangs; it only ever
+ *    touches the process its own request started, never a newer request's;
+ *  - superseding or stopping a request settles it at once (it does not wait for
+ *    the killed process to report close), and a request settles exactly once.
  * The IPC handlers and their isTrustedSender checks stay in main.ts.
  */
 
@@ -80,6 +83,8 @@ export class NativeTts {
   // Each speak request invalidates the previous one so a killed request's
   // close-handler can never spawn a fallback that talks over the newer request.
   private generation = 0;
+  // Settles the request that is currently pending, if any (supersede / stop).
+  private cancelCurrent: (() => void) | null = null;
 
   constructor(private readonly deps: NativeTtsDeps) {}
 
@@ -101,6 +106,7 @@ export class NativeTts {
     // on a future tick, so bumping the generation first guarantees it observes
     // the mismatch and never spawns a voice-fallback over this request.
     const myGeneration = ++this.generation;
+    this.cancelCurrent?.();
     this.killActive();
 
     if (this.deps.platform !== 'darwin') {
@@ -108,25 +114,47 @@ export class NativeTts {
     }
 
     return new Promise((resolve) => {
-      // Hard overall cap so a hung `say` can never leave this call pending
-      // forever. One shared deadline across voice-fallback retries.
       let settled = false;
       let timedOut = false;
-      const watchdog = setTimeout(() => {
-        timedOut = true;
-        this.killActive();
-      }, this.deps.speakTimeoutMs ?? DEFAULT_SPEAK_TIMEOUT_MS);
-      watchdog.unref?.();
+      // The process this request is running right now (it changes on a voice fallback).
+      let own: SayProcess | null = null;
+      const killOwn = (signal?: NodeJS.Signals) => {
+        if (!own) return;
+        const proc = own;
+        own = null;
+        if (this.active === proc) this.active = null;
+        try { proc.kill(signal); } catch (_) {}
+      };
       const finish = (result: SpeakResult) => {
         if (settled) return;
         settled = true;
         clearTimeout(watchdog);
+        if (this.cancelCurrent === cancel) this.cancelCurrent = null;
         resolve(result);
       };
+      // Used when a newer request or stop() replaces this one: the caller kills the
+      // active process itself, so this only has to settle the promise.
+      const cancel = () => {
+        own = null;
+        finish({ success: false, error: 'Superseded or stopped' });
+      };
+      this.cancelCurrent = cancel;
+      // Hard overall cap so a hung `say` can never leave this call pending
+      // forever. One shared deadline across voice-fallback retries. It kills only
+      // this request's own process and settles immediately: waiting for a 'close'
+      // that a stuck process may never send would defeat the purpose.
+      const watchdog = setTimeout(() => {
+        timedOut = true;
+        killOwn();
+        finish({ success: false, error: 'Speech synthesis timed out' });
+      }, this.deps.speakTimeoutMs ?? DEFAULT_SPEAK_TIMEOUT_MS);
+      watchdog.unref?.();
 
       const run = (args: string[]) => {
+        if (settled) return;
         try {
           const proc = this.deps.spawn(SAY, args, { stdio: ['pipe', 'ignore', 'pipe'] });
+          own = proc;
           this.active = proc;
           // Drain stderr so pipe backpressure can never stall the process.
           proc.stderr?.on('data', () => {});
@@ -139,6 +167,8 @@ export class NativeTts {
           }
           proc.on('close', (code: number | null) => {
             if (this.active === proc) this.active = null;
+            if (own === proc) own = null;
+            if (settled) return;
             if (myGeneration !== this.generation) {
               finish({ success: false, error: 'Superseded or stopped' });
             } else if (timedOut) {
@@ -154,10 +184,12 @@ export class NativeTts {
           });
           proc.on('error', (err: Error) => {
             if (this.active === proc) this.active = null;
+            if (own === proc) own = null;
             finish({ success: false, error: err.message });
           });
         } catch (err: any) {
           this.active = null;
+          own = null;
           finish({ success: false, error: err.message });
         }
       };
@@ -169,6 +201,7 @@ export class NativeTts {
   /** Invalidates in-flight requests and kills the process. True when something was playing. */
   stop(): boolean {
     this.generation++;
+    this.cancelCurrent?.();
     if (this.active) {
       try { this.active.kill('SIGKILL'); } catch (_) {}
       this.active = null;

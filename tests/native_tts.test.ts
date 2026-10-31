@@ -156,6 +156,60 @@ async function run() {
   err.procs[0].emit('error', new Error('boom'));
   assert.deepEqual(await errPromise, { success: false, error: 'boom' });
 
+
+  // Regression: an old request's watchdog must never kill a NEWER request's process.
+  // Before the fix the watchdog killed "whatever is active", so an older request
+  // whose process ignored the kill (stayed alive, never emitted close) fired later
+  // and silenced the speech that replaced it.
+  const wd = harness('darwin', 100);
+  const oldReq = wd.tts.speak('old', 'Alex');
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const newReq = wd.tts.speak('new', 'Anna');
+  assert.deepEqual(await oldReq, { success: false, error: 'Superseded or stopped' }, 'a superseded request settles at once, even if its process ignores the kill');
+  await new Promise((resolve) => setTimeout(resolve, 70)); // past the OLD request's deadline (100ms), before the new one's (150ms)
+  assert.deepEqual(wd.procs[1].signals, [], 'the old watchdog did not kill the newer process');
+  wd.procs[1].exit(0);
+  assert.deepEqual(await newReq, { success: true }, 'the newer request completes normally');
+
+  // A timeout kills its own process, settles without waiting for close, and frees the slot.
+  const to = harness('darwin', 20);
+  const toPromise = to.tts.speak('stuck', 'Alex');
+  assert.deepEqual(await toPromise, { success: false, error: 'Speech synthesis timed out' }, 'timeout settles even if the process never closes');
+  assert.deepEqual(to.procs[0].signals, [undefined], 'the timed-out process is killed');
+  to.procs[0].exit(1); // a late close must neither resolve again nor spawn a voice fallback
+  assert.equal(to.procs.length, 1, 'no fallback is spawned after a timeout');
+  const afterTimeout = to.tts.speak('again');
+  assert.equal(to.procs.length, 2, 'the next request starts normally after a timeout');
+  to.procs[1].exit(0);
+  assert.deepEqual(await afterTimeout, { success: true });
+
+  // stop() settles a pending request immediately and kills its process.
+  const stp2 = harness();
+  const pendingStop = stp2.tts.speak('long', 'Alex');
+  stp2.tts.stop();
+  assert.deepEqual(await pendingStop, { success: false, error: 'Superseded or stopped' }, 'stop does not wait for the process to close');
+  assert.equal(stp2.tts.stop(), false, 'stopping twice is harmless');
+
+  // Rapid concurrent requests: only the last one speaks and every promise settles exactly once.
+  const burst = harness();
+  const results = [burst.tts.speak('a', 'Alex'), burst.tts.speak('b', 'Alex'), burst.tts.speak('c', 'Alex')];
+  assert.equal(burst.procs.length, 3);
+  burst.procs[0].exit(1); burst.procs[1].exit(1); // old closes after being superseded: no fallbacks
+  burst.procs[2].exit(0);
+  const settled = await Promise.all(results);
+  assert.deepEqual(settled, [
+    { success: false, error: 'Superseded or stopped' },
+    { success: false, error: 'Superseded or stopped' },
+    { success: true }
+  ]);
+  assert.equal(burst.procs.length, 3, 'superseded requests spawn no fallback processes');
+
+  // A process error after a timeout does not change the outcome.
+  const lateErr = harness('darwin', 15);
+  const lateErrPromise = lateErr.tts.speak('x');
+  assert.equal((await lateErrPromise).error, 'Speech synthesis timed out');
+  lateErr.procs[0].emit('error', new Error('late'));
+
   clearInterval(keepAlive);
   console.log('[PASS] Native TTS controller');
 }
