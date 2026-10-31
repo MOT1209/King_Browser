@@ -151,6 +151,7 @@ import './runall_registration.test';
 import './phishing_block_page.test';
 import './webview_policy.test';
 import './permission_store.test';
+import './translation_batch.test';
 import './popup_and_guest_event_hardening.test';
 import './webview_partition_hardening_failure.test';
 import './linux_sandbox_fallback.test';
