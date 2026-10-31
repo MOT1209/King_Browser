@@ -25,6 +25,14 @@ import { classifyAction, buildApprovalSummary, redactArgs } from './main/policyE
 import { describeApprovalArgs, previewSelectorFor } from './main/approvalDetails.js';
 import { formatHandoffMessage } from './main/handoffNote.js';
 import { encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity.js';
+import {
+  createCustomToolStore, executeHttpTool, CUSTOM_TOOL_PREFIX, formatToolOutput, toInputSchema, validateArguments,
+  type CustomToolStore, type CustomToolDefinition, type ExecuteDeps
+} from './main/customTools.js';
+import type { ApprovalDetailLine } from './main/approvalDetails.js';
+
+// Secrets of user-defined tools: same fallback scheme, distinct magic so the blobs cannot be confused.
+const CUSTOM_SECRET_CRYPTO = { magic: 'NCTS', saltContext: 'king-custom-tool-salt' } as const;
 
 // Token file format used when safeStorage is unavailable: kept distinct from the secure store's NENC blobs.
 const MCP_TOKEN_FALLBACK = { magic: 'NMCP', saltContext: 'king-mcp-salt' } as const;
@@ -616,6 +624,12 @@ export class BrowserMCPServer {
   private siteRuleStoreInstance: SiteRuleStore | null | undefined;
   private activityStoreInstance: ActivityStore | null | undefined;
   private engineInstance: ExecutionEngine | null = null;
+  // User-defined tools (Settings -> MCP -> Tool Manager). The store is the single
+  // source for them; built-in tools stay in TOOLS. Network access is injected by
+  // main.ts so the SSRF rules are shared with the preview fetch; until then a
+  // custom tool fails closed.
+  private customToolStoreInstance: CustomToolStore | null | undefined;
+  private customToolNetwork: Pick<ExecuteDeps, 'validate' | 'fetch'> | null = null;
 
   constructor(private requestedPort: number = 3020) {
     // Performance: express/express-rate-limit are NOT required here — they are
@@ -801,7 +815,23 @@ export class BrowserMCPServer {
   }
 
   private isRegisteredTool(toolName: unknown): boolean {
-    return typeof toolName === 'string' && REGISTERED_TOOL_NAMES.has(toolName);
+    if (typeof toolName !== 'string') return false;
+    return REGISTERED_TOOL_NAMES.has(toolName) || Boolean(this.customToolStore()?.get(toolName));
+  }
+
+  /** True for a user-defined tool, whether or not it is currently enabled. */
+  private isCustomTool(toolName: unknown): boolean {
+    return typeof toolName === 'string' && !REGISTERED_TOOL_NAMES.has(toolName) && Boolean(this.customToolStore()?.get(toolName));
+  }
+
+  /** Built-in tools the caller may use, then the user's enabled custom tools: the one list every transport serves. */
+  private visibleTools(): McpTool[] {
+    const custom = (this.customToolStore()?.listEnabled() ?? []).map((def): McpTool => ({
+      name: def.name,
+      description: def.description,
+      inputSchema: toInputSchema(def.parameters) as McpTool['inputSchema']
+    }));
+    return [...TOOLS.filter((tool) => this.isToolAllowed(tool.name)), ...custom];
   }
 
   private isToolAllowed(toolName: string): boolean {
@@ -810,6 +840,7 @@ export class BrowserMCPServer {
     // listed in TOOL_PERMISSIONS, or a non-string such as an absent
     // body.params.name — pass the gate and be forwarded to the renderer. A name
     // must now be a registered tool AND not be disabled.
+    if (typeof toolName === 'string' && this.isCustomTool(toolName)) return Boolean(this.customToolStore()?.isActive(toolName));
     return this.isRegisteredTool(toolName) && !this.disabledTools.has(toolName);
   }
 
@@ -926,6 +957,13 @@ export class BrowserMCPServer {
     }
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       throw new Error('King Browser window is not available');
+    }
+    // Decided by name, not by the store: a tool deleted while its approval was open must
+    // fail here, never fall through to the renderer.
+    if (request.toolName.startsWith(CUSTOM_TOOL_PREFIX) && !REGISTERED_TOOL_NAMES.has(request.toolName)) {
+      const output = await this.runCustomToolInMain(request);
+      (request as ActionRequest & { __mcpResult?: unknown }).__mcpResult = output;
+      return output;
     }
     const result = await requestRendererMcpAction(this.mainWindow, request.toolName, request.args);
     // The engine's executor receives the same ActionRequest object that was
@@ -1223,6 +1261,10 @@ export class BrowserMCPServer {
       );
     }
 
+    // User-defined tools run in the main process through the same approval
+    // engine; they are never forwarded to the renderer.
+    if (this.isCustomTool(toolName)) return this.executeCustomTool(toolName, args, false);
+
     // §9 alias resolution: agent vocabulary is mapped to the canonical renderer
     // tool. Using an alias requires the canonical tool to be enabled too —
     // permission is the intersection, so an enabled alias can never bypass a
@@ -1463,11 +1505,185 @@ export class BrowserMCPServer {
     return output;
   }
 
+
+  // ---- Custom tools (Tool Manager) -----------------------------------------
+
+  private customToolStore(): CustomToolStore | null {
+    if (this.customToolStoreInstance === undefined) {
+      try {
+        const dir = electronApp.getPath('userData');
+        const secretsPath = path.join(dir, 'mcp-custom-tool-secrets.bin');
+        const auditPath = path.join(dir, 'mcp-custom-tools-audit.jsonl');
+        this.customToolStoreInstance = createCustomToolStore({
+          filePath: path.join(dir, 'mcp-custom-tools.json'),
+          readSecrets: () => {
+            try {
+              const text = decryptDataWithFallback(fs.readFileSync(secretsPath), dir, safeStorage, CUSTOM_SECRET_CRYPTO);
+              const parsed = text ? JSON.parse(text) : {};
+              return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+            } catch { return {}; }
+          },
+          writeSecrets: (secrets) => {
+            if (Object.keys(secrets).length === 0) { try { fs.unlinkSync(secretsPath); } catch { /* already gone */ } return; }
+            const payload = encryptDataWithFallback(JSON.stringify(secrets), dir, safeStorage, CUSTOM_SECRET_CRYPTO);
+            fs.writeFileSync(secretsPath, payload, { mode: 0o600 });
+          },
+          audit: (entry) => { fs.appendFileSync(auditPath, JSON.stringify(entry) + '\n', { encoding: 'utf8', mode: 0o600 }); }
+        });
+      } catch (err) {
+        console.warn('[MCP Server] Custom tools are unavailable:', err);
+        this.customToolStoreInstance = null;
+      }
+    }
+    return this.customToolStoreInstance;
+  }
+
+  /** main.ts hands in the shared SSRF validation and fetch; without them custom tools refuse to run. */
+  public setCustomToolNetwork(network: Pick<ExecuteDeps, 'validate' | 'fetch'> | null): void {
+    this.customToolNetwork = network;
+  }
+
+  /** Every tool the Tool Manager shows: built-ins (with their permission level and state) and user tools. */
+  public getToolRegistry() {
+    const builtIn = TOOLS.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      source: 'built-in' as const,
+      level: TOOL_PERMISSIONS[tool.name] ?? 'sensitive',
+      enabled: !this.disabledTools.has(tool.name)
+    }));
+    return { builtIn, custom: this.customToolStore()?.list() ?? [] };
+  }
+
+  public createCustomTool(input: unknown, secret?: unknown) {
+    const store = this.customToolStore();
+    if (!store) return { ok: false as const, errors: ['Custom tools are unavailable.'] };
+    const res = store.create(input, typeof secret === 'string' ? secret : undefined);
+    return res;
+  }
+
+  public updateCustomTool(id: unknown, input: unknown, options: { secret?: unknown; confirmed?: unknown } = {}) {
+    const store = this.customToolStore();
+    if (!store || typeof id !== 'string') return { ok: false as const, errors: ['That tool no longer exists.'] };
+    const secret = options.secret === null ? null : typeof options.secret === 'string' ? options.secret : undefined;
+    return store.update(id, input, { secret, confirmed: options.confirmed === true });
+  }
+
+  public setCustomToolEnabled(id: unknown, enabled: unknown) {
+    const store = this.customToolStore();
+    if (!store || typeof id !== 'string') return { ok: false as const, errors: ['That tool no longer exists.'] };
+    return store.setEnabled(id, enabled === true);
+  }
+
+  public deleteCustomTool(id: unknown): { ok: boolean; name?: string } {
+    const store = this.customToolStore();
+    if (!store || typeof id !== 'string') return { ok: false };
+    return store.remove(id);
+  }
+
+  public exportCustomTools(): string { return this.customToolStore()?.exportDefinitions() ?? ''; }
+  public previewCustomToolImport(text: unknown) { return this.customToolStore()?.previewImport(text) ?? { entries: [], error: 'Custom tools are unavailable.' }; }
+  public importCustomTools(text: unknown, renameDuplicates: unknown) {
+    return this.customToolStore()?.commitImport(text, { renameDuplicates: renameDuplicates === true }) ?? { ok: false, imported: [], errors: ['Custom tools are unavailable.'] };
+  }
+
+  /** "Test Tool": a real call through the approval engine; never reports success unless the request completed. */
+  public async testCustomTool(id: unknown, args: unknown): Promise<{ ok: boolean; output?: string; error?: string }> {
+    const store = this.customToolStore();
+    const def = store && typeof id === 'string' ? store.getById(id) : undefined;
+    if (!store || !def) return { ok: false, error: 'That tool no longer exists.' };
+    const at = new Date().toISOString();
+    try {
+      const output = await this.executeCustomTool(def.name, (args && typeof args === 'object' && !Array.isArray(args) ? args : {}) as Record<string, unknown>, true);
+      store.recordTest(def.id, { ok: true, at, message: 'Completed.' });
+      return { ok: true, output };
+    } catch (err) {
+      const message = formatToolError(err).replace(/^Error:\s*/, '');
+      store.recordTest(def.id, { ok: false, at, message });
+      return { ok: false, error: message };
+    }
+  }
+
+  /** Approval line items for a custom call: where it goes and exactly what is sent. */
+  private customApprovalDetails(def: CustomToolDefinition, args: Record<string, unknown>): ApprovalDetailLine[] {
+    let target = def.http.urlTemplate;
+    try { const u = new URL(def.http.urlTemplate.replace(/\{[^}]*\}/g, 'x')); target = `${u.host}${u.pathname}`.replace(/\/x(?=\/|$)/g, '/{…}'); } catch { /* shown as typed */ }
+    const lines: ApprovalDetailLine[] = [
+      { kind: 'url', text: target },
+      { kind: 'other', text: `method: ${def.http.method}` }
+    ];
+    if (def.http.auth.type !== 'none') lines.push({ kind: 'other', text: 'sends: saved credential' });
+    for (const [key, value] of Object.entries(args).slice(0, 4)) {
+      lines.push({ kind: 'other', text: `${key}: ${String(value).replace(/\s+/g, ' ').slice(0, 100)}` });
+    }
+    return lines;
+  }
+
+  private async executeCustomTool(toolName: string, args: Record<string, unknown>, isTest: boolean): Promise<string> {
+    const store = this.customToolStore();
+    const def = store?.get(toolName);
+    if (!store || !def) throw new Error(`Permission denied: Tool '${toolName}' is not a known MCP tool.`);
+    if (!isTest && !store.isActive(toolName)) {
+      throw new Error(`Permission denied: Tool '${toolName}' is disabled in MCP security settings.`);
+    }
+    const problems = validateArguments(def.parameters, args);
+    if (problems.length > 0) throw new Error(`Invalid arguments for ${toolName}: ${problems.join(' ')}`);
+    // Custom tools always go through the approval engine; without it they do not run.
+    if (!this.policyEnforced) throw new Error('Custom tools require the approval policy to be enforced.');
+
+    const strict = strictModeRequiresApproval(this.getApprovalMode(), toolName);
+    const triggers: string[] = [];
+    if (def.approval === 'always' || isTest) triggers.push('share_private');
+    if (strict) triggers.push('strict_mode');
+    if (this.injectionSuspect) { triggers.push('prompt_injection'); this.injectionSuspect = null; }
+    const sensitive = triggers.length > 0;
+    let host: string | undefined;
+    try { host = new URL(def.http.urlTemplate.replace(/\{[^}]*\}/g, 'x')).hostname; } catch { /* no host shown */ }
+    const request: ActionRequest & { __mcpResult?: unknown; __customTest?: boolean } = {
+      toolName,
+      args,
+      risk: sensitive ? 'sensitive' : 'safe',
+      domain: host,
+      summary: sensitive ? `Call your custom tool ${toolName} (${def.http.method} ${host ?? ''}) — ${def.description.slice(0, 120)}` : undefined,
+      details: sensitive ? this.customApprovalDetails(def, args) : undefined,
+      __customTest: isTest
+    };
+    const record: ActionRecord = await this.engine().submit(request);
+    if (record.status !== 'completed') {
+      throw new Error(record.error ? `${record.error} (${record.status})` : `Action ${record.status}.`);
+    }
+    const output = typeof request.__mcpResult === 'string' ? request.__mcpResult : JSON.stringify(request.__mcpResult ?? '');
+    const reasons = detectPromptInjection(output);
+    if (reasons.length > 0) {
+      this.injectionSuspect = { reasons };
+      return injectionWarning(reasons) + output;
+    }
+    return output;
+  }
+
+  /** Runs after approval, inside the engine's executor: the only place a custom request is sent. */
+  private async runCustomToolInMain(request: ActionRequest & { __customTest?: boolean }): Promise<string> {
+    const store = this.customToolStore();
+    const def = store?.get(request.toolName);
+    if (!store || !def) throw new Error('This tool was deleted before it could run.');
+    // The approval can take a while: the tool may have been disabled or deleted meanwhile.
+    if (!request.__customTest && !store.isActive(def.name)) throw new Error('This tool was disabled before it could run.');
+    if (!this.customToolNetwork) throw new Error('Custom tool networking is not available.');
+    const execution = store.beginExecution(def.id);
+    try {
+      const result = await executeHttpTool(def, request.args, store.secretFor(def.id), { ...this.customToolNetwork, signal: execution.signal });
+      if (!result.ok) throw new Error(result.error);
+      return formatToolOutput(def, result);
+    } finally {
+      execution.end();
+    }
+  }
+
   /** What the transport-independent protocol layer needs from this server. */
   private protocolHandlers(): McpProtocolHandlers {
     return {
       get serverVersion() { return electronApp?.getVersion?.() || '1.5.0'; },
-      listTools: () => TOOLS.filter((tool) => this.isToolAllowed(tool.name)),
+      listTools: () => this.visibleTools(),
       callTool: (name, args) => this.executeToolForClient(name, args as Record<string, any>)
     };
   }
@@ -1707,7 +1923,7 @@ export class BrowserMCPServer {
       if (!this.isAuthenticated(req)) {
         return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' });
       }
-      res.json({ tools: TOOLS.filter((tool) => this.isToolAllowed(tool.name)) });
+      res.json({ tools: this.visibleTools() });
     });
   }
 

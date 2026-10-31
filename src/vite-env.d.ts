@@ -2,6 +2,7 @@
 
 import type { DownloadItem, PermissionRequest } from './types/browser';
 import type { NativeVoiceInfo } from './services/tts';
+import type { McpToolRegistry, McpToolMutation } from './types/mcpTools';
 
 /** Wallpaper photo object returned by the main-process wallpaper providers. */
 interface ElectronWallpaperPhoto {
@@ -287,6 +288,16 @@ export interface ElectronAPI {
   setMcpSiteRules: (rules: Array<{ domain: string; mode: 'ask' | 'block' }>) => Promise<Array<{ domain: string; mode: 'ask' | 'block' }>>;
   getMcpToolSettings: () => Promise<string[]>;
   setMcpToolEnabled: (toolName: string, enabled: boolean) => Promise<boolean>;
+  // Tool Manager (custom MCP tools)
+  getMcpToolRegistry: () => Promise<McpToolRegistry>;
+  createMcpCustomTool: (input: unknown, secret?: string) => Promise<McpToolMutation>;
+  updateMcpCustomTool: (id: string, input: unknown, options?: { secret?: string | null; confirmed?: boolean }) => Promise<McpToolMutation>;
+  setMcpCustomToolEnabled: (id: string, enabled: boolean) => Promise<McpToolMutation>;
+  deleteMcpCustomTool: (id: string) => Promise<{ ok: boolean; name?: string }>;
+  testMcpCustomTool: (id: string, args: Record<string, unknown>) => Promise<{ ok: boolean; output?: string; error?: string }>;
+  exportMcpCustomTools: () => Promise<string>;
+  previewMcpCustomToolImport: (text: string) => Promise<{ entries: Array<{ name: string; status: 'new' | 'duplicate' | 'invalid' | 'limit'; errors: string[] }>; error?: string }>;
+  importMcpCustomTools: (text: string, renameDuplicates?: boolean) => Promise<{ ok: boolean; imported: string[]; errors: string[] }>;
   // §10 execution control panel (engine bridge)
   getEngineStatus: () => Promise<ElectronEngineStatus>;
   getEngineHistory: () => Promise<ElectronEngineActionRecord[]>;

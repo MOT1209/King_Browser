@@ -9,7 +9,7 @@ description: "Adding or changing a King Browser MCP tool end to end: schema, per
 A tool is an authority granted to a remote agent. Each one needs a strict schema, an honest tier, a policy decision, a handler, a failure response and a test, in that order. The full checklist for humans is in `docs/engineering/mcp-development.md`.
 
 ## Files
-`electron/mcpServer.ts` (`TOOLS`, `TOOL_PERMISSIONS`, `TOOL_ALIASES`), `electron/main/mcpProtocol.ts`, `src/hooks/useBrowserAgentBridge.ts`, `electron/main/policyEngine.ts`, `electron/main/elementRefs.ts`, `src/components/settings/McpSection.tsx`, `tests/mcp_tool_catalog.test.ts`, `tests/mcp_tool_schemas.test.ts`, `tests/policy_engine.test.ts`, `README.md` (counts).
+`electron/mcpServer.ts` (`TOOLS`, `TOOL_PERMISSIONS`, `TOOL_ALIASES`), `electron/main/mcpProtocol.ts`, `src/hooks/useBrowserAgentBridge.ts`, `electron/main/policyEngine.ts`, `electron/main/elementRefs.ts`, `src/components/settings/McpSection.tsx`, `tests/mcp_tool_catalog.test.ts`, `tests/mcp_tool_schemas.test.ts`, `tests/policy_engine.test.ts`, `README.md` (counts), `electron/main/customTools.ts`.
 
 ## Workflow
 1. State the purpose in one sentence and decide the tier: read-only metadata `safe`; reads page content or moves the user `medium`; types, submits or crosses an account boundary `sensitive`. When unsure choose `sensitive`.
@@ -20,6 +20,9 @@ A tool is an authority granted to a remote agent. Each one needs a strict schema
 6. Add the tool to `MCP_TOOLS` in `McpSection.tsx` with display copy in all locales.
 7. Return a clear failure string starting with `Error:` (use `formatToolError`); never return a stack trace or a secret.
 8. Update the tool counts in `README.md` and the families in `AGENTS.md` section 2.
+
+## User-defined tools
+Tools the user creates in Settings -> MCP -> Tool Manager are not added to `TOOLS`. They live in `electron/main/customTools.ts` (validation, store, SSRF-safe HTTPS executor) and are merged into `tools/list` by `visibleTools()` in `mcpServer.ts`. Do not add a second registry or a code-execution tool type. Guide: `docs/engineering/custom-mcp-tools.md`. Tests: `tests/custom_tools.test.ts`, `tests/mcp_custom_tools_integration.test.ts`.
 
 ## Rules
 - Do not lower an existing tool's tier or add a mode that skips approval (hard rule 5).

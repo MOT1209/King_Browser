@@ -6,6 +6,7 @@ import * as urlRedactionModule from '../src/utils/urlRedaction';
 import * as trustedInputModule from '../src/utils/trustedInput';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import https from 'node:https';
 import vm from 'node:vm';
 import ts from 'typescript';
 import crypto from 'node:crypto';
@@ -112,6 +113,7 @@ async function run() {
   const mcpStreamableHttpModule = loadSource('electron/main/mcpStreamableHttp.ts', {}, { 'node:crypto': crypto, './mcpProtocol.js': mcpProtocolModule });
   const proxySecurityModule = loadSource('electron/main/proxySecurity.ts', { Buffer, URL, process }, { crypto, os, fs, path });
   const injectionDetectorModule = loadSource('electron/main/injectionDetector.ts', {}, {});
+  const customToolsModule = loadSource('electron/main/customTools.ts', { Buffer, URL, AbortController, AbortSignal }, { 'node:fs': fs, 'node:https': https, './injectionDetector.js': injectionDetectorModule });
   const siteRulesModule = loadSource('electron/main/siteRules.ts', {}, { 'node:fs': fs });
   const policyEngineModule = loadSource('electron/main/policyEngine.ts', { setTimeout, clearTimeout, setImmediate }, {});
   const approvalDetailsModule = loadSource('electron/main/approvalDetails.ts', {}, {});
@@ -129,6 +131,7 @@ async function run() {
     './main/uiStrings.js': uiStringsModule,
     './main/siteRules.js': siteRulesModule,
     './main/injectionDetector.js': injectionDetectorModule,
+    './main/customTools.js': customToolsModule,
     './main/elementRefs.js': elementRefsModule,
     './main/mcpContent.js': mcpContentModule,
     './main/mcpProtocol.js': mcpProtocolModule,

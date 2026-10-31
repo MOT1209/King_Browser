@@ -5,6 +5,7 @@ import { copyTextToClipboard } from '../../utils/clipboard';
 import { showConfirm } from '../../utils/confirmDialog';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 import { useTranslation } from '../../services/i18n';
+import { McpToolManager } from './McpToolManager';
 
 // mcpToken from getMcpTokenStatus is only a display prefix (e.g. "king_mcp_••••").
 // Never treat a masked value as the real secret.
@@ -686,6 +687,9 @@ export const McpSection: React.FC<McpSectionProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Tool Manager: built-in overview plus the user's own tools */}
+      <McpToolManager />
 
       {/* Per-site rules */}
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">

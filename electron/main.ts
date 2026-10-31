@@ -2001,6 +2001,8 @@ app.whenReady().then(async () => {
   // §11/§12: forwarded agent actions go through the policy classifier and the
   // execution engine (approval dialog for sensitive decisions, STOP NOW support).
   mcpServer.setPolicyEnforcement(true);
+  // Custom (user-defined) tools reuse the preview fetch's SSRF validation and DNS pinning.
+  mcpServer.setCustomToolNetwork({ validate: validatePreviewUrl, fetch: (target, init) => fetch(target, init) });
   mcpServer.setUiLanguageProvider(() => currentUiLanguage);
   // Approvals requested while King is in the background notify the human and
   // flash the taskbar entry, so an unseen dialog does not silently time out.
@@ -4089,6 +4091,46 @@ ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolea
   if (!toolName || typeof toolName !== 'string') return false;
   mcpServer?.setToolEnabled(toolName, Boolean(enabled));
   return true;
+});
+
+// Tool Manager (Settings -> MCP): user-defined tools. Definitions are validated and stored in the
+// main process (main/customTools.ts); credentials never travel back to the renderer.
+const CUSTOM_TOOLS_DENIED = { ok: false, errors: ['Unauthorized'] };
+ipcMain.handle('mcp-tool-registry', (event) => {
+  if (!isTrustedSender(event)) return { builtIn: [], custom: [] };
+  return mcpServer?.getToolRegistry() ?? { builtIn: [], custom: [] };
+});
+ipcMain.handle('mcp-custom-tool-create', (event, input: unknown, secret?: unknown) => {
+  if (!isTrustedSender(event)) return CUSTOM_TOOLS_DENIED;
+  return mcpServer?.createCustomTool(input, secret) ?? CUSTOM_TOOLS_DENIED;
+});
+ipcMain.handle('mcp-custom-tool-update', (event, id: unknown, input: unknown, options?: { secret?: unknown; confirmed?: unknown }) => {
+  if (!isTrustedSender(event)) return CUSTOM_TOOLS_DENIED;
+  return mcpServer?.updateCustomTool(id, input, options && typeof options === 'object' ? options : {}) ?? CUSTOM_TOOLS_DENIED;
+});
+ipcMain.handle('mcp-custom-tool-set-enabled', (event, id: unknown, enabled: unknown) => {
+  if (!isTrustedSender(event)) return CUSTOM_TOOLS_DENIED;
+  return mcpServer?.setCustomToolEnabled(id, enabled) ?? CUSTOM_TOOLS_DENIED;
+});
+ipcMain.handle('mcp-custom-tool-delete', (event, id: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false };
+  return mcpServer?.deleteCustomTool(id) ?? { ok: false };
+});
+ipcMain.handle('mcp-custom-tool-test', (event, id: unknown, args: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Unauthorized' };
+  return mcpServer?.testCustomTool(id, args) ?? { ok: false, error: 'MCP is unavailable' };
+});
+ipcMain.handle('mcp-custom-tools-export', (event) => {
+  if (!isTrustedSender(event)) return '';
+  return mcpServer?.exportCustomTools() ?? '';
+});
+ipcMain.handle('mcp-custom-tools-import-preview', (event, text: unknown) => {
+  if (!isTrustedSender(event)) return { entries: [], error: 'Unauthorized' };
+  return mcpServer?.previewCustomToolImport(text) ?? { entries: [], error: 'MCP is unavailable' };
+});
+ipcMain.handle('mcp-custom-tools-import', (event, text: unknown, renameDuplicates?: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, imported: [], errors: ['Unauthorized'] };
+  return mcpServer?.importCustomTools(text, renameDuplicates) ?? { ok: false, imported: [], errors: ['MCP is unavailable'] };
 });
 
 // Wipes everything the agent has stored (cookies, logins, caches) in both of its sessions.

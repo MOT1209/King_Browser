@@ -228,6 +228,12 @@ export function redactArgsForLog(
   args: Record<string, unknown>
 ): Record<string, unknown> {
   const redacted = redactArgs(toolName, args);
+  // User-defined tools take arbitrary data (a message body, an ID, a query) that
+  // the history has no reason to keep: record which arguments were passed, not their values.
+  if (toolName.startsWith('custom_')) {
+    for (const key of Object.keys(redacted)) redacted[key] = REDACTED_VALUE;
+    return redacted;
+  }
   if (toolName === 'browser_type' && typeof args.text === 'string' && args.text.length > 0) {
     redacted.text = REDACTED_VALUE;
   }
