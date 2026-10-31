@@ -8,7 +8,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setGoogleSigninCompat: (enabled: boolean) => ipcRenderer.invoke('set-google-signin-compat', enabled),
   getSuggestions: (query: string, engine?: string, locale?: string) => ipcRenderer.invoke('get-suggestions', query, engine, locale),
   fetchWallpaperPhotos: (query: string) => ipcRenderer.invoke('fetch-wallpaper-photos', query),
-  fetchUnsplashPhotos: (query: string) => ipcRenderer.invoke('fetch-unsplash-photos', query),
   fetchPageHtml: (url: string) => ipcRenderer.invoke('fetch-page-html', url),
   captureFullPage: (wcId: number) => ipcRenderer.invoke('capture-full-page', wcId),
   // Translation APIs
@@ -149,7 +148,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   modelCacheGet: (url: string) => ipcRenderer.invoke('model-cache-get', url),
   modelCacheSet: (url: string, data: ArrayBuffer | ArrayBufferView) => ipcRenderer.invoke('model-cache-set', url, data),
   // Password Manager: fire-and-forget send channel (not invoke)
-  savePassword: (data: { hostname: string; username: string; password: string }) => ipcRenderer.send('save-password', data),
   storeSet: (key: string, value: string) => ipcRenderer.invoke('store-set', key, value),
   storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
   showConfirmDialog: (options: { title?: string; message: string; detail?: string; confirmLabel?: string; cancelLabel?: string }) =>

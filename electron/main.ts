@@ -3553,12 +3553,6 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
   return results;
 });
 
-// Legacy alias for compatibility
-ipcMain.handle('fetch-unsplash-photos', async (event, query: string) => {
-  if (!isTrustedSender(event)) return [];
-  return [];
-});
-
 // Set theme source for dark mode rendering on pages
 ipcMain.on('set-theme', (event, theme: 'light' | 'dark' | 'system') => {
   if (!isTrustedSender(event)) return;
@@ -4386,33 +4380,9 @@ ipcMain.handle('purge-system-memory', async (event) => {
   }
 });
 
-// Password Manager: save-password channel (fire-and-forget, validated with isTrustedSender)
-ipcMain.on('save-password', (event, data: { hostname: string; username: string; password: string }) => {
-  if (!isTrustedSender(event)) return;
-  if (!data || typeof data !== 'object') return;
-  const { hostname, username, password } = data;
-  if (typeof hostname !== 'string' || typeof username !== 'string' || typeof password !== 'string') return;
-  const cleanUser = username.trim();
-  let cleanHost = hostname.trim().toLowerCase();
-  try {
-    if (cleanHost.includes('://')) {
-      cleanHost = new URL(cleanHost).hostname.toLowerCase();
-    } else {
-      cleanHost = new URL(`https://${cleanHost}`).hostname.toLowerCase();
-    }
-  } catch {
-    cleanHost = cleanHost.replace(/:\d+$/, '').replace(/\.+$/, '');
-  }
-  if (!cleanHost || !cleanUser || !password) return;
-  // Emit event to the main window to trigger password prompt
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('password-form-submitted', { hostname: cleanHost, username: cleanUser, password });
-  }
-});
-
 // Generic Secure Storage API (for future password manager, etc.)
 // Mutex: serialize concurrent secure-store operations to prevent read-modify-write races
-// when multiple tabs call save-password / secure-store-set simultaneously.
+// when multiple tabs call secure-store-set simultaneously.
 let secureStoreMutexChain: Promise<unknown> = Promise.resolve();
 function withSecureStoreMutex<T>(fn: () => Promise<T>): Promise<T> {
   const next = secureStoreMutexChain.then(fn, fn) as Promise<T>;

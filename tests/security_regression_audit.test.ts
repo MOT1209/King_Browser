@@ -160,19 +160,10 @@ async function runSecurityRegressionAuditSuite() {
     `Expected false, got ${r1_1_5}`
   );
 
-  // R1.1.6: Static audit of electron/main.ts for fetch-unsplash-photos and other handlers
+  // R1.1.6: Static audit of electron/main.ts for critical IPC handlers
   const rootDir = process.cwd();
   const mainTsPath = path.resolve(rootDir, 'electron/main.ts');
   const mainTsContent = fs.readFileSync(mainTsPath, 'utf8');
-
-  // Verify fetch-unsplash-photos contains isTrustedSender
-  const fetchUnsplashMatch = /ipcMain\.handle\s*\(\s*['"]fetch-unsplash-photos['"][\s\S]*?isTrustedSender/m.test(mainTsContent);
-  record(
-    'R1-IPC-Handler-Audit',
-    'fetch-unsplash-photos handler enforces isTrustedSender',
-    fetchUnsplashMatch,
-    fetchUnsplashMatch ? 'isTrustedSender present in fetch-unsplash-photos handler' : 'Missing isTrustedSender guard'
-  );
 
   // Verify other critical IPC handlers enforce isTrustedSender
   const criticalIpcChannels = [

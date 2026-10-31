@@ -12,7 +12,7 @@ description: "Content Security Policy for the King Browser renderer: the product
 - `tests/csp_parity.test.ts` fails when the two copies differ, when `script-src` gains inline/eval/remote sources, or when the built `dist/index.html` differs. `tests/electron/smoke.spec.ts` re-checks the CSP of the running app.
 
 ## Adding a host (for example a new API)
-1. Prefer doing the request in the main process behind a guarded IPC (as `fetch-unsplash-photos` does), so the renderer CSP does not grow.
+1. Prefer doing the request in the main process behind a guarded IPC (as `fetch-page-html` does), so the renderer CSP does not grow.
 2. If the renderer must connect directly: add the narrowest origin to `connect-src` in BOTH copies, and to the dev policy in `index.html`.
 3. Add the host to README "Network connections" (CLAUDE.md rule 8).
 4. Never add `'unsafe-eval'`, `'unsafe-inline'`, `blob:`, `data:` or wildcards to `script-src`.
