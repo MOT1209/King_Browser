@@ -108,7 +108,7 @@ Bundle impact: none (test-only). Install impact: 5 packages, none with an instal
 - `codeql.yml` (new): CodeQL for JavaScript/TypeScript, `build-mode: none`, on pushes to `main`, pull requests and weekly; job-level `security-events: write` only. Pinned to `github/codeql-action` v4.39.1. The repository is public, so code scanning is available without extra licences.
 - `release.yml`: actions pinned to the commit SHAs their tags resolved to on 2026-10-28 (including `softprops/action-gh-release` v2.6.2, which runs with `contents: write`), approved by the owner. No other change to the release workflow.
 - `release.yml` (2026-10-31, owner-requested): after publishing the rolling nightly, a step deletes nightly assets the current build did not produce (versioned names such as `King-Browser-0.0.9-x64.exe` otherwise accumulate). Guarded by `tests/release_nightly_cleanup.test.ts`, which runs the step's script against a stub `gh`.
-- `dependabot.yml`: unchanged. Dependabot version updates are disabled on purpose, so pinned SHAs are not bumped automatically; update them by hand with the version comment. GitHub Dependabot security alerts are a repository setting, not a file, and were not checked from here.
+- `dependabot.yml` (2026-10-31, owner-requested): version updates stay disabled (`open-pull-requests-limit: 0`), so pinned SHAs are not bumped automatically; update them by hand with the version comment. The `ignore: "*"` rules were removed because ignore conditions also suppress Dependabot security updates. Security update pull requests additionally need "Dependabot security updates" enabled in the repository settings, which was not checked from here.
 
 ## 5. Troubleshooting
 

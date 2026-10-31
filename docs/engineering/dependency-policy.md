@@ -23,7 +23,7 @@ Evidence comes from `agent-tooling.md` (measured 2026-10-28) and this session's 
 | `@electron/fuses` | Retained | Applied by `scripts/apply-fuses.cjs` for packaged builds |
 | npm audit | Retained | `npm run audit:prod` blocks CI on high advisories in runtime dependencies |
 | CodeQL | Retained | `.github/workflows/codeql.yml` |
-| Dependabot | Version updates off on purpose (SHA-pinned actions are bumped by hand); security alerts are a repository setting that was not checked from here | See `agent-tooling.md` section 4 |
+| Dependabot | Version updates off on purpose (SHA-pinned actions are bumped by hand); no ignore rule, so security updates can open pull requests once enabled in the repository settings (not checked from here) | See `agent-tooling.md` section 4 |
 | Vitest, Testing Library, MSW | Rejected | The Node runner `tests/runAll.ts` already covers logic and jsdom components; a second runner would duplicate the 130 existing imports. No test depends on an external service |
 | Prettier | Rejected for now | Would reformat most files in one diff; an owner decision |
 | Knip, dependency-cruiser, Madge | On demand, not installed | Run with `npx`; Knip has many false positives here, Madge finds no runtime cycle. A CI gate is not justified yet |
