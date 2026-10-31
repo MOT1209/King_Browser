@@ -192,6 +192,22 @@ jobs:
             Unsigned. For trying the newest code; use a versioned release for everyday use.
           files: release-files/*
 
+      # Same-named assets were replaced above, but versioned names (for
+      # example King-Browser-0.0.9-x64.exe) never match the new build's names
+      # and would pile up on the rolling release. Runs only after the publish
+      # step succeeded, so a failed run can never leave nightly without files.
+      - name: Remove stale nightly assets
+        if: needs.check.outputs.nightly == 'true'
+        run: |
+          keep="$(ls release-files)"
+          [ -n "$keep" ] || { echo "release-files is empty; refusing to prune"; exit 1; }
+          gh release view nightly --json assets --jq '.assets[].name' | while IFS= read -r name; do
+            if ! printf '%s\n' "$keep" | grep -qxF -- "$name"; then
+              echo "Deleting stale nightly asset: $name"
+              gh release delete-asset nightly "$name" --yes
+            fi
+          done
+
       - name: Publish v-release
         if: needs.check.outputs.versioned == 'true'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
