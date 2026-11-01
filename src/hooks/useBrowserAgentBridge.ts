@@ -10,6 +10,7 @@ import { orchestrator } from '../services/agentOrchestrator';
 // deliberately permits loopback/private hosts for real user navigation.
 import { isSafeAgentNavigationUrl } from '../utils/safeNavigation';
 import { buildSnapshotScript } from '../utils/elementSnapshot';
+import { withDeepQuery } from '../utils/deepQuery';
 import { redactSnapshotUrls, redactUrlForAgent, redactUrlParamsInText } from '../utils/urlRedaction';
 import { getConsoleMessages } from '../utils/consoleBuffer';
 import { MCP_ACTION_TIMEOUT_MS, MCP_APPROVAL_WINDOW_MS, MCP_POLICY_CONTEXT_ACTION } from '../utils/mcpActionTiming';
@@ -234,7 +235,7 @@ export function useBrowserAgentBridge({
             return async (code: string) => {
               await authorize();
               return guest.executeJavaScript(
-                `if (window.location.href !== ${JSON.stringify(target.url)}) { throw new Error('Agent action blocked: target document changed.'); }\n${code}`,
+                withDeepQuery(`if (window.location.href !== ${JSON.stringify(target.url)}) { throw new Error('Agent action blocked: target document changed.'); }\n${code}`),
                 true
               );
             };
@@ -249,7 +250,7 @@ export function useBrowserAgentBridge({
             if (key === 'executeJavaScript') {
               // The check runs in the same guest task as the operation, closing
               // the cross-origin navigation gap between IPC dispatch and use.
-              args[0] = `if (window.location.href !== ${JSON.stringify(target.url)}) { throw new Error('Agent action blocked: target document changed.'); }\n${args[0]}`;
+              args[0] = withDeepQuery(`if (window.location.href !== ${JSON.stringify(target.url)}) { throw new Error('Agent action blocked: target document changed.'); }\n${args[0]}`);
             }
             const result = await original.apply(guest, args);
             // History/reload intentionally replace the document and return no
@@ -292,11 +293,12 @@ export function useBrowserAgentBridge({
           target = await activeWebview.executeJavaScript(`
             (() => {
               try {
-                const el = document.querySelector(${JSON.stringify(selector)});
+                const el = __kingQuery(${JSON.stringify(selector)});
                 if (!el) return null;
                 el.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
                 const r = el.getBoundingClientRect();
-                return { x: r.left + r.width / 2, y: r.top + r.height / 2, sensitive: el.type === 'password' };
+                const off = __kingOffset(el);
+                return { x: r.left + off.x + r.width / 2, y: r.top + off.y + r.height / 2, sensitive: el.type === 'password' };
               } catch (_) { return null; }
             })()
           `);
@@ -419,7 +421,7 @@ export function useBrowserAgentBridge({
             // end instead of select-all, which would wipe a whole document.
             const field = await activeWebview.executeAction(`
               (() => {
-                const el = document.querySelector(${selectorJson});
+                const el = __kingQuery(${selectorJson});
                 if (!el) return { ok: false };
                 const isActive = () => document.activeElement === el || el.contains(document.activeElement);
                 if (!isActive() && typeof el.focus === 'function') el.focus();
@@ -444,7 +446,7 @@ export function useBrowserAgentBridge({
             // Compared inside the page, so a password never travels back.
             const check = await activeWebview.executeAction(`
               (() => {
-                const el = document.querySelector(${selectorJson});
+                const el = __kingQuery(${selectorJson});
                 if (!el) return { matches: false, length: 0 };
                 const expected = ${JSON.stringify(textToType)};
                 const actual = String((el.isContentEditable ? el.innerText : el.value) ?? '');
@@ -580,7 +582,7 @@ export function useBrowserAgentBridge({
           // is read only for buttons, never for fields that can hold user input.
           const elementText = await activeWebview.executeJavaScript(`
             (() => {
-              const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+              const el = __kingQuery(${JSON.stringify(safeArgs.selector)});
               if (!el) return '';
               const type = (el.getAttribute('type') || '').toLowerCase();
               const isButton = el.tagName === 'BUTTON' || ['submit', 'button', 'reset'].includes(type);
@@ -625,7 +627,7 @@ export function useBrowserAgentBridge({
             return await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+                  const el = __kingQuery(${JSON.stringify(safeArgs.selector)});
                   if (el) { el.focus(); return "Focused element"; }
                   return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
                 } catch (err) {
@@ -670,7 +672,7 @@ export function useBrowserAgentBridge({
             return await activeWebview.executeAction(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+                  const el = __kingQuery(${JSON.stringify(safeArgs.selector)});
                   if (el && el.tagName === 'SELECT') {
                     // The native setter, so frameworks that track the value
                     // (React) see the change; then the events a user's pick fires.
@@ -703,7 +705,7 @@ export function useBrowserAgentBridge({
               const focused = await activeWebview.executeAction(`
                 (() => {
                   try {
-                    const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+                    const el = __kingQuery(${JSON.stringify(safeArgs.selector)});
                     if (el && typeof el.focus === 'function') { el.focus(); return true; }
                   } catch (_) {}
                   return false;
@@ -724,7 +726,7 @@ export function useBrowserAgentBridge({
             return await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+                  const el = __kingQuery(${JSON.stringify(safeArgs.selector)});
                   if (!el) return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
                   const tag = el.tagName.toLowerCase();
                   // Form controls carry their text in .value, not innerText, so
@@ -783,7 +785,7 @@ export function useBrowserAgentBridge({
                     const text = ${JSON.stringify(text)};
                     if (document.readyState === 'loading') return 'the document is still parsing';
                     if (selector) {
-                      const el = document.querySelector(selector);
+                      const el = __kingQuery(selector);
                       if (!el) return 'no element matches ' + selector;
                       const r = el.getBoundingClientRect();
                       if (r.width === 0 && r.height === 0) return 'the element ' + selector + ' is not visible';
@@ -826,7 +828,7 @@ export function useBrowserAgentBridge({
           const rect = await activeWebview.executeJavaScript(`
             (() => {
               try {
-                const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+                const el = __kingQuery(${JSON.stringify(safeArgs.selector)});
                 if (!el) return { error: "Element not found with selector: " + ${JSON.stringify(safeArgs.selector)} };
                 if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center', inline: 'center' });
                 const r = el.getBoundingClientRect();
@@ -922,7 +924,7 @@ export function useBrowserAgentBridge({
             return await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
+                  const el = __kingQuery(${JSON.stringify(safeArgs.selector)});
                   if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return "Scrolled to element"; }
                   return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
                 } catch (err) {
@@ -1272,20 +1274,21 @@ export function useBrowserAgentBridge({
       const guest = selector ? currentGuest() : null;
       if (!selector || !guest?.executeJavaScript) { setHighlight(null); return; }
       const tabId = browserDataRef.current.activeTabId;
-      Promise.resolve(guest.executeJavaScript(`
+      Promise.resolve(guest.executeJavaScript(withDeepQuery(`
         (() => {
           try {
-            const el = document.querySelector(${JSON.stringify(selector)});
+            const el = __kingQuery(${JSON.stringify(selector)});
             if (!el) return null;
             let r = el.getBoundingClientRect();
             if (r.bottom <= 0 || r.top >= window.innerHeight) {
               el.scrollIntoView?.({ block: 'center', inline: 'nearest' });
               r = el.getBoundingClientRect();
             }
-            return { x: r.left, y: r.top, width: r.width, height: r.height };
+            const off = __kingOffset(el);
+            return { x: r.left + off.x, y: r.top + off.y, width: r.width, height: r.height };
           } catch (_) { return null; }
         })()
-      `)).then((rect: any) => {
+      `))).then((rect: any) => {
         if (browserDataRef.current.activeTabId !== tabId) return;
         if (!rect || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) { setHighlight(null); return; }
         const bounds = guest.getBoundingClientRect();

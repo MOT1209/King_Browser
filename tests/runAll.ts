@@ -127,6 +127,7 @@ import './mcp_tool_catalog.test';
 import './mcp_tool_schemas.test';
 import './element_refs.test';
 import './page_dialogs.test';
+import './deep_query.test';
 import './url_redaction.test';
 import './trusted_input.test';
 import './approval_mode.test';

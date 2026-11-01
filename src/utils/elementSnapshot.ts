@@ -8,6 +8,8 @@
  * fields are only marked as such.
  */
 
+import { DEEP_QUERY_SOURCE } from './deepQuery';
+
 export const SNAPSHOT_MAX_ELEMENTS = 150;
 
 export interface SnapshotScriptOptions {
@@ -19,10 +21,13 @@ export interface SnapshotScriptOptions {
 export function buildSnapshotScript(options: SnapshotScriptOptions = {}): string {
   const requireVisible = options.requireVisible !== false;
   const max = Math.max(1, Math.min(options.maxElements ?? SNAPSHOT_MAX_ELEMENTS, 500));
-  return `(() => {
+  return `${DEEP_QUERY_SOURCE}
+  (() => {
     const MAX = ${max};
     const REQUIRE_VISIBLE = ${requireVisible};
-    document.querySelectorAll('[data-king-ref]').forEach(el => el.removeAttribute('data-king-ref'));
+    // Open shadow roots and same-origin iframes are part of the page a person sees.
+    const ROOTS = __kingRoots();
+    for (const root of ROOTS) root.querySelectorAll('[data-king-ref]').forEach(el => el.removeAttribute('data-king-ref'));
     const SELECTOR = [
       'a[href]', 'button', 'input:not([type="hidden"])', 'select', 'textarea', 'summary',
       '[contenteditable=""]', '[contenteditable="true"]',
@@ -34,7 +39,7 @@ export function buildSnapshotScript(options: SnapshotScriptOptions = {}): string
       if (!REQUIRE_VISIBLE) return true;
       const rects = el.getClientRects();
       if (!rects.length || (rects[0].width === 0 && rects[0].height === 0)) return false;
-      const style = getComputedStyle(el);
+      const style = (el.ownerDocument.defaultView || window).getComputedStyle(el);
       return style.visibility !== 'hidden' && style.display !== 'none';
     };
     const roleOf = (el) => {
@@ -59,7 +64,8 @@ export function buildSnapshotScript(options: SnapshotScriptOptions = {}): string
       if (aria) return clean(aria);
       const labelledBy = el.getAttribute('aria-labelledby');
       if (labelledBy) {
-        const text = labelledBy.split(/\\s+/).map(id => { const n = document.getElementById(id); return n ? n.textContent : ''; }).join(' ');
+        const text = labelledBy.split(/\\s+/).map(id => { const rootNode = el.getRootNode();
+          const n = rootNode && rootNode.getElementById ? rootNode.getElementById(id) : document.getElementById(id); return n ? n.textContent : ''; }).join(' ');
         if (clean(text)) return clean(text);
       }
       if (el.labels && el.labels.length) {
@@ -79,7 +85,9 @@ export function buildSnapshotScript(options: SnapshotScriptOptions = {}): string
     const lines = [];
     let count = 0;
     let truncated = false;
-    for (const el of document.querySelectorAll(SELECTOR)) {
+    const found = [];
+    for (const root of ROOTS) for (const el of root.querySelectorAll(SELECTOR)) found.push(el);
+    for (const el of found) {
       if (el.disabled || el.getAttribute('aria-hidden') === 'true' || !visible(el)) continue;
       if (count >= MAX) { truncated = true; break; }
       count++;
