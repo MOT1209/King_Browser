@@ -87,7 +87,12 @@ export const TOOLS: McpTool[] = [
   {
     name: 'browser_snapshot',
     description: 'Lists the interactive elements of the active page (links, buttons, fields) with a ref such as e12, a role and a name. Use the ref with browser_click, browser_type and the other element tools instead of guessing CSS selectors. Refs are valid until the next snapshot or navigation; take a new snapshot after the page changes.',
-    inputSchema: { type: 'object', properties: {} }
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['dom', 'accessibility'], description: 'dom (default) scans the page; accessibility reads the browser\'s accessibility tree, which reflects roles, names and disabled state as assistive technology sees them' }
+      }
+    }
   },
   {
     name: 'browser_screenshot',

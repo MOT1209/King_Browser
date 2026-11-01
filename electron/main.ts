@@ -7,6 +7,7 @@ import { isLocalOrIntranetHost } from './main/hostPolicy';
 import { PageDialogTracker, planDialogResponse } from './main/pageDialogs';
 import { validateUploadPath } from './main/uploadPolicy';
 import { parseDragPoint, dragPath } from './main/dragPlan';
+import { selectInteractiveNodes, formatAxSnapshot } from './main/axSnapshot';
 import { DEEP_QUERY_SOURCE } from '../src/utils/deepQuery.js';
 import { isExtensionAllowedInIncognito, setExtensionIncognitoAccess, hasExtensionIncognitoAccess } from './main/incognitoExtensions';
 import { openPageSourceViewer as createPageSourceViewer } from './windows/sourceViewer';
@@ -4608,6 +4609,46 @@ ipcMain.handle('agent-page-dialog', async (event, webContentsId: unknown, action
     return { ok: true, text: plan.accept ? 'Dialog accepted.' : 'Dialog dismissed.' };
   } catch (err) {
     return { ok: false, error: 'The dialog could not be answered.' };
+  }
+});
+
+ipcMain.handle('agent-ax-snapshot', async (event, webContentsId: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'untrusted sender' };
+  if (typeof webContentsId !== 'number' || !Number.isInteger(webContentsId)) return { ok: false, error: 'invalid tab' };
+  const wc = webContents.fromId(webContentsId);
+  if (!wc || wc.isDestroyed() || wc.getType() !== 'webview') return { ok: false, error: 'invalid tab' };
+  const pageUrl = wc.getURL();
+  if (!/^https?:/i.test(pageUrl)) return { ok: false, error: 'Snapshots are only available on public websites.' };
+  const hostVerdict = await isAgentNavigationHostPublic(pageUrl);
+  if (!hostVerdict.allowed) return { ok: false, error: `Snapshot blocked for security (${hostVerdict.reason}).` };
+  let attachedHere = false;
+  try {
+    if (!wc.debugger.isAttached()) { wc.debugger.attach('1.3'); attachedHere = true; }
+    await wc.debugger.sendCommand('Accessibility.enable');
+    const tree: any = await wc.debugger.sendCommand('Accessibility.getFullAXTree');
+    const { entries, truncated } = selectInteractiveNodes(tree?.nodes);
+    // Earlier refs belong to the previous snapshot: clear them everywhere, then stamp the new ones.
+    await wc.debugger.sendCommand('Runtime.evaluate', {
+      expression: `(() => { ${DEEP_QUERY_SOURCE}\nfor (const root of __kingRoots()) root.querySelectorAll('[data-king-ref]').forEach(el => el.removeAttribute('data-king-ref')); })()`
+    });
+    const stamped = [];
+    for (const entry of entries) {
+      try {
+        const resolved: any = await wc.debugger.sendCommand('DOM.resolveNode', { backendNodeId: entry.backendNodeId });
+        const objectId = resolved?.object?.objectId;
+        if (!objectId) continue;
+        await wc.debugger.sendCommand('Runtime.callFunctionOn', {
+          objectId,
+          functionDeclaration: `function () { if (this && this.setAttribute) this.setAttribute('data-king-ref', ${JSON.stringify(entry.ref)}); }`
+        });
+        stamped.push(entry);
+      } catch (_) { /* node vanished between the tree and the stamp */ }
+    }
+    return { ok: true, text: formatAxSnapshot(pageUrl, wc.getTitle(), stamped, truncated) };
+  } catch (err) {
+    return { ok: false, error: 'The accessibility snapshot could not be taken.' };
+  } finally {
+    if (attachedHere) { try { wc.debugger.detach(); } catch (_) { /* already detached */ } }
   }
 });
 

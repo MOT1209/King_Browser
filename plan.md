@@ -48,20 +48,21 @@
 - تحديث Electron ضمن الإصدار الرئيسي نفسه مع كل إصدار (تحديثات Chromium الأمنية التزام دائم).
 - حماية المزامنة من إعادة تقديم نسخة قديمة (تحتاج صيغة تشفير جديدة وترحيلاً؛ قرارك قبل البدء).
 
-### WP10 — تحكم الوكيل بإدخال حقيقي (أنا) — المتبقي
+### WP10 — تحكم الوكيل بإدخال حقيقي (أنا) — منفَّذ في الكود، ينتظر تجربة حية
 - **الهدف:** كل نقرة وكتابة ومفتاح وتمرير يمر عبر مسار الإدخال الأصلي للمتصفح. **ليس هدفاً:** التخفي عن كشف البوتات، أو حل CAPTCHA، أو تزييف البصمة.
-- **المرحلة 2 — أدوات جديدة:** نوافذ `alert`/`confirm`/`prompt`؛ رفع الملفات (`<input type=file>` عبر CDP `DOM.setFileInputFiles`، بموافقة في كل مرة لأنه يُخرج ملفاً من الجهاز)؛ السحب والإفلات؛ دعم iframe وShadow DOM في `browser_snapshot`. الصعوبة: متوسطة-عالية. الوقت: 4-6 أسابيع **[رأي]**.
-- **المرحلة 3 — الإدراك:** شجرة الوصول عبر CDP `Accessibility.getFullAXTree` بدل مسح DOM. الصعوبة: متوسطة. الوقت: 2-3 أسابيع **[رأي]**.
-- **القيود:** لا مكتبات جديدة (إدخال Electron الأصلي وCDP يكفيان)، ولا إدخال على مستوى النظام (يحرّك مؤشر الإنسان ويكسر التحكم البشري). اختبار أولاً، ثم تحقق حي، ولا تخفيف لبوابة الموافقة.
+- **المرحلة 2 (منفَّذة):** `browser_handle_dialog` (نوافذ `alert`/`confirm`/`prompt`/`beforeunload` عبر CDP، والقبول يحتاج موافقة، وإن لم يجب الوكيل خلال 20 ثانية تظهر نافذة نظام للمستخدم)؛ `browser_upload_file` (`DOM.setFileInputFiles`، موافقة في كل مرة، والمسار يُتحقق منه في العملية الرئيسية: ملف عادي مطلق ≤ 100 ميغابايت وخارج مجلدات الاعتماد وبيانات التطبيق)؛ `browser_drag` (سحب وإفلات HTML5 بمؤشر حقيقي عبر CDP، موافقة في كل مرة)؛ وShadow DOM المفتوح وiframe من نفس الأصل في `browser_snapshot` والاستهداف.
+- **المرحلة 3 (منفَّذة):** `browser_snapshot` مع `mode: "accessibility"` يقرأ شجرة الوصول عبر `Accessibility.getFullAXTree` ويختم المراجع على العناصر.
+- **لم يُجرَّب حياً (لا أستطيع من هنا):** كل ما سبق مغطى باختبارات وحدة وتصنيف سياسة فقط، ولم يُشغَّل على Electron حقيقي. يجب تجربته ضمن WP1: نافذة `confirm` حقيقية ثم الرد من الوكيل ثم عدم رده؛ رفع ملف إلى موقع حقيقي؛ سحب بطاقة في لوحة كانبان وشريط تمرير؛ مكوّن Web Component؛ iframe من نفس الأصل. **حدود معروفة:** المراقبة تشمل التبويبات المنشأة بعد تشغيل خادم MCP فقط؛ iframe من أصل آخر وShadow DOM المغلق غير قابلين للوصول؛ لقطة الوصول تغطي الإطار الرئيسي فقط؛ ملف واحد في كل نداء رفع؛ الفحص في `activeElement` داخل Shadow DOM لا يطابق الصفحة العادية.
+- **القيود:** لا مكتبات جديدة، ولا إدخال على مستوى النظام، ولا تخفيف لبوابة الموافقة.
 
 ## 4) الإيراد (رأي، لا تفكر فيه الآن)
 - لا إيراد قبل مستخدمين فعليين. إن ظهر طلب: ميزات فرق (سياسات مشتركة، تصدير تدقيق، SSO) فوق نواة مفتوحة **[افتراض]**. تذكّر أن Vercel Hobby (للموقع) غير تجاري.
 
 ## 5) ترتيب التنفيذ
 1. WP1 (أنت، بالتوازي مع الباقي).
-2. WP10 المرحلة 2 بحسب ما يظهر في WP1؛ **[رأي]** نوافذ `alert`/`confirm`/`prompt` أولاً لأنها شائعة وقد توقف تشغيل الوكيل.
+2. WP10 (المرحلتان 2 و3 منفَّذتان في الكود): تجربتهما حياً ضمن WP1 وإصلاح ما يظهر.
 3. WP7 (توقيع Windows عبر SignPath) بالتوازي.
-4. WP10 المرحلة 3، ثم WP8 حسب قرارك. WP9 على الهامش.
+4. WP8 حسب قرارك. WP9 على الهامش.
 
 ## 6) ما لن أفعله بلا اتفاق
 حذف ميزات، تغيير الإصدار/النشر العلني، الدمج على CI أحمر، تقسيم `main.ts` دفعة واحدة، ادعاءات أمان لم تُثبت، تغيير صيغة تشفير المزامنة أو سياسة الموافقة.
@@ -111,20 +112,21 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich" = per Code umsetzbar; „du" 
 - Electron mit jedem Release innerhalb der Hauptversion aktualisieren (Chromium-Sicherheitsupdates sind eine Dauerverpflichtung).
 - Sync gegen das erneute Ausliefern einer alten Version schützen (braucht ein neues Verschlüsselungsformat und eine Migration; vorher deine Entscheidung).
 
-### WP10 — Agent steuert mit echter Eingabe (ich) — offen
+### WP10 — Agent steuert mit echter Eingabe (ich) — im Code umgesetzt, wartet auf Live-Test
 - **Ziel:** Jeder Klick, jede Eingabe, jede Taste und jedes Scrollen läuft über den nativen Eingabepfad des Browsers. **Kein Ziel:** Bot-Erkennung umgehen, CAPTCHAs lösen oder Fingerabdrücke fälschen.
-- **Phase 2 — neue Werkzeuge:** `alert`/`confirm`/`prompt`-Dialoge; Datei-Upload (`<input type=file>` über CDP `DOM.setFileInputFiles`, jedes Mal mit Freigabe, weil eine Datei den Rechner verlässt); Drag-and-drop; iframe- und Shadow-DOM-Unterstützung in `browser_snapshot`. Schwierigkeit: mittel bis hoch. Zeit: 4-6 Wochen **[Meinung]**.
-- **Phase 3 — Wahrnehmung:** Zugänglichkeitsbaum über CDP `Accessibility.getFullAXTree` statt DOM-Scan. Schwierigkeit: mittel. Zeit: 2-3 Wochen **[Meinung]**.
-- **Grenzen:** keine neuen Bibliotheken (native Electron-Eingabe und CDP reichen), keine Eingabe auf Systemebene (bewegt den Mauszeiger des Menschen und bricht die menschliche Kontrolle). Erst Test, dann Live-Prüfung, keine Lockerung des Freigabe-Tors.
+- **Phase 2 (umgesetzt):** `browser_handle_dialog` (`alert`/`confirm`/`prompt`/`beforeunload` über CDP; Annehmen braucht Freigabe; ohne Antwort des Agenten erscheint nach 20 Sekunden ein Systemdialog für den Menschen); `browser_upload_file` (`DOM.setFileInputFiles`, jedes Mal Freigabe; der Pfad wird im Hauptprozess geprüft: absolute reguläre Datei bis 100 MB, außerhalb von Zugangsdaten-Ordnern und App-Daten); `browser_drag` (HTML5-Drag-and-drop mit echtem Mauszeiger über CDP, jedes Mal Freigabe); offener Shadow DOM und gleich-ursprüngliche iframes in `browser_snapshot` und Zielauswahl.
+- **Phase 3 (umgesetzt):** `browser_snapshot` mit `mode: "accessibility"` liest den Zugänglichkeitsbaum über `Accessibility.getFullAXTree` und stempelt die Refs auf die Elemente.
+- **Nicht live getestet (von hier nicht möglich):** Alles oben ist nur durch Unit-Tests und Richtlinien-Klassifizierung abgedeckt, nicht auf echtem Electron gelaufen. In WP1 ausprobieren: echter `confirm`-Dialog (Agent antwortet, Agent antwortet nicht); Datei-Upload auf einer echten Seite; Karte im Kanban ziehen und Schieberegler; Web Component; gleich-ursprünglicher iframe. **Bekannte Grenzen:** Überwacht werden nur Tabs, die nach dem Start des MCP-Servers entstehen; iframes fremden Ursprungs und geschlossener Shadow DOM sind nicht erreichbar; der Zugänglichkeits-Snapshot deckt nur den Hauptframe ab; eine Datei pro Upload-Aufruf; `activeElement`-Prüfungen in Shadow DOM verhalten sich anders als im normalen DOM.
+- **Grenzen:** keine neuen Bibliotheken, keine Eingabe auf Systemebene, keine Lockerung des Freigabe-Tors.
 
 ## 4) Einnahmen (Meinung, jetzt nicht darüber nachdenken)
 - Keine Einnahmen vor echten Nutzern. Falls Nachfrage entsteht: Team-Funktionen (gemeinsame Richtlinien, Audit-Export, SSO) auf offenem Kern **[Annahme]**. Vercel Hobby (Website) ist nicht kommerziell.
 
 ## 5) Reihenfolge
 1. WP1 (du, parallel zum Rest).
-2. WP10 Phase 2 nach dem, was WP1 zeigt; **[Meinung]** zuerst `alert`/`confirm`/`prompt`-Dialoge, weil sie häufig sind und einen Agentenlauf anhalten können.
+2. WP10 (Phasen 2 und 3 im Code umgesetzt): live in WP1 ausprobieren und beheben, was auffällt.
 3. WP7 (Windows-Signatur über SignPath) parallel.
-4. WP10 Phase 3, dann WP8 nach deiner Entscheidung. WP9 nebenbei.
+4. WP8 nach deiner Entscheidung. WP9 nebenbei.
 
 ## 6) Was ich nicht ohne Absprache tue
 Funktionen löschen, Version/öffentliche Veröffentlichung ändern, bei roter CI mergen, `main.ts` in einem Zug aufteilen, unbewiesene Sicherheitsaussagen, das Sync-Verschlüsselungsformat oder die Freigabe-Politik ändern.

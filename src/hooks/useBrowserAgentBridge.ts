@@ -360,6 +360,18 @@ export function useBrowserAgentBridge({
           return "Error: No active webview available.";
 
         case 'browser_snapshot':
+          if (safeArgs.mode !== undefined && safeArgs.mode !== 'dom' && safeArgs.mode !== 'accessibility') {
+            return "Error: Invalid 'mode' parameter: use dom or accessibility.";
+          }
+          if (safeArgs.mode === 'accessibility') {
+            const api = (window as any).electronAPI;
+            if (!api?.agentAxSnapshot) return 'Error: Accessibility snapshots are unavailable.';
+            if (!activeWebview || typeof activeWebview.getWebContentsId !== 'function') return 'Error: No active webview available.';
+            let wcId: number;
+            try { wcId = activeWebview.getWebContentsId(); } catch (_) { return 'Error: No active webview available.'; }
+            const result = await api.agentAxSnapshot(wcId);
+            return result?.ok ? redactSnapshotUrls(String(result.text)) : `Error: ${result?.error || 'The accessibility snapshot could not be taken.'}`;
+          }
           if (activeWebview && activeWebview.executeJavaScript) {
             const snapshot = await activeWebview.executeJavaScript(buildSnapshotScript());
             return typeof snapshot === 'string' ? redactSnapshotUrls(snapshot) : snapshot;

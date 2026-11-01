@@ -130,6 +130,7 @@ import './page_dialogs.test';
 import './deep_query.test';
 import './upload_policy.test';
 import './drag_plan.test';
+import './ax_snapshot.test';
 import './url_redaction.test';
 import './trusted_input.test';
 import './approval_mode.test';

@@ -69,6 +69,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /** Drags between two points (page coordinates) of a tab with real mouse input. */
   agentDrag: (webContentsId: number, from: { x: number; y: number }, to: { x: number; y: number }) =>
     ipcRenderer.invoke('agent-drag', webContentsId, from, to),
+  /** Accessibility-tree snapshot of a tab; stamps refs and returns the listing. */
+  agentAxSnapshot: (webContentsId: number) =>
+    ipcRenderer.invoke('agent-ax-snapshot', webContentsId),
   onUpdateDownloaded: (callback: (event: any, info: any) => void) => {
     const handler = (_event: any, info: any) => callback(null, info);
     ipcRenderer.on('update-downloaded', handler);
