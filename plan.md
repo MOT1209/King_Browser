@@ -1,7 +1,7 @@
-# King Browser — خطة التطوير الكاملة / Vollständiger Entwicklungsplan
+# King Browser — خطة التطوير / Entwicklungsplan
 
-> الحقائق مأخوذة من مراجعة الكود والاختبارات (أكتوبر 2026). الآراء والتقديرات موسومة بـ **[رأي]**، وما لم أتحقق منه بـ **[افتراض]**، وما لا أعرفه بـ **[لا أعرف]**.
-> Fakten stammen aus Code- und Testprüfung (Oktober 2026). Meinungen und Schätzungen sind mit **[Meinung]**, Ungeprüftes mit **[Annahme]**, Unbekanntes mit **[Unbekannt]** markiert.
+> الحقائق مأخوذة من الكود والاختبارات (نوفمبر 2026). الآراء والتقديرات موسومة بـ **[رأي]**، وما لم أتحقق منه بـ **[افتراض]**، وما لا أعرفه بـ **[لا أعرف]**. هذه الخطة تضم ما تبقى فقط؛ ما أُنجز موجود في سجل الإصدارات (`src/data/changelog.ts`) وفي `git log`.
+> Fakten stammen aus Code und Tests (November 2026). Meinungen und Schätzungen sind mit **[Meinung]**, Ungeprüftes mit **[Annahme]**, Unbekanntes mit **[Unbekannt]** markiert. Dieser Plan enthält nur, was noch offen ist; Erledigtes steht im Changelog (`src/data/changelog.ts`) und in `git log`.
 
 ---
 
@@ -16,92 +16,55 @@
 - **[رأي]** خطر استراتيجي: "طبقة موافقة" كإضافة لمتصفح موجود أو كخادم MCP وسيط قد تصل لناس أكثر بجهد أقل من متصفح كامل يلزمه تحديث Chromium الأمني كل بضعة أسابيع إلى الأبد. اختبر الطلب قبل أن تستثمر أكثر.
 
 ## 2) الحالة الحالية (حقائق)
-- الإصدار المنشور: `v0.0.10` (أكتوبر 2026)، ينشر سير عمل Release إصداراً تلقائياً عند رفع الإصدار في `main`. آخر الإصدارات: 0.0.6-0.0.7 واجهة بالعربية والإنجليزية والألمانية، 0.0.8 إصلاح ثغرات التبعيات (`npm audit --omit=dev` بلا ثغرات؛ بقيت ثغرات في أدوات الفيديو `remotion` فقط)، 0.0.9 موقع بثلاث لغات مع فيلم جديد وإصلاح تخطيط التبويب الجديد، 0.0.10 موافقة لإرسال نماذج POST أياً كان نص الزر، وإخفاء رموز الدخول من العناوين المعادة للوكيل، واستلام المتصفح من الوكيل وإعادته. بعد 0.0.10 على `main` دون إصدار: إدخال حقيقي للوكيل (WP10 المرحلة 1).
-- مكتمل ومدموج: إصلاح تحميل الإصدارات؛ سجل النشاط الدائم مع التصدير؛ قواعد المواقع (اسأل/احظر)؛ إنذار حقن الأوامر؛ نافذة موافقة تعرض الصفحة والعنصر؛ ملف معزول للوكيل (اختياري ومؤقت)؛ زر OpenCode؛ اختبار Windows مانع في CI؛ نقل MCP عبر Streamable HTTP (`/mcp`) بجانب SSE القديم، مع اختبارات آلية بعملاء SDK الرسميين.
-- **غير مجرَّب فعلياً:** المثبّت على Windows، واجهة الإعدادات الجديدة، Codex (لا يوجد وصول)؛ أُبلغ يدوياً أن OpenCode وClaude Code يعملان دون تسجيل طريقة الاتصال، `browser_login` على مواقع حقيقية.
-- الاختبارات الآلية (أكثر من 1300 تأكيد ناجح، 0 إخفاق) و`tsc` و`eslint` (0 أخطاء، 1165 تحذيراً) وCI خضراء على آخر إصدار.
+- الإصدار المنشور: `v0.0.11` (أكتوبر 2026). يُنشر إصدار تلقائياً عند رفع `version` في `main`. CI خضراء على Linux وWindows وmacOS وelectron-e2e.
+- **منفَّذ لكن لم يُجرَّب على مواقع حقيقية أو بصرياً** (لا عمل برمجي متبقٍ، يحتاج تجربة فقط): استهداف العناصر بالمراجع (`browser_snapshot`)؛ التسجيل والإعادة؛ ملف الوكيل المعزول الدائم؛ النقر الأيمن والمزدوج؛ مهارة قيادة المتصفح مع وكيل حقيقي؛ مدير الأدوات المخصصة؛ `browser_login`؛ المثبّت على Windows وmacOS؛ محرر contenteditable حقيقي (Gmail أو Slack أو Docs).
+- كاشف حقن الأوامر يلتقط 13 من 20 (65%) على مجموعتي الخاصة، والأرجح أقل في الواقع. هو إنذار لا حماية؛ الحماية هي بوابة الموافقة.
+- لم يُتحقق حياً من المزامنة على مشروع Supabase حقيقي بحسابين.
 
-## 3) حزم العمل (WP)
-الصعوبة والوقت **[رأي]**. "أنا" = ما أستطيع تنفيذه في الكود؛ "أنت" = ما يحتاج جهازك أو مالك أو قراراً.
+## 3) حزم العمل المتبقية
+الصعوبة والوقت **[رأي]**. "أنا" = ما أستطيع تنفيذه في الكود؛ "أنت" = ما يحتاج جهازك أو حسابك أو قرارك.
 
 ### WP1 — الاستخدام الفعلي أسبوعين (أنت، أولوية قصوى)
-- ثبّت `v0.0.2` على Windows، اربط OpenCode بزر "OpenCode"، ونفّذ مهام حقيقية، وارفض إجراءً حساساً عمداً.
+- ثبّت `v0.0.11` على Windows، اربط OpenCode بزر "OpenCode"، ونفّذ مهام حقيقية، وارفض إجراءً حساساً عمداً. جرّب العناصر في قائمة "منفَّذ لكن لم يُجرَّب" أعلاه.
 - سجّل كل عطل في GitHub Issues (قوالب البلاغات جاهزة).
 - **معيار النجاح:** مطوّر جديد يوصل OpenCode في أقل من 5 دقائق وينفّذ الوكيل مهمة حقيقية بلا تدخل مني.
 - الصعوبة: منخفضة. الوقت: أسبوعان. **هذه الحزمة تحدد أولويات الباقي؛ لا تتجاوزها.**
 
-### WP2 — استهداف العناصر بلقطة وصول بدل محددات CSS (أنا) — **منفَّذ، لم يُقَس على مواقع حقيقية**
-- **المشكلة:** الوكلاء يفشلون كثيراً لأنهم يخمّنون محددات CSS **[افتراض]**.
-- **الحل:** أداة جديدة `browser_snapshot` تُرجع قائمة العناصر التفاعلية (دور + اسم + مرجع مثل `e12`). تقبل أدوات النقر والكتابة والاختيار الوسيط `ref` وتحوّله الطبقة الرئيسية إلى محدد قبل التصنيف، فتبقى سياسة الموافقة وسجل النشاط وقواعد المواقع كما هي دون تغيير.
-- **الأمان:** ناتج اللقطة نص صفحة غير موثوق: يمر عبر كاشف الحقن؛ المراجع تُختم على العناصر ولا تُقبل إلا بصيغة `e<رقم>`.
-- **القبول:** اختبارات: صيغة المرجع، التحويل، رفض المراجع المشوهة، المسح الضوئي للحقن؛ التوثيق في README.
-- الصعوبة: متوسطة. الوقت: 1-2 أسبوع. **الحد:** لا أستطيع قياس تحسن النجاح على مواقع حقيقية (لا إنترنت هنا).
-
-### WP3 — إعدادات أمان جاهزة وواجهة سجل النشاط (أنا) — **منفَّذ بنمطين فقط**
-- **تعديل عن الاقتراح:** نمطان فقط، **متوازن** (الحالي) و**صارم** (كل إجراء يحتاج موافقة عدا أدوات البيانات الوصفية). حذفتُ نمط "مرن" عمداً: لا نمط يخفف بوابة الموافقة. النمط يُحفظ في العملية الرئيسية ولا يُزامَن بين الأجهزة. السجل يظهر في الإعدادات > MCP مع تصفية.
-- عرض السجل في الواجهة (جدول: الوقت، الأداة، الموقع، القرار، السبب) مع تصفية.
-- الصعوبة: منخفضة-متوسطة. الوقت: أسبوع.
-
-### WP4 — تسجيل وإعادة (أنا، بعد WP2) — **منفَّذ، غير مجرَّب بصرياً ولا على مواقع حقيقية**
-- تسجيل ما نفّذه الوكيل كسلسلة خطوات (باستخدام المراجع/المحددات) وإعادتها بلا نموذج ذكاء اصطناعي، مع المرور بنفس بوابة الموافقة في كل إعادة.
-- **الخطر:** صفحات تتغير تكسر الإعادة؛ نحتاج رسالة فشل واضحة ولا إعادة صامتة.
-- الصعوبة: متوسطة. الوقت: أسبوعان.
-
-### WP5 — ملف معزول دائم وتسليم الدخول (أنا + أنت) — **منفَّذ (اختياري، افتراضه معطّل)، غير مجرَّب بصرياً**
-- الحالي مؤقت (يُمسح عند إغلاق النافذة). المطلوب خيار "حفظ جلسة الوكيل" يسجّل فيه **أنت** الدخول يدوياً ثم يستخدمه الوكيل دون الوصول إلى كلمات مرورك.
-- **مخاطرة:** جلسة دائمة تعني أن سرقة الجهاز أو تعليمة خبيثة تصل لحسابات مفعّلة؛ تحتاج زر "امسح جلسة الوكيل" واضحاً وتنبيهاً.
-- الصعوبة: متوسطة. الوقت: أسبوع.
-
-### WP6 — مجموعة اختبار حقن الأوامر (أنا) — **منفَّذ: النتيجة 13 من 20 (65%) على مجموعتي الخاصة، والأرجح أقل في الواقع**
-- مجموعة صفحات هجوم معروفة (تعليمات مخفية، نص أبيض، تعليقات HTML، لغات متعددة) وسكربت يقيس ما يلتقطه الكاشف ويطبع نسبة صادقة بما فيه الإخفاقات.
-- **الهدف:** أرقام صادقة قابلة للنشر. الكاشف إنذار لا حماية؛ الحماية الحقيقية هي بوابة الموافقة.
-- الصعوبة: متوسطة. الوقت: أسبوع.
-
 ### WP7 — التوزيع والثقة (أنت أساساً)
-- شهادات توقيع (Apple نحو 99$ سنوياً؛ Windows: OV أو Azure Trusted Signing) وأسرار GitHub؛ الـ workflow جاهز.
+- **توقيع Windows:** سياسة التوقيع منشورة (`CODE_SIGNING.md`). الخطوة التالية: طلب SignPath Foundation، ثم ربط سير الإصدار بعد الموافقة.
+- **توقيع macOS:** شهادة Apple (نحو 99$ سنوياً **[افتراض]**)؛ التحديث التلقائي على macOS يحتاجها.
 - winget وHomebrew cask؛ دومين للموقع ثم canonical وsitemap؛ فيديو توضيحي قصير بصوت جديد (الحالي يقول "Nova").
-- تدقيق أمني خارجي قبل أي ادعاء "تشفير طرف لطرف".
+- تدقيق أمني خارجي قبل أي ادعاء أمني أقوى في README.
 - الصعوبة: مالية/إدارية. الوقت: يعتمد عليك.
 
 ### WP8 — تقليص السطح (قرارك أنت)
 - **[رأي]** فكّر في تعطيل أو حذف VPN والمساعد المحلي بنماذج WebGPU والمزامنة إن لم تكن جزءاً من قصتك: كل واحد صيانة وسطح هجوم موروث من Nova. **لن أحذف شيئاً قبل قرارك الصريح.** البديل الأرخص: إخفاؤها خلف علامة "تجريبي".
+- إزالة نقل SSE القديم في MCP (يكسر العملاء الذين يستخدمون `/sse`).
 - الصعوبة: منخفضة. الوقت: أيام.
 
-### WP9 — صيانة تقنية (أنا، تدريجياً) — **جزئي: اختبار macOS غير مانع في CI، واستُخرجت دوال الترجمة من `main.ts` كمثال؛ تحذيرات ESLint (1109، منها 918 `any`) لم أمسّها لأن إصلاحها دفعة واحدة محفوف بالمخاطر**
-- تقسيم `electron/main.ts` (نحو 6900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة.
-- تخفيض تحذيرات ESLint (1081) تدريجياً؛ macOS في CI؛ سياسة تحديث Electron (تحديثات Chromium الأمنية كل بضعة أسابيع التزام دائم).
+### WP9 — صيانة تقنية (أنا، تدريجياً)
+- تقسيم `electron/main.ts` (نحو 5900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة.
+- تخفيض تحذيرات ESLint في `src` و`electron` (860) تدريجياً، لا دفعة واحدة.
+- تحديث Electron ضمن الإصدار الرئيسي نفسه مع كل إصدار (تحديثات Chromium الأمنية التزام دائم).
+- حماية المزامنة من إعادة تقديم نسخة قديمة (تحتاج صيغة تشفير جديدة وترحيلاً؛ قرارك قبل البدء).
 
-### WP10 — تحكم الوكيل بإدخال حقيقي كمستخدم (أنا) — **المرحلة 1 منفَّذة ومختبرة حياً؛ المرحلة 2 جزئية (نقر أيمن ومزدوج، اختبار وحدة فقط)؛ المرحلة 4 منفَّذة؛ المرحلة 3 ومعظم 2 لم تبدأ**
-- **الهدف:** كل نقرة وكتابة ومفتاح وتمرير يمر عبر مسار الإدخال الأصلي للمتصفح (`sendInputEvent` و`insertText`)، فيعمل في كل المواقع (React والمحررات والعربية). **ليس هدفاً:** التخفي عن كشف البوتات، أو حل CAPTCHA، أو تزييف البصمة.
-- **[منفَّذ] المرحلة 1 — الإدخال الأساسي** (`src/utils/trustedInput.ts`, `src/hooks/useBrowserAgentBridge.ts`): نقر حقيقي يرفض العنصر المغطّى ويسمّي الغطاء؛ كتابة بمفاتيح حقيقية و`insertText` مع تحقق من النتيجة داخل الصفحة؛ اختصارات مثل `Control+A`؛ عجلة فأرة حقيقية؛ مؤشر حقيقي للـ hover؛ setter أصلي للقوائم. تشديد الموافقة: Enter في حقل نموذج POST، أو Enter/Space على زر إرساله، يحتاج موافقة.
-  - **مختبر حياً (أكتوبر 2026):** TodoMVC (React) بنص عربي، نموذج POST في httpbin (ظهرت الموافقة ورُفضت فلم يُرسل)، hover، اختصار مفاتيح، تمرير، عنصر مغطّى بنافذة. CI أخضر على Linux وWindows وmacOS وelectron-e2e.
-  - **[لم يُختبر]** محرر contenteditable حقيقي (Gmail أو Slack أو Docs).
-- **المرحلة 2 — أدوات جديدة** **[جزئي]**: **منفَّذ:** `browser_click` يقبل `button: "right"` و`doubleClick: true` (`parseClickOptions` و`clickEventSequence` في `src/utils/trustedInput.ts`، مغطّاة باختبار وحدة؛ **لم تُجرَّب حياً على موقع حقيقي**، ولم أضف نقراً أيمن مزدوجاً عمداً). **لم يبدأ:** السحب والإفلات؛ رفع الملفات (`<input type=file>` عبر CDP `DOM.setFileInputFiles`، بموافقة في كل مرة لأنه يُخرج ملفاً من الجهاز)؛ نوافذ `alert`/`confirm`/`prompt`؛ النقر المزدوج والأيمن؛ دعم iframe وShadow DOM في `browser_snapshot`. الصعوبة: متوسطة-عالية. الوقت: 4-6 أسابيع **[رأي]**.
-- **المرحلة 3 — الإدراك:** شجرة الوصول عبر CDP `Accessibility.getFullAXTree` بدل مسح DOM، فتكون الأدوار والأسماء أدق (`wc.debugger` مستخدم أصلاً في `main.ts` للقطة الكاملة). الصعوبة: متوسطة. الوقت: 2-3 أسابيع **[رأي]**.
-- **المرحلة 4 — المهارات** **[منفَّذ]** (`.claude/skills/driving-king-browser/SKILL.md`، مفهرسة في `AGENTS.md`؛ **لم تُشغَّل مع وكيل حقيقي**): مهارة لقيادة King (SKILL.md) لـ Claude Code وOpenCode، مبنية من القسم 2 في `AGENTS.md` ومن مهارة `browser-automation` الموجودة. الصعوبة: منخفضة. الوقت: أيام.
-- **المكتبات:** لا جديد. إدخال Electron الأصلي وCDP يكفيان. لا Playwright داخل التطبيق، ولا إدخال على مستوى النظام (يحرّك مؤشر الإنسان الحقيقي ويكسر التحكم البشري).
-- **البروتوكولات:** لا جديد. MCP (Streamable HTTP وSSE وstdio) كافٍ. اختياري لاحقاً: `notifications/tools/list_changed` وإشعارات التقدم.
-- **في كل مرحلة:** اختبار أولاً، ثم تحقق حي، ولا تخفيف لبوابة الموافقة.
+### WP10 — تحكم الوكيل بإدخال حقيقي (أنا) — المتبقي
+- **الهدف:** كل نقرة وكتابة ومفتاح وتمرير يمر عبر مسار الإدخال الأصلي للمتصفح. **ليس هدفاً:** التخفي عن كشف البوتات، أو حل CAPTCHA، أو تزييف البصمة.
+- **المرحلة 2 — أدوات جديدة:** نوافذ `alert`/`confirm`/`prompt`؛ رفع الملفات (`<input type=file>` عبر CDP `DOM.setFileInputFiles`، بموافقة في كل مرة لأنه يُخرج ملفاً من الجهاز)؛ السحب والإفلات؛ دعم iframe وShadow DOM في `browser_snapshot`. الصعوبة: متوسطة-عالية. الوقت: 4-6 أسابيع **[رأي]**.
+- **المرحلة 3 — الإدراك:** شجرة الوصول عبر CDP `Accessibility.getFullAXTree` بدل مسح DOM. الصعوبة: متوسطة. الوقت: 2-3 أسابيع **[رأي]**.
+- **القيود:** لا مكتبات جديدة (إدخال Electron الأصلي وCDP يكفيان)، ولا إدخال على مستوى النظام (يحرّك مؤشر الإنسان ويكسر التحكم البشري). اختبار أولاً، ثم تحقق حي، ولا تخفيف لبوابة الموافقة.
 
 ## 4) الإيراد (رأي، لا تفكر فيه الآن)
 - لا إيراد قبل مستخدمين فعليين. إن ظهر طلب: ميزات فرق (سياسات مشتركة، تصدير تدقيق، SSO) فوق نواة مفتوحة **[افتراض]**. تذكّر أن Vercel Hobby (للموقع) غير تجاري.
 
 ## 5) ترتيب التنفيذ
 1. WP1 (أنت، بالتوازي مع الباقي).
-2. WP2 ثم WP3 (أنا، أعلى قيمة).
-3. WP6 ثم WP5 ثم WP4.
-4. WP7 و WP8 حسب هدفك وقراراتك. WP9 على الهامش.
-5. WP10: المرحلة 2 بعد WP1، لأن الاستخدام الفعلي يحدد أي أداة تأتي أولاً؛ ثم 3 ثم 4.
+2. WP10 المرحلة 2 بحسب ما يظهر في WP1؛ **[رأي]** نوافذ `alert`/`confirm`/`prompt` أولاً لأنها شائعة وقد توقف تشغيل الوكيل.
+3. WP7 (توقيع Windows عبر SignPath) بالتوازي.
+4. WP10 المرحلة 3، ثم WP8 حسب قرارك. WP9 على الهامش.
 
 ## 6) ما لن أفعله بلا اتفاق
-حذف ميزات، تغيير الإصدار/النشر العلني، الدمج على CI أحمر، تقسيم `main.ts` دفعة واحدة، ادعاءات أمان لم تُثبت.
-
-## حالة مراجعة الاعتماد والمزامنة (أكتوبر 2026) — [منفَّذ ومختبر] / [يحتاج بيئة خارجية]
-- [منفَّذ ومختبر] حارس الحساب المتعدد في `initSupabaseListener` (`src/services/syncService.ts`): جلسة `INITIAL_SESSION` قديمة تخص حساباً آخر لا تُعتمد بعد الآن ولا تُكتب مفتاح المزامنة في خانة حساب مغاير. مغطاة باختبارات سلوك حقيقية (`tests/king_cloud_auth_behaviour.test.ts`، 61 فحصاً).
-- [منفَّذ ومختبر] تكامل الاختبارات: بقية الأجنحة خضراء في تشغيلين كاملين متتاليين لـ `npm test` (منها 32 فحص اعتماد، 78 فحص صحة مزامنة، 11 فحص لوحة الوكيل، 17 فحص لوح المقص/Q).
-- [منفَّذ ومختبر] مراجعة `supabase_schema.sql`: سياسات RLS سليمة (قبو المستخدم، الدعوات، دالة الاستهلاك security definer). ملاحظة واحدة: العمود `consumed_by` بلا `on delete`، فحذف مستخدم استهلك دعوة سيفشل — لكن ميزة الإقران معطّلة اليوم (`PAIRING_AVAILABLE = false`)، فلا أثر فعلياً.
-- [يحتاج بيئة خارجية] تحقق حي على Supabase حقيقي بحسابين حقيقيين وسياسات RLS الفعلية: لا يوجد مشروع اختبار متاح من هذه البيئة.
-- [منفَّذ] Workflow الليلي (PR #15): استُبدل ترتيب «حذف ثم رفع» بالكتابة فوق الملفات في مكانها (الإيداع `b067692`)، فلا يترك فشل الرفع بلا نسخة ليلية.
+حذف ميزات، تغيير الإصدار/النشر العلني، الدمج على CI أحمر، تقسيم `main.ts` دفعة واحدة، ادعاءات أمان لم تُثبت، تغيير صيغة تشفير المزامنة أو سياسة الموافقة.
 
 ---
 
@@ -113,92 +76,55 @@ Ein Open-Source-Browser, in dem ein Coding-Agent (OpenCode u. ä.) einen echten,
 **Annahmen, die ich hinterfrage:**
 - **[Unbekannt]** Wie groß die Nachfrage nach einem eigenen Agenten-Browser ist. **[Fakt]** Kostenlose Alternativen existieren (Playwright MCP, Chrome DevTools MCP) und brauchen keinen neuen Browser.
 - Ist dein Hauptziel der eigene Gebrauch, sind Markt und Einnahmen zweitrangig; Alltagsstabilität hat Vorrang.
-- **[Meinung]** Strategisches Risiko: Eine „Freigabe-Schicht“ als Erweiterung eines bestehenden Browsers oder als vermittelnder MCP-Server erreicht mit weniger Aufwand eventuell mehr Menschen als ein kompletter Browser, der auf Dauer alle paar Wochen Chromium-Sicherheitsupdates braucht. Nachfrage testen, bevor du mehr investierst.
+- **[Meinung]** Strategisches Risiko: Eine „Freigabe-Schicht" als Erweiterung eines bestehenden Browsers oder als vermittelnder MCP-Server erreicht mit weniger Aufwand eventuell mehr Menschen als ein kompletter Browser, der auf Dauer alle paar Wochen Chromium-Sicherheitsupdates braucht. Nachfrage testen, bevor du mehr investierst.
 
 ## 2) Aktueller Stand (Fakten)
-- Veröffentlicht: `v0.0.10` (Oktober 2026); der Release-Workflow veröffentlicht automatisch, wenn die Version in `main` erhöht wird. Zuletzt: 0.0.6-0.0.7 Oberfläche auf Arabisch, Englisch und Deutsch, 0.0.8 Behebung von Abhängigkeits-Schwachstellen (`npm audit --omit=dev` ohne Funde; offen bleiben nur Werkzeuge für Video, `remotion`), 0.0.9 dreisprachige Website mit neuem Film und korrigiertes Layout des neuen Tabs, 0.0.10 Freigabe für das Absenden von POST-Formularen unabhängig von der Beschriftung, Schwärzung von Zugangsdaten in URLs für den Agenten, Übernahme des Browsers vom Agenten und Rückgabe. Nach 0.0.10 auf `main` ohne Release: echte Eingabe für den Agenten (WP10 Phase 1).
-- Fertig und gemerged: Release-Download repariert; dauerhaftes Aktivitätsprotokoll mit Export; Site-Regeln (fragen/blockieren); Injection-Alarm; Freigabe-Dialog mit Seite und Element; isoliertes Agent-Profil (optional, flüchtig); OpenCode-Button; blockierender Windows-Test in der CI; MCP über Streamable HTTP (`/mcp`) neben dem alten SSE, mit automatischen Tests über die offiziellen SDK-Clients.
-- **Nicht real getestet:** Installer unter Windows, neue Einstellungsoberfläche, Codex (kein Zugang); manuell berichtet, dass OpenCode und Claude Code funktionieren, ohne die Verbindungsart festzuhalten, `browser_login` an echten Seiten.
-- Automatische Tests (über 1300 bestandene Assertions, 0 Fehlschläge), `tsc` und `eslint` (0 Fehler, 1165 Warnungen) sowie die CI sind beim letzten Release grün.
+- Veröffentlicht: `v0.0.11` (Oktober 2026). Ein Release erscheint automatisch, wenn `version` in `main` erhöht wird. CI grün auf Linux, Windows, macOS und electron-e2e.
+- **Umgesetzt, aber nicht an echten Seiten oder visuell getestet** (keine Programmierarbeit offen, nur Ausprobieren): Element-Refs (`browser_snapshot`); Aufzeichnen und Abspielen; dauerhaftes isoliertes Agent-Profil; Rechts- und Doppelklick; der Driver-Skill mit einem echten Agenten; der Tool Manager für eigene Tools; `browser_login`; die Installer unter Windows und macOS; ein echter contenteditable-Editor (Gmail, Slack oder Docs).
+- Der Prompt-Injection-Detektor erkennt 13 von 20 (65 %) auf meinem eigenen Satz, real vermutlich weniger. Er ist ein Alarm, kein Schutz; der Schutz ist das Freigabe-Tor.
+- Sync wurde nicht live gegen ein echtes Supabase-Projekt mit zwei Konten geprüft.
 
-## 3) Arbeitspakete (WP)
-Schwierigkeit und Zeit sind **[Meinung]**. „Ich“ = per Code umsetzbar; „du“ = braucht deinen Rechner, Besitz oder eine Entscheidung.
+## 3) Offene Arbeitspakete
+Schwierigkeit und Zeit sind **[Meinung]**. „Ich" = per Code umsetzbar; „du" = braucht deinen Rechner, dein Konto oder deine Entscheidung.
 
 ### WP1 — Zwei Wochen echte Nutzung (du, höchste Priorität)
-- `v0.0.2` unter Windows installieren, OpenCode per Button verbinden, echte Aufgaben ausführen, bewusst eine sensible Aktion ablehnen.
-- Jeden Fehler als GitHub-Issue erfassen (Vorlagen vorhanden).
-- **Erfolgskriterium:** Ein neuer Entwickler verbindet OpenCode in unter 5 Minuten, der Agent erledigt eine echte Aufgabe, ohne dass ich eingreife.
-- Schwierigkeit: niedrig. Zeit: zwei Wochen. **Dieses Paket bestimmt die Prioritäten der übrigen; nicht überspringen.**
-
-### WP2 — Elemente über Zugänglichkeits-Snapshot statt CSS-Selektoren (ich) — **umgesetzt, an echten Seiten nicht gemessen**
-- **Problem:** Agenten scheitern oft, weil sie CSS-Selektoren raten **[Annahme]**.
-- **Lösung:** Neues Werkzeug `browser_snapshot` liefert interaktive Elemente (Rolle + Name + Referenz wie `e12`). Klick-, Eingabe- und Auswahl-Werkzeuge akzeptieren `ref`; der Hauptprozess wandelt es vor der Klassifizierung in einen Selektor um, sodass Freigabe-Policy, Aktivitätsprotokoll und Site-Regeln unverändert greifen.
-- **Sicherheit:** Die Snapshot-Ausgabe ist nicht vertrauenswürdiger Seitentext: sie läuft durch den Injection-Detektor; Referenzen werden auf Elemente gestempelt und nur im Format `e<Zahl>` akzeptiert.
-- **Abnahme:** Tests zu Referenzformat, Umwandlung, Ablehnung fehlerhafter Referenzen, Injection-Scan; Doku im README.
-- Schwierigkeit: mittel. Zeit: 1–2 Wochen. **Grenze:** Ich kann die Erfolgsverbesserung an echten Seiten nicht messen (hier kein Internet).
-
-### WP3 — Sicherheitsprofile und Oberfläche für das Protokoll (ich) — **mit nur zwei Modi umgesetzt**
-- **Abweichung vom Vorschlag:** Nur zwei Modi, **Ausgewogen** (heute) und **Streng** (jede Aktion braucht Freigabe, außer reinen Metadaten-Werkzeugen). Den Modus „Locker“ habe ich bewusst weggelassen: kein Modus darf das Freigabe-Tor lockern. Der Modus liegt im Hauptprozess und wird nicht zwischen Geräten synchronisiert. Das Protokoll steht unter Einstellungen > MCP mit Filter.
-- Protokollansicht in der Oberfläche (Zeit, Werkzeug, Seite, Entscheidung, Grund) mit Filter.
-- Schwierigkeit: niedrig–mittel. Zeit: eine Woche.
-
-## Stand der Auth- und Sync-Prüfung (Oktober 2026) — [umgesetzt und getestet] / [benötigt externe Umgebung]
-- [umgesetzt und getestet] Kontenwachschutz in `initSupabaseListener` (`src/services/syncService.ts`): eine ältere `INITIAL_SESSION` eines fremden Kontos wird nicht mehr adoptiert und deren Sync-Schlüssel nicht mehr in den Vault-Slot des falschen Kontos geschrieben. Abgedeckt durch echte Verhaltenstests (`tests/king_cloud_auth_behaviour.test.ts`, 61 Prüfpunkte).
-- [umgesetzt und getestet] Suite-Integration: alle übrigen Suites sind in zwei aufeinanderfolgenden vollständigen `npm test`-Läufen grün (u. a. 32 Auth-Prüfpunkte, 78 Sync-Richtigkeit, 11 Agent-Panel, 17 Clipboard/QR).
-- [umgesetzt und getestet] Prüfung von `supabase_schema.sql`: RLS-Richtlinien in Ordnung (Benutzer-Vault, Einladungen, security-definer-RPC). Ein Befund: `consumed_by` hat kein `on delete`, das Löschen eines Benutzers, der eine Einladung verbraucht hat, würde fehlschlagen — das Pairing-Feature ist aber derzeit deaktiviert (`PAIRING_AVAILABLE = false`), keine praktische Auswirkung.
-- [benötigt externe Umgebung] Live-Verifikation auf echtem Supabase mit zwei echten Konten und den tatsächlichen RLS-Richtlinien: in dieser Umgebung kein Testprojekt verfügbar.
-- [umgesetzt] Nightly-Workflow (PR #15): „löschen vor hochladen“ wurde durch Überschreiben an Ort und Stelle ersetzt (Commit `b067692`); ein fehlgeschlagener Upload hinterlässt keine Lücke mehr.
-
-### WP4 — Aufzeichnen und Abspielen (ich, nach WP2) — **umgesetzt, weder visuell noch an echten Seiten getestet**
-- Aktionen des Agenten als Schrittfolge aufzeichnen und ohne KI-Modell erneut abspielen, jedes Mal durch dasselbe Freigabe-Tor.
-- **Risiko:** Sich ändernde Seiten brechen das Abspielen; es braucht klare Fehlermeldungen, kein stilles Weiterlaufen.
-- Schwierigkeit: mittel. Zeit: zwei Wochen.
-
-### WP5 — Dauerhaftes isoliertes Profil und Login-Übergabe (ich + du) — **umgesetzt (optional, standardmäßig aus), visuell nicht getestet**
-- Heute flüchtig (beim Schließen gelöscht). Gewünscht: Option „Agent-Sitzung speichern“, in der **du** dich manuell anmeldest und der Agent sie nutzt, ohne an deine Passwörter zu kommen.
-- **Risiko:** Eine dauerhafte Sitzung bedeutet, dass Gerätediebstahl oder eine bösartige Anweisung angemeldete Konten erreicht; es braucht einen klaren Button „Agent-Sitzung löschen“ und einen Hinweis.
-- Schwierigkeit: mittel. Zeit: eine Woche.
-
-### WP6 — Testsatz für Prompt-Injection (ich) — **umgesetzt: 13 von 20 (65 %) auf meinem eigenen Satz, real vermutlich weniger**
-- Sammlung bekannter Angriffsseiten (versteckte Anweisungen, weißer Text, HTML-Kommentare, mehrere Sprachen) und ein Skript, das misst, was der Detektor fängt, und eine ehrliche Quote inklusive Fehlschlägen ausgibt.
-- **Ziel:** Ehrliche, veröffentlichbare Zahlen. Der Detektor ist ein Alarm, kein Schutz; der echte Schutz ist das Freigabe-Tor.
-- Schwierigkeit: mittel. Zeit: eine Woche.
+- `v0.0.11` unter Windows installieren, OpenCode über den „OpenCode"-Button verbinden, echte Aufgaben erledigen und absichtlich eine sensible Aktion ablehnen. Die Punkte aus „umgesetzt, aber nicht getestet" oben ausprobieren.
+- Jeden Fehler als GitHub Issue melden (Vorlagen sind vorhanden).
+- **Erfolgskriterium:** Ein neuer Entwickler verbindet OpenCode in unter 5 Minuten, und der Agent erledigt eine echte Aufgabe ohne mein Eingreifen.
+- Schwierigkeit: niedrig. Zeit: zwei Wochen. **Dieses Paket bestimmt die Prioritäten des Rests; nicht überspringen.**
 
 ### WP7 — Verteilung und Vertrauen (hauptsächlich du)
-- Signaturzertifikate (Apple ca. 99 $/Jahr; Windows: OV oder Azure Trusted Signing) und GitHub-Secrets; der Workflow ist bereit.
-- winget und Homebrew-Cask; Domain für die Website, danach canonical und Sitemap; kurzes Demo-Video mit neuer Tonspur (die aktuelle sagt „Nova“).
-- Externes Sicherheits-Audit, bevor mit „Ende-zu-Ende-Verschlüsselung“ geworben wird.
+- **Windows-Signatur:** Die Signing Policy ist veröffentlicht (`CODE_SIGNING.md`). Nächster Schritt: Antrag bei der SignPath Foundation, nach der Genehmigung den Release-Workflow anbinden.
+- **macOS-Signatur:** Apple-Zertifikat (ca. 99 $/Jahr **[Annahme]**); automatische Updates unter macOS brauchen es.
+- winget und Homebrew-Cask; Domain für die Website, danach canonical und Sitemap; kurzes Demo-Video mit neuer Tonspur (die aktuelle sagt „Nova").
+- Externes Sicherheits-Audit vor stärkeren Sicherheitsaussagen im README.
 - Schwierigkeit: finanziell/organisatorisch. Zeit: hängt von dir ab.
 
 ### WP8 — Angriffsfläche verkleinern (deine Entscheidung)
-- **[Meinung]** VPN, lokalen WebGPU-Assistenten und Sync deaktivieren oder entfernen, wenn sie nicht zu deiner Geschichte gehören: Jedes ist Wartung und von Nova geerbte Angriffsfläche. **Ich lösche nichts ohne deine ausdrückliche Entscheidung.** Günstigere Alternative: hinter einem „Experimentell“-Schalter verstecken.
+- **[Meinung]** VPN, lokalen WebGPU-Assistenten und Sync deaktivieren oder entfernen, wenn sie nicht zu deiner Geschichte gehören: Jedes ist Wartung und von Nova geerbte Angriffsfläche. **Ich lösche nichts ohne deine ausdrückliche Entscheidung.** Günstigere Alternative: hinter einem „Experimentell"-Schalter verstecken.
+- Den alten SSE-Transport von MCP entfernen (bricht Clients, die `/sse` nutzen).
 - Schwierigkeit: niedrig. Zeit: Tage.
 
-### WP9 — Technische Wartung (ich, schrittweise) — **teilweise: nicht blockierender macOS-Test in der CI, Übersetzungs-Helfer als Beispiel aus `main.ts` ausgelagert; ESLint-Warnungen (1109, davon 918 `any`) nicht angefasst, da ein Massen-Fix riskant ist**
-- `electron/main.ts` (ca. 6900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug.
-- ESLint-Warnungen (1081) schrittweise abbauen; macOS in der CI; Electron-Update-Politik (Chromium-Sicherheitsupdates alle paar Wochen sind eine Dauerverpflichtung).
+### WP9 — Technische Wartung (ich, schrittweise)
+- `electron/main.ts` (ca. 5900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug.
+- ESLint-Warnungen in `src` und `electron` (860) schrittweise abbauen, nicht in einem Zug.
+- Electron mit jedem Release innerhalb der Hauptversion aktualisieren (Chromium-Sicherheitsupdates sind eine Dauerverpflichtung).
+- Sync gegen das erneute Ausliefern einer alten Version schützen (braucht ein neues Verschlüsselungsformat und eine Migration; vorher deine Entscheidung).
 
-### WP10 — Agent steuert mit echter Eingabe wie ein Mensch (ich) — **Phase 1 umgesetzt und live getestet; Phase 2 teilweise (Rechts- und Doppelklick, nur Unit-Test); Phase 4 umgesetzt; Phase 3 und der Großteil von Phase 2 nicht begonnen**
-- **Ziel:** Jeder Klick, jede Eingabe, jede Taste und jedes Scrollen läuft über die native Eingabe des Browsers (`sendInputEvent`, `insertText`) und funktioniert damit auf allen Seiten (React, Editoren, Arabisch). **Kein Ziel:** Bot-Erkennung umgehen, CAPTCHAs lösen oder den Fingerabdruck fälschen.
-- **[umgesetzt] Phase 1 — Grundeingabe** (`src/utils/trustedInput.ts`, `src/hooks/useBrowserAgentBridge.ts`): echter Klick, der ein verdecktes Element ablehnt und die Abdeckung benennt; Eingabe mit echten Tasten und `insertText`, danach Prüfung des Ergebnisses in der Seite; Tastenkombinationen wie `Control+A`; echtes Mausrad; echter Zeiger für Hover; nativer Setter für Auswahllisten. Strengere Freigabe: Enter in einem Feld eines POST-Formulars oder Enter/Leertaste auf dessen Absende-Button braucht eine Freigabe.
-  - **Live getestet (Oktober 2026):** TodoMVC (React) mit arabischem Text, POST-Formular auf httpbin (Freigabe erschien und wurde abgelehnt, nichts gesendet), Hover, Tastenkombination, Scrollen, von einem Dialog verdecktes Element. CI grün auf Linux, Windows, macOS und electron-e2e.
-  - **[nicht getestet]** ein echter contenteditable-Editor (Gmail, Slack oder Docs).
-- **Phase 2 — neue Werkzeuge** **[teilweise]**: **Umgesetzt:** `browser_click` akzeptiert `button: "right"` und `doubleClick: true` (`parseClickOptions` und `clickEventSequence` in `src/utils/trustedInput.ts`, per Unit-Test abgedeckt; **nicht live an einer echten Seite getestet**; ein doppelter Rechtsklick wird bewusst nicht angeboten). **Nicht begonnen:** Drag and Drop; Datei-Upload (`<input type=file>` über CDP `DOM.setFileInputFiles`, jedes Mal mit Freigabe, da eine Datei das Gerät verlässt); `alert`/`confirm`/`prompt`-Dialoge; Doppel- und Rechtsklick; iframes und Shadow DOM in `browser_snapshot`. Schwierigkeit: mittel-hoch. Zeit: 4-6 Wochen **[Meinung]**.
-- **Phase 3 — Wahrnehmung:** Barrierefreiheitsbaum über CDP `Accessibility.getFullAXTree` statt DOM-Durchlauf, für genauere Rollen und Namen (`wc.debugger` wird in `main.ts` schon für den Ganzseiten-Screenshot genutzt). Schwierigkeit: mittel. Zeit: 2-3 Wochen **[Meinung]**.
-- **Phase 4 — Skills** **[umgesetzt]** (`.claude/skills/driving-king-browser/SKILL.md`, in `AGENTS.md` verzeichnet; **mit keinem echten Agenten ausgeführt**): ein Skill (SKILL.md) zum Steuern von King für Claude Code und OpenCode, aufgebaut auf Abschnitt 2 von `AGENTS.md` und dem vorhandenen Skill `browser-automation`. Schwierigkeit: niedrig. Zeit: Tage.
-- **Bibliotheken:** keine neuen. Native Electron-Eingabe und CDP reichen. Kein Playwright in der App und keine Eingabe auf Betriebssystemebene (sie bewegt den echten Mauszeiger des Menschen und bricht die menschliche Kontrolle).
-- **Protokolle:** keine neuen. MCP (Streamable HTTP, SSE, stdio) reicht. Optional später: `notifications/tools/list_changed` und Fortschrittsmeldungen.
-- **In jeder Phase:** Test zuerst, dann Live-Prüfung, keine Lockerung des Freigabe-Tors.
+### WP10 — Agent steuert mit echter Eingabe (ich) — offen
+- **Ziel:** Jeder Klick, jede Eingabe, jede Taste und jedes Scrollen läuft über den nativen Eingabepfad des Browsers. **Kein Ziel:** Bot-Erkennung umgehen, CAPTCHAs lösen oder Fingerabdrücke fälschen.
+- **Phase 2 — neue Werkzeuge:** `alert`/`confirm`/`prompt`-Dialoge; Datei-Upload (`<input type=file>` über CDP `DOM.setFileInputFiles`, jedes Mal mit Freigabe, weil eine Datei den Rechner verlässt); Drag-and-drop; iframe- und Shadow-DOM-Unterstützung in `browser_snapshot`. Schwierigkeit: mittel bis hoch. Zeit: 4-6 Wochen **[Meinung]**.
+- **Phase 3 — Wahrnehmung:** Zugänglichkeitsbaum über CDP `Accessibility.getFullAXTree` statt DOM-Scan. Schwierigkeit: mittel. Zeit: 2-3 Wochen **[Meinung]**.
+- **Grenzen:** keine neuen Bibliotheken (native Electron-Eingabe und CDP reichen), keine Eingabe auf Systemebene (bewegt den Mauszeiger des Menschen und bricht die menschliche Kontrolle). Erst Test, dann Live-Prüfung, keine Lockerung des Freigabe-Tors.
 
 ## 4) Einnahmen (Meinung, jetzt nicht darüber nachdenken)
 - Keine Einnahmen vor echten Nutzern. Falls Nachfrage entsteht: Team-Funktionen (gemeinsame Richtlinien, Audit-Export, SSO) auf offenem Kern **[Annahme]**. Vercel Hobby (Website) ist nicht kommerziell.
 
 ## 5) Reihenfolge
 1. WP1 (du, parallel zum Rest).
-2. WP2, dann WP3 (ich, höchster Nutzen).
-3. WP6, dann WP5, dann WP4.
-4. WP7 und WP8 je nach deinem Ziel und deinen Entscheidungen. WP9 nebenbei.
-5. WP10: Phase 2 nach WP1, weil die echte Nutzung zeigt, welches Werkzeug zuerst kommt; dann 3, dann 4.
+2. WP10 Phase 2 nach dem, was WP1 zeigt; **[Meinung]** zuerst `alert`/`confirm`/`prompt`-Dialoge, weil sie häufig sind und einen Agentenlauf anhalten können.
+3. WP7 (Windows-Signatur über SignPath) parallel.
+4. WP10 Phase 3, dann WP8 nach deiner Entscheidung. WP9 nebenbei.
 
 ## 6) Was ich nicht ohne Absprache tue
-Funktionen löschen, Version ändern/öffentlich veröffentlichen, auf rote CI mergen, `main.ts` in einem Zug aufteilen, Sicherheitsversprechen ohne Beleg.
+Funktionen löschen, Version/öffentliche Veröffentlichung ändern, bei roter CI mergen, `main.ts` in einem Zug aufteilen, unbewiesene Sicherheitsaussagen, das Sync-Verschlüsselungsformat oder die Freigabe-Politik ändern.

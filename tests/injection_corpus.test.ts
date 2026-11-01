@@ -1,5 +1,5 @@
 /**
- * Honest measurement of the prompt-injection tripwire (plan.md, WP6).
+ * Honest measurement of the prompt-injection tripwire (plan.md, section 2: the published detection rate).
  *
  * The detector is a tripwire, not a defence. This corpus records what it
  * catches and what it misses, so claims about it stay tied to numbers. Misses
