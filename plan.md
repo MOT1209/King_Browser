@@ -43,25 +43,26 @@
 - الصعوبة: منخفضة. الوقت: أيام.
 
 ### WP9 — صيانة تقنية (أنا، تدريجياً)
-- تقسيم `electron/main.ts` (نحو 5900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة.
+- تقسيم `electron/main.ts` (نحو 5900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة. **أُنجز جزء:** معالجات CDP للوكيل نُقلت إلى `electron/main/agentCdp.ts`.
 - تخفيض تحذيرات ESLint في `src` و`electron` (860) تدريجياً، لا دفعة واحدة.
 - تحديث Electron ضمن الإصدار الرئيسي نفسه مع كل إصدار (تحديثات Chromium الأمنية التزام دائم).
 - حماية المزامنة من إعادة تقديم نسخة قديمة (تحتاج صيغة تشفير جديدة وترحيلاً؛ قرارك قبل البدء).
 
-### WP10 — تحكم الوكيل بإدخال حقيقي (أنا) — المتبقي
+### WP10 — تحكم الوكيل بإدخال حقيقي (أنا) — منفَّذ في الكود، ينتظر تجربة حية
 - **الهدف:** كل نقرة وكتابة ومفتاح وتمرير يمر عبر مسار الإدخال الأصلي للمتصفح. **ليس هدفاً:** التخفي عن كشف البوتات، أو حل CAPTCHA، أو تزييف البصمة.
-- **المرحلة 2 — أدوات جديدة:** نوافذ `alert`/`confirm`/`prompt`؛ رفع الملفات (`<input type=file>` عبر CDP `DOM.setFileInputFiles`، بموافقة في كل مرة لأنه يُخرج ملفاً من الجهاز)؛ السحب والإفلات؛ دعم iframe وShadow DOM في `browser_snapshot`. الصعوبة: متوسطة-عالية. الوقت: 4-6 أسابيع **[رأي]**.
-- **المرحلة 3 — الإدراك:** شجرة الوصول عبر CDP `Accessibility.getFullAXTree` بدل مسح DOM. الصعوبة: متوسطة. الوقت: 2-3 أسابيع **[رأي]**.
-- **القيود:** لا مكتبات جديدة (إدخال Electron الأصلي وCDP يكفيان)، ولا إدخال على مستوى النظام (يحرّك مؤشر الإنسان ويكسر التحكم البشري). اختبار أولاً، ثم تحقق حي، ولا تخفيف لبوابة الموافقة.
+- **المرحلة 2 (منفَّذة):** `browser_handle_dialog` (يُبلغ الوكيل بنوافذ `alert`/`confirm`/`prompt`/`beforeunload` التي ظهرت وكيف انتهت؛ **قيس فعلياً** أن Electron يغلق نافذة الضيف فوراً بنتيجة إلغاء قبل أن يستطيع الوكيل الرد، فالقبول والرفض لا ينفعان إلا لنافذة ما زالت مفتوحة، والقبول يحتاج موافقة)؛ `browser_upload_file` (`DOM.setFileInputFiles`، موافقة في كل مرة، والمسار يُتحقق منه في العملية الرئيسية: ملف عادي مطلق ≤ 100 ميغابايت وخارج مجلدات الاعتماد وبيانات التطبيق)؛ `browser_drag` (سحب وإفلات HTML5 بمؤشر حقيقي عبر CDP، موافقة في كل مرة)؛ وShadow DOM المفتوح وiframe من نفس الأصل في `browser_snapshot` والاستهداف.
+- **المرحلة 3 (منفَّذة):** `browser_snapshot` مع `mode: "accessibility"` يقرأ شجرة الوصول عبر `Accessibility.getFullAXTree` ويختم المراجع على العناصر.
+- **تحقق حي جزئي:** `tests/electron/agent_cdp.spec.ts` يشغّل أوامر CDP نفسها على webview حقيقي (شجرة الوصول مع Shadow DOM وختم المراجع، رفع ملف، سحب HTML5، سحب بمؤشر، سلوك النافذة) ونجحت الخمسة، وكشف خطأين أُصلحا (زر الإفلات وتصميم النافذة). **لم يُجرَّب:** المعالجات الكاملة عبر MCP لأن حارس العناوين يرفض الصفحات المحلية عمداً، ولا أي موقع حقيقي. يجب تجربته ضمن WP1: رفع ملف إلى موقع حقيقي؛ سحب بطاقة في لوحة كانبان وشريط تمرير؛ مكوّن Web Component؛ iframe من نفس الأصل؛ شكل نافذة `confirm` على جهازك (قد تظهر نافذة Electron للمستخدم). **حدود معروفة:** المراقبة تشمل التبويبات المنشأة بعد تشغيل خادم MCP فقط؛ iframe من أصل آخر وShadow DOM المغلق غير قابلين للوصول؛ لقطة الوصول تغطي الإطار الرئيسي فقط؛ ملف واحد في كل نداء رفع؛ الفحص في `activeElement` داخل Shadow DOM لا يطابق الصفحة العادية.
+- **القيود:** لا مكتبات جديدة، ولا إدخال على مستوى النظام، ولا تخفيف لبوابة الموافقة.
 
 ## 4) الإيراد (رأي، لا تفكر فيه الآن)
 - لا إيراد قبل مستخدمين فعليين. إن ظهر طلب: ميزات فرق (سياسات مشتركة، تصدير تدقيق، SSO) فوق نواة مفتوحة **[افتراض]**. تذكّر أن Vercel Hobby (للموقع) غير تجاري.
 
 ## 5) ترتيب التنفيذ
 1. WP1 (أنت، بالتوازي مع الباقي).
-2. WP10 المرحلة 2 بحسب ما يظهر في WP1؛ **[رأي]** نوافذ `alert`/`confirm`/`prompt` أولاً لأنها شائعة وقد توقف تشغيل الوكيل.
+2. WP10 (المرحلتان 2 و3 منفَّذتان في الكود): تجربتهما حياً ضمن WP1 وإصلاح ما يظهر.
 3. WP7 (توقيع Windows عبر SignPath) بالتوازي.
-4. WP10 المرحلة 3، ثم WP8 حسب قرارك. WP9 على الهامش.
+4. WP8 حسب قرارك. WP9 على الهامش.
 
 ## 6) ما لن أفعله بلا اتفاق
 حذف ميزات، تغيير الإصدار/النشر العلني، الدمج على CI أحمر، تقسيم `main.ts` دفعة واحدة، ادعاءات أمان لم تُثبت، تغيير صيغة تشفير المزامنة أو سياسة الموافقة.
@@ -106,25 +107,26 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich" = per Code umsetzbar; „du" 
 - Schwierigkeit: niedrig. Zeit: Tage.
 
 ### WP9 — Technische Wartung (ich, schrittweise)
-- `electron/main.ts` (ca. 5900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug.
+- `electron/main.ts` (ca. 5900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug. **Teilweise erledigt:** die CDP-Handler des Agenten liegen jetzt in `electron/main/agentCdp.ts`.
 - ESLint-Warnungen in `src` und `electron` (860) schrittweise abbauen, nicht in einem Zug.
 - Electron mit jedem Release innerhalb der Hauptversion aktualisieren (Chromium-Sicherheitsupdates sind eine Dauerverpflichtung).
 - Sync gegen das erneute Ausliefern einer alten Version schützen (braucht ein neues Verschlüsselungsformat und eine Migration; vorher deine Entscheidung).
 
-### WP10 — Agent steuert mit echter Eingabe (ich) — offen
+### WP10 — Agent steuert mit echter Eingabe (ich) — im Code umgesetzt, wartet auf Live-Test
 - **Ziel:** Jeder Klick, jede Eingabe, jede Taste und jedes Scrollen läuft über den nativen Eingabepfad des Browsers. **Kein Ziel:** Bot-Erkennung umgehen, CAPTCHAs lösen oder Fingerabdrücke fälschen.
-- **Phase 2 — neue Werkzeuge:** `alert`/`confirm`/`prompt`-Dialoge; Datei-Upload (`<input type=file>` über CDP `DOM.setFileInputFiles`, jedes Mal mit Freigabe, weil eine Datei den Rechner verlässt); Drag-and-drop; iframe- und Shadow-DOM-Unterstützung in `browser_snapshot`. Schwierigkeit: mittel bis hoch. Zeit: 4-6 Wochen **[Meinung]**.
-- **Phase 3 — Wahrnehmung:** Zugänglichkeitsbaum über CDP `Accessibility.getFullAXTree` statt DOM-Scan. Schwierigkeit: mittel. Zeit: 2-3 Wochen **[Meinung]**.
-- **Grenzen:** keine neuen Bibliotheken (native Electron-Eingabe und CDP reichen), keine Eingabe auf Systemebene (bewegt den Mauszeiger des Menschen und bricht die menschliche Kontrolle). Erst Test, dann Live-Prüfung, keine Lockerung des Freigabe-Tors.
+- **Phase 2 (umgesetzt):** `browser_handle_dialog` (meldet dem Agenten, welche `alert`/`confirm`/`prompt`/`beforeunload`-Dialoge erschienen und wie sie endeten; **gemessen:** Electron schließt den Dialog eines Gasts sofort mit „Abbrechen", bevor der Agent antworten kann; Annehmen/Ablehnen wirken nur bei einem noch offenen Dialog, Annehmen braucht Freigabe); `browser_upload_file` (`DOM.setFileInputFiles`, jedes Mal Freigabe; der Pfad wird im Hauptprozess geprüft: absolute reguläre Datei bis 100 MB, außerhalb von Zugangsdaten-Ordnern und App-Daten); `browser_drag` (HTML5-Drag-and-drop mit echtem Mauszeiger über CDP, jedes Mal Freigabe); offener Shadow DOM und gleich-ursprüngliche iframes in `browser_snapshot` und Zielauswahl.
+- **Phase 3 (umgesetzt):** `browser_snapshot` mit `mode: "accessibility"` liest den Zugänglichkeitsbaum über `Accessibility.getFullAXTree` und stempelt die Refs auf die Elemente.
+- **Teilweise live geprüft:** `tests/electron/agent_cdp.spec.ts` führt dieselben CDP-Befehle gegen ein echtes Webview aus (Zugänglichkeitsbaum mit Shadow DOM und Ref-Stempel, Datei-Upload, HTML5-Drag, Zeiger-Drag, Dialogverhalten); alle fünf bestehen und deckten zwei Fehler auf, die behoben sind (Maustaste beim Loslassen, Dialog-Design). **Nicht geprüft:** die vollständigen Handler über MCP, weil der Host-Wächter lokale Seiten absichtlich ablehnt, und keine echte Website. In WP1 ausprobieren: Datei-Upload auf einer echten Seite; Karte im Kanban ziehen und Schieberegler; Web Component; gleich-ursprünglicher iframe. **Bekannte Grenzen:** Überwacht werden nur Tabs, die nach dem Start des MCP-Servers entstehen; iframes fremden Ursprungs und geschlossener Shadow DOM sind nicht erreichbar; der Zugänglichkeits-Snapshot deckt nur den Hauptframe ab; eine Datei pro Upload-Aufruf; `activeElement`-Prüfungen in Shadow DOM verhalten sich anders als im normalen DOM.
+- **Grenzen:** keine neuen Bibliotheken, keine Eingabe auf Systemebene, keine Lockerung des Freigabe-Tors.
 
 ## 4) Einnahmen (Meinung, jetzt nicht darüber nachdenken)
 - Keine Einnahmen vor echten Nutzern. Falls Nachfrage entsteht: Team-Funktionen (gemeinsame Richtlinien, Audit-Export, SSO) auf offenem Kern **[Annahme]**. Vercel Hobby (Website) ist nicht kommerziell.
 
 ## 5) Reihenfolge
 1. WP1 (du, parallel zum Rest).
-2. WP10 Phase 2 nach dem, was WP1 zeigt; **[Meinung]** zuerst `alert`/`confirm`/`prompt`-Dialoge, weil sie häufig sind und einen Agentenlauf anhalten können.
+2. WP10 (Phasen 2 und 3 im Code umgesetzt): live in WP1 ausprobieren und beheben, was auffällt.
 3. WP7 (Windows-Signatur über SignPath) parallel.
-4. WP10 Phase 3, dann WP8 nach deiner Entscheidung. WP9 nebenbei.
+4. WP8 nach deiner Entscheidung. WP9 nebenbei.
 
 ## 6) Was ich nicht ohne Absprache tue
 Funktionen löschen, Version/öffentliche Veröffentlichung ändern, bei roter CI mergen, `main.ts` in einem Zug aufteilen, unbewiesene Sicherheitsaussagen, das Sync-Verschlüsselungsformat oder die Freigabe-Politik ändern.

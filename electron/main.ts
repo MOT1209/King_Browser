@@ -156,6 +156,7 @@ import { isPrivateIP } from './main/ipAddress.js';
 export { isLocalOrIntranetHost } from './main/hostPolicy';
 import { enforceModelCacheBudget, MAX_MODEL_CACHE_FILE_BYTES } from './main/modelCacheQuota.js';
 import { isAgentNavigationHostPublic } from './main/agentNavigationGuard.js';
+import { registerAgentCdpHandlers, watchPageDialogs } from './main/agentCdp.js';
 import { shouldReloadAfterRendererGone, markQuitting } from './main/rendererRecovery.js';
 import { assessUpdateIntegrity } from './main/updateIntegrity.js';
 
@@ -3629,6 +3630,7 @@ app.on('web-contents-created', (_event, wc) => {
     watchGoogleSigninRejection(wc);
     applyGoogleSigninCompat(wc);
   }
+  watchPageDialogs(wc, () => Boolean(mcpServer && mcpServer.isRunning()));
   wc.removeAllListeners('context-menu');
   wc.on('context-menu', (e, params) => {
     // Only show for webviews
@@ -4515,6 +4517,9 @@ ipcMain.handle('model-cache-set', async (event, url: unknown, data: unknown) => 
     return false;
   }
 });
+
+// Dialog, upload, drag and accessibility-snapshot handlers (electron/main/agentCdp.ts).
+registerAgentCdpHandlers({ isTrustedSender, isMcpRunning: () => Boolean(mcpServer && mcpServer.isRunning()) });
 
 // Second layer of the agent navigation policy. The renderer check
 // (isSafeAgentNavigationUrl) cannot resolve a DNS name, so a public hostname
