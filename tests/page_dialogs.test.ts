@@ -40,6 +40,21 @@ console.log('\n--- Page Dialogs Test Suite ---');
   t.closed(1);
   assert.equal(t.get(1), undefined);
   assert.equal(t.opened(1, { type: 'bogus' }), null);
+
+  // The browser closes a guest's dialog at once; the agent learns how it ended.
+  const t2 = new PageDialogTracker();
+  assert.match(t2.describe(7, 1000), /none was shown recently/);
+  t2.opened(7, { type: 'confirm', message: 'Delete everything?', url: 'https://e.com/a?x=1' });
+  t2.closed(7, false, 1000);
+  assert.match(t2.describe(7, 6000), /Recent confirm dialog from https:\/\/e\.com\/a, closed by the browser as cancelled 5s ago/);
+  assert.match(t2.describe(7, 6000), /"Delete everything\?"/);
+  assert.doesNotMatch(t2.describe(7, 1000 + 130_000), /Recent/, 'old dialogs expire');
+  assert.doesNotMatch(t2.describe(8, 6000), /Recent/, 'recent dialogs are per guest');
+  t2.closed(7, undefined, 2000);
+  for (let i = 0; i < 8; i++) { t2.opened(7, { type: 'alert', message: 'm' + i }); t2.closed(7, true, 3000 + i); }
+  assert.equal(t2.describe(7, 3100).split('\n').length, 5, 'only the last five are kept');
+  t2.forget(7);
+  assert.match(t2.describe(7, 3100), /none was shown/);
   console.log('[PASS] Page dialogs - tracker is per guest and labels page text as data');
 }
 

@@ -150,7 +150,7 @@ import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, getGoogleSigninCompatUserAgent, isGoogleAccountsUrl, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
-import { approvalNotificationStrings, contextMenuLabels, googleSigninDialogStrings, pageDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
+import { approvalNotificationStrings, contextMenuLabels, googleSigninDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
 import { createApprovalAttention } from './main/approvalAttention.js';
 import { resolveMenuAccelerators, sanitizeMenuBindings, type ShortcutBinding as MenuShortcutBinding } from './main/shortcutAccelerators.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
@@ -4526,49 +4526,13 @@ ipcMain.handle('model-cache-set', async (event, url: unknown, data: unknown) => 
 // (isSafeAgentNavigationUrl) cannot resolve a DNS name, so a public hostname
 // that points at a private address still needs to be refused here, where the
 // name can actually be resolved. Trusted-sender only, and read-only.
-// Page dialogs (alert/confirm/prompt/beforeunload). A guest watched here has
-// its dialogs handled over CDP, which hides Chromium's own window, so every
-// dialog must end up answered: by the agent (browser_handle_dialog) within
-// PAGE_DIALOG_AGENT_WINDOW_MS, otherwise by the person in a native box.
-// Only guests created while the MCP server runs are watched (no debugger is
+// Page dialogs (alert/confirm/prompt/beforeunload). Electron's own handler
+// closes a guest's dialog at once (measured in tests/electron/agent_cdp.spec.ts),
+// so the agent cannot answer in time; this only records what happened so
+// browser_handle_dialog can tell the agent why a confirm returned false. Only
+// guests created while the MCP server runs are watched (no debugger is
 // attached for people who never use the agent).
 const pageDialogs = new PageDialogTracker();
-const PAGE_DIALOG_AGENT_WINDOW_MS = 20_000;
-const pageDialogTimers = new Map<number, NodeJS.Timeout>();
-
-async function answerPageDialog(wc: Electron.WebContents, plan: { accept: boolean; promptText?: string }): Promise<void> {
-  pageDialogs.closed(wc.id);
-  const timer = pageDialogTimers.get(wc.id);
-  if (timer) { clearTimeout(timer); pageDialogTimers.delete(wc.id); }
-  await wc.debugger.sendCommand('Page.handleJavaScriptDialog', { accept: plan.accept, ...(plan.promptText !== undefined ? { promptText: plan.promptText } : {}) });
-}
-
-async function askPersonAboutPageDialog(wc: Electron.WebContents): Promise<void> {
-  const dialogInfo = pageDialogs.get(wc.id);
-  if (!dialogInfo || wc.isDestroyed()) return;
-  const strings = pageDialogStrings(currentUiLanguage);
-  let host = '';
-  try { host = new URL(dialogInfo.url).host; } catch (_) { /* no usable URL */ }
-  const options: Electron.MessageBoxOptions = {
-    type: 'info',
-    title: strings.title(host),
-    message: dialogInfo.message || strings.title(host),
-    buttons: dialogInfo.type === 'alert' ? [strings.ok] : [strings.ok, strings.cancel],
-    defaultId: 0,
-    cancelId: dialogInfo.type === 'alert' ? 0 : 1,
-    noLink: true
-  };
-  try {
-    const result = mainWindow && !mainWindow.isDestroyed()
-      ? await dialog.showMessageBox(mainWindow, options)
-      : await dialog.showMessageBox(options);
-    if (!pageDialogs.get(wc.id) || wc.isDestroyed()) return; // the agent answered meanwhile
-    const accept = dialogInfo.type === 'alert' || result.response === 0;
-    await answerPageDialog(wc, { accept, ...(dialogInfo.type === 'prompt' && accept ? { promptText: dialogInfo.defaultPrompt } : {}) });
-  } catch (err) {
-    console.warn('[PageDialog] Could not answer the dialog:', err instanceof Error ? err.message : err);
-  }
-}
 
 function watchPageDialogs(wc: Electron.WebContents): void {
   if (wc.getType() !== 'webview' || !mcpServer || !mcpServer.isRunning()) return;
@@ -4576,20 +4540,10 @@ function watchPageDialogs(wc: Electron.WebContents): void {
     if (wc.debugger.isAttached()) return;
     wc.debugger.attach('1.3');
     wc.debugger.on('message', (_e, method, params) => {
-      if (method === 'Page.javascriptDialogOpening') {
-        if (!pageDialogs.opened(wc.id, params)) return;
-        pageDialogTimers.set(wc.id, setTimeout(() => { void askPersonAboutPageDialog(wc); }, PAGE_DIALOG_AGENT_WINDOW_MS));
-      } else if (method === 'Page.javascriptDialogClosed') {
-        pageDialogs.closed(wc.id);
-        const timer = pageDialogTimers.get(wc.id);
-        if (timer) { clearTimeout(timer); pageDialogTimers.delete(wc.id); }
-      }
+      if (method === 'Page.javascriptDialogOpening') pageDialogs.opened(wc.id, params);
+      else if (method === 'Page.javascriptDialogClosed') pageDialogs.closed(wc.id, params?.result);
     });
-    wc.once('destroyed', () => {
-      pageDialogs.closed(wc.id);
-      const timer = pageDialogTimers.get(wc.id);
-      if (timer) { clearTimeout(timer); pageDialogTimers.delete(wc.id); }
-    });
+    wc.once('destroyed', () => pageDialogs.forget(wc.id));
     void wc.debugger.sendCommand('Page.enable').catch(() => { /* page gone */ });
   } catch (err) {
     console.warn('[PageDialog] Could not watch dialogs:', err instanceof Error ? err.message : err);
@@ -4605,10 +4559,10 @@ ipcMain.handle('agent-page-dialog', async (event, webContentsId: unknown, action
   const plan = planDialogResponse(pageDialogs.get(webContentsId), action, promptText);
   if (!plan.ok) return { ok: false, error: plan.error };
   try {
-    await answerPageDialog(wc, plan);
+    await wc.debugger.sendCommand('Page.handleJavaScriptDialog', { accept: plan.accept, ...(plan.promptText !== undefined ? { promptText: plan.promptText } : {}) });
     return { ok: true, text: plan.accept ? 'Dialog accepted.' : 'Dialog dismissed.' };
   } catch (err) {
-    return { ok: false, error: 'The dialog could not be answered.' };
+    return { ok: false, error: 'The dialog could not be answered: the browser had already closed it. Use status to see how it ended.' };
   }
 });
 
@@ -4675,8 +4629,9 @@ ipcMain.handle('agent-drag', async (event, webContentsId: unknown, fromRaw: unkn
     // Intercepting lets an HTML5 drag be replayed as drag events instead of
     // starting the operating system's drag loop.
     await wc.debugger.sendCommand('Input.setInterceptDrags', { enabled: true });
+    // A release names the button that was released while `buttons` is already 0.
     const mouse = (type: string, p: { x: number; y: number }, buttons: number, extra: Record<string, unknown> = {}) =>
-      wc.debugger.sendCommand('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: buttons ? 'left' : 'none', buttons, ...extra });
+      wc.debugger.sendCommand('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: buttons || type === 'mouseReleased' ? 'left' : 'none', buttons, ...extra });
     await mouse('mouseMoved', from, 0);
     await mouse('mousePressed', from, 1, { clickCount: 1 });
     for (const p of dragPath(from, to)) {
