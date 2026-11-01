@@ -326,3 +326,20 @@ export function buildApprovalDialogDetail(input: ApprovalDialogInput, strings: A
   }
   return lines.join('\n');
 }
+
+export interface PageDialogStrings {
+  /** Window title; the host the dialog came from is appended by the caller. */
+  title: (host: string) => string;
+  ok: string;
+  cancel: string;
+}
+
+const PAGE_DIALOG: Record<UiLanguage, PageDialogStrings> = {
+  en: { title: (host) => host ? `${host} says` : 'This page says', ok: 'OK', cancel: 'Cancel' },
+  ar: { title: (host) => host ? `${host} يقول` : 'هذه الصفحة تقول', ok: 'موافق', cancel: 'إلغاء' },
+  de: { title: (host) => host ? `${host} meldet` : 'Diese Seite meldet', ok: 'OK', cancel: 'Abbrechen' },
+};
+
+export function pageDialogStrings(lang: UiLanguage): PageDialogStrings {
+  return PAGE_DIALOG[lang] ?? PAGE_DIALOG.en;
+}

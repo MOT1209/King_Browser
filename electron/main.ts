@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { createTrustedSenderPolicy } from './security/trustedSender';
 import { appendCrashLog as writeCrashLog } from './main/crashLog';
 import { isLocalOrIntranetHost } from './main/hostPolicy';
+import { PageDialogTracker, planDialogResponse } from './main/pageDialogs';
 import { isExtensionAllowedInIncognito, setExtensionIncognitoAccess, hasExtensionIncognitoAccess } from './main/incognitoExtensions';
 import { openPageSourceViewer as createPageSourceViewer } from './windows/sourceViewer';
 import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
@@ -145,7 +146,7 @@ import { buildMcpClientConfig, type McpClientKind } from './main/mcpClientConfig
 import { initMcpBridge } from './main/mcpBridge.js';
 import { canOpenInSystemBrowser, getGoogleSigninCompatUserAgent, isGoogleAccountsUrl, isGoogleEmbeddedSigninRejection, pickSystemBrowserUrl } from './main/googleSigninFallback.js';
 import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windowOpenPolicy.js';
-import { approvalNotificationStrings, contextMenuLabels, googleSigninDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
+import { approvalNotificationStrings, contextMenuLabels, googleSigninDialogStrings, pageDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
 import { createApprovalAttention } from './main/approvalAttention.js';
 import { resolveMenuAccelerators, sanitizeMenuBindings, type ShortcutBinding as MenuShortcutBinding } from './main/shortcutAccelerators.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
@@ -3629,6 +3630,7 @@ app.on('web-contents-created', (_event, wc) => {
     watchGoogleSigninRejection(wc);
     applyGoogleSigninCompat(wc);
   }
+  watchPageDialogs(wc);
   wc.removeAllListeners('context-menu');
   wc.on('context-menu', (e, params) => {
     // Only show for webviews
@@ -4520,6 +4522,92 @@ ipcMain.handle('model-cache-set', async (event, url: unknown, data: unknown) => 
 // (isSafeAgentNavigationUrl) cannot resolve a DNS name, so a public hostname
 // that points at a private address still needs to be refused here, where the
 // name can actually be resolved. Trusted-sender only, and read-only.
+// Page dialogs (alert/confirm/prompt/beforeunload). A guest watched here has
+// its dialogs handled over CDP, which hides Chromium's own window, so every
+// dialog must end up answered: by the agent (browser_handle_dialog) within
+// PAGE_DIALOG_AGENT_WINDOW_MS, otherwise by the person in a native box.
+// Only guests created while the MCP server runs are watched (no debugger is
+// attached for people who never use the agent).
+const pageDialogs = new PageDialogTracker();
+const PAGE_DIALOG_AGENT_WINDOW_MS = 20_000;
+const pageDialogTimers = new Map<number, NodeJS.Timeout>();
+
+async function answerPageDialog(wc: Electron.WebContents, plan: { accept: boolean; promptText?: string }): Promise<void> {
+  pageDialogs.closed(wc.id);
+  const timer = pageDialogTimers.get(wc.id);
+  if (timer) { clearTimeout(timer); pageDialogTimers.delete(wc.id); }
+  await wc.debugger.sendCommand('Page.handleJavaScriptDialog', { accept: plan.accept, ...(plan.promptText !== undefined ? { promptText: plan.promptText } : {}) });
+}
+
+async function askPersonAboutPageDialog(wc: Electron.WebContents): Promise<void> {
+  const dialogInfo = pageDialogs.get(wc.id);
+  if (!dialogInfo || wc.isDestroyed()) return;
+  const strings = pageDialogStrings(currentUiLanguage);
+  let host = '';
+  try { host = new URL(dialogInfo.url).host; } catch (_) { /* no usable URL */ }
+  const options: Electron.MessageBoxOptions = {
+    type: 'info',
+    title: strings.title(host),
+    message: dialogInfo.message || strings.title(host),
+    buttons: dialogInfo.type === 'alert' ? [strings.ok] : [strings.ok, strings.cancel],
+    defaultId: 0,
+    cancelId: dialogInfo.type === 'alert' ? 0 : 1,
+    noLink: true
+  };
+  try {
+    const result = mainWindow && !mainWindow.isDestroyed()
+      ? await dialog.showMessageBox(mainWindow, options)
+      : await dialog.showMessageBox(options);
+    if (!pageDialogs.get(wc.id) || wc.isDestroyed()) return; // the agent answered meanwhile
+    const accept = dialogInfo.type === 'alert' || result.response === 0;
+    await answerPageDialog(wc, { accept, ...(dialogInfo.type === 'prompt' && accept ? { promptText: dialogInfo.defaultPrompt } : {}) });
+  } catch (err) {
+    console.warn('[PageDialog] Could not answer the dialog:', err instanceof Error ? err.message : err);
+  }
+}
+
+function watchPageDialogs(wc: Electron.WebContents): void {
+  if (wc.getType() !== 'webview' || !mcpServer || !mcpServer.isRunning()) return;
+  try {
+    if (wc.debugger.isAttached()) return;
+    wc.debugger.attach('1.3');
+    wc.debugger.on('message', (_e, method, params) => {
+      if (method === 'Page.javascriptDialogOpening') {
+        if (!pageDialogs.opened(wc.id, params)) return;
+        pageDialogTimers.set(wc.id, setTimeout(() => { void askPersonAboutPageDialog(wc); }, PAGE_DIALOG_AGENT_WINDOW_MS));
+      } else if (method === 'Page.javascriptDialogClosed') {
+        pageDialogs.closed(wc.id);
+        const timer = pageDialogTimers.get(wc.id);
+        if (timer) { clearTimeout(timer); pageDialogTimers.delete(wc.id); }
+      }
+    });
+    wc.once('destroyed', () => {
+      pageDialogs.closed(wc.id);
+      const timer = pageDialogTimers.get(wc.id);
+      if (timer) { clearTimeout(timer); pageDialogTimers.delete(wc.id); }
+    });
+    void wc.debugger.sendCommand('Page.enable').catch(() => { /* page gone */ });
+  } catch (err) {
+    console.warn('[PageDialog] Could not watch dialogs:', err instanceof Error ? err.message : err);
+  }
+}
+
+ipcMain.handle('agent-page-dialog', async (event, webContentsId: unknown, action: unknown, promptText: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'untrusted sender' };
+  if (typeof webContentsId !== 'number' || !Number.isInteger(webContentsId)) return { ok: false, error: 'invalid tab' };
+  const wc = webContents.fromId(webContentsId);
+  if (!wc || wc.isDestroyed() || wc.getType() !== 'webview') return { ok: false, error: 'invalid tab' };
+  if (action === 'status') return { ok: true, text: pageDialogs.describe(webContentsId) };
+  const plan = planDialogResponse(pageDialogs.get(webContentsId), action, promptText);
+  if (!plan.ok) return { ok: false, error: plan.error };
+  try {
+    await answerPageDialog(wc, plan);
+    return { ok: true, text: plan.accept ? 'Dialog accepted.' : 'Dialog dismissed.' };
+  } catch (err) {
+    return { ok: false, error: 'The dialog could not be answered.' };
+  }
+});
+
 ipcMain.handle('agent-navigation-host-check', async (event, url: unknown) => {
   if (!isTrustedSender(event)) return { allowed: false, reason: 'untrusted sender' };
   if (typeof url !== 'string') return { allowed: false, reason: 'invalid url' };

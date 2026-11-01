@@ -340,6 +340,7 @@ export interface ElectronAPI {
     confirmLabel?: string;
     cancelLabel?: string;
   }) => Promise<boolean>;
+  agentPageDialog: (webContentsId: number, action: string, promptText?: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
   // VPN
   setVpn: (config: { enabled: boolean; proxyUrl?: string }) => Promise<boolean | { error: string }>;
   // Shortcuts, navigation & download events

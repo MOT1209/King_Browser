@@ -60,6 +60,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   checkAgentNavigationHost: (url: string) =>
     ipcRenderer.invoke('agent-navigation-host-check', url),
+  /** Reads or answers the JS dialog blocking a tab (status, accept, dismiss). */
+  agentPageDialog: (webContentsId: number, action: string, promptText?: string) =>
+    ipcRenderer.invoke('agent-page-dialog', webContentsId, action, promptText),
   onUpdateDownloaded: (callback: (event: any, info: any) => void) => {
     const handler = (_event: any, info: any) => callback(null, info);
     ipcRenderer.on('update-downloaded', handler);

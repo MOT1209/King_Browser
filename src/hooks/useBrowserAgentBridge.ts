@@ -745,6 +745,23 @@ export function useBrowserAgentBridge({
           }
           return "Error: No active webview available.";
 
+        case 'browser_handle_dialog': {
+          // The dialog blocks the page, so this must not go through
+          // executeJavaScript; main answers it over CDP for this tab's guest.
+          const action = safeArgs.action;
+          if (action !== 'status' && action !== 'accept' && action !== 'dismiss') {
+            return "Error: Invalid 'action' parameter: use status, accept or dismiss.";
+          }
+          const api = (window as any).electronAPI;
+          if (!api?.agentPageDialog) return 'Error: Page dialog control is unavailable.';
+          if (!activeWebview || typeof activeWebview.getWebContentsId !== 'function') return 'Error: No active webview available.';
+          let wcId: number;
+          try { wcId = activeWebview.getWebContentsId(); } catch (_) { return 'Error: No active webview available.'; }
+          const result = await api.agentPageDialog(wcId, action, typeof safeArgs.promptText === 'string' ? safeArgs.promptText : undefined);
+          if (!result?.ok) return `Error: ${result?.error || 'The dialog could not be handled.'}`;
+          return String(result.text);
+        }
+
         case 'browser_wait_for': {
           // Polls a fresh guest each round: the document is expected to change
           // while a page loads, so one bound guest would only report "changed".

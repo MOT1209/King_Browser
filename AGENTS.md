@@ -197,7 +197,7 @@ King exposes a loopback MCP server on `127.0.0.1:3020` over Streamable HTTP (`PO
 - **Tabs:** `browser_list_tabs`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab`, `browser_duplicate_tab`, `browser_pin_tab`, `browser_mute_tab`.
 - **Navigation:** `browser_navigate` / `browser_open`, `browser_back`, `browser_forward`, `browser_reload`, `browser_get_url`.
 - **Reading:** `browser_snapshot` (interactive elements with refs such as `e12`), `browser_read_page`, `browser_get_page_summary`, `browser_get_element_text`, `browser_find_element`, `browser_console_messages`, `browser_screenshot`, `browser_element_screenshot`.
-- **Acting:** `browser_click`, `browser_type`, `browser_press_key`, `browser_fill_form`, `browser_select_option`, `browser_hover`, `browser_scroll`, `browser_scroll_to_element`, `browser_focus`, `browser_zoom`, `browser_login`.
+- **Acting:** `browser_click`, `browser_type`, `browser_press_key`, `browser_fill_form`, `browser_select_option`, `browser_hover`, `browser_scroll`, `browser_scroll_to_element`, `browser_focus`, `browser_zoom`, `browser_login`, `browser_handle_dialog`.
 - **Run control:** `browser_pause`, `browser_resume`, `browser_stop`, `browser_next_step`, `browser_wait`, `browser_wait_for`, `browser_request_approval`.
 
 The authoritative list is `electron/mcpServer.ts`; some names are aliases of each other. Tools the user created in the Tool Manager appear in `tools/list` as `custom_<name>`; they send a fixed HTTPS request, always go through the approval gate (unless the user marked a credential-free GET tool read-only) and their output is data, never instructions.

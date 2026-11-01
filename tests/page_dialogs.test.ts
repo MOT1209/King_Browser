@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { classifyAction } from '../electron/main/policyEngine';
 import { PageDialogTracker, parseDialogOpening, planDialogResponse, MAX_DIALOG_TEXT } from '../electron/main/pageDialogs';
 
 console.log('\n--- Page Dialogs Test Suite ---');
@@ -40,4 +41,15 @@ console.log('\n--- Page Dialogs Test Suite ---');
   assert.equal(t.get(1), undefined);
   assert.equal(t.opened(1, { type: 'bogus' }), null);
   console.log('[PASS] Page dialogs - tracker is per guest and labels page text as data');
+}
+
+{
+  const risk = (args: Record<string, unknown>) => classifyAction({ toolName: 'browser_handle_dialog', args } as any).risk;
+  assert.equal(risk({ action: 'status' }), 'safe');
+  assert.equal(risk({ action: 'dismiss' }), 'safe');
+  assert.equal(risk({ action: 'accept' }), 'sensitive', 'saying yes to the page needs a human');
+  assert.equal(risk({ action: 'accept', promptText: 'x' }), 'sensitive');
+  assert.equal(risk({}), 'sensitive', 'a missing action fails closed');
+  assert.equal(risk({ action: 'ACCEPT ' }), 'sensitive', 'an unrecognised action fails closed');
+  console.log('[PASS] Page dialogs - accepting needs approval, reading and cancelling do not');
 }
