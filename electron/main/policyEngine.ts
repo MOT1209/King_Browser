@@ -381,6 +381,10 @@ export function classifyAction(input: PolicyInput): PolicyDecision {
       return { risk: 'safe', triggers: [], reasons: ['Reading or dismissing a page dialog commits to nothing.'], domain, redactedArgs };
     }
     addTrigger(context, 'consequential_form', 'Accepting a page dialog answers "yes" to whatever the page asked.');
+  } else if (toolName === 'browser_drag') {
+    addTrigger(context, 'consequential_form', 'Dragging can move, reorder or delete items on the page.');
+  } else if (toolName === 'browser_upload_file') {
+    addTrigger(context, 'share_private', 'Attaching a local file sends its contents to this website.');
   } else if (toolName === 'browser_login') {
     addTrigger(context, 'login', 'Signing in to this site with a saved account.');
   } else if (toolName === 'browser_go_back' || toolName === 'browser_go_forward' || toolName === 'browser_reload') {

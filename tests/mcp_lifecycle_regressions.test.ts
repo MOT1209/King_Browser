@@ -4,6 +4,7 @@ import * as elementSnapshotModule from '../src/utils/elementSnapshot';
 import * as consoleBufferModule from '../src/utils/consoleBuffer';
 import * as urlRedactionModule from '../src/utils/urlRedaction';
 import * as trustedInputModule from '../src/utils/trustedInput';
+import * as deepQueryModule from '../src/utils/deepQuery';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import https from 'node:https';
@@ -73,6 +74,7 @@ async function run() {
     '../utils/consoleBuffer': consoleBufferModule,
     '../utils/agentLogin': agentLoginModule,
     '../utils/urlRedaction': urlRedactionModule,
+    '../utils/deepQuery': deepQueryModule,
     '../utils/trustedInput': trustedInputModule
   });
   hook.useBrowserAgentBridge({ activeTabId: 'tab', tabs: [], history: [], bookmarks: [], settingsRef,

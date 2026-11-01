@@ -57,5 +57,7 @@ export const MCP_TOOLS = [
   { name: 'browser_console_messages', desc: 'Read the page console (logs, warnings, errors)', level: 'medium' },
   { name: 'browser_element_screenshot', desc: 'Screenshot a single element', level: 'medium' },
   { name: 'browser_handle_dialog', desc: 'Read or answer a blocking alert/confirm/prompt dialog', level: 'medium' },
+  { name: 'browser_upload_file', desc: 'Attach a local file to a file input (every call needs your approval)', level: 'sensitive' },
+  { name: 'browser_drag', desc: 'Drag one element onto another (every call needs your approval)', level: 'sensitive' },
   { name: 'browser_fill_form', desc: 'Fill several fields at once (each checked like browser_type)', level: 'sensitive' },
 ];

@@ -747,6 +747,39 @@ export function useBrowserAgentBridge({
           }
           return "Error: No active webview available.";
 
+        case 'browser_drag': {
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
+          if (typeof safeArgs.toSelector !== 'string' || !safeArgs.toSelector) return "Error: Missing or invalid 'toSelector' parameter";
+          const api = (window as any).electronAPI;
+          if (!api?.agentDrag) return 'Error: Dragging is unavailable.';
+          if (!activeWebview || typeof activeWebview.getWebContentsId !== 'function' || !activeWebview.executeJavaScript) return 'Error: No active webview available.';
+          if (!await previewTarget(safeArgs.selector)) return "Error: MCP action was cancelled or expired.";
+          const ends: Array<{ x: number; y: number }> = [];
+          for (const [sel, label] of [[safeArgs.selector, 'source'], [safeArgs.toSelector, 'drop target']] as const) {
+            const located = await activeWebview.executeAction(buildLocateScript(sel));
+            if (!located?.found) return `Error: The ${label} was not found: ${describeMissingTarget(sel, located?.error || `Element not found with selector: ${sel}`)}`;
+            if (!located.inView) return `Error: The ${label} is not visible on screen (it is hidden or has no size).`;
+            if (!located.hit) return `Error: The ${label} is covered by ${located.covering || 'another element'}.`;
+            ends.push(toGuestPoint(activeWebview, located.x, located.y));
+          }
+          let wcId: number;
+          try { wcId = activeWebview.getWebContentsId(); } catch (_) { return 'Error: No active webview available.'; }
+          const result = await api.agentDrag(wcId, ends[0], ends[1]);
+          return result?.ok ? String(result.text) : `Error: ${result?.error || 'The drag could not be performed.'}`;
+        }
+
+        case 'browser_upload_file': {
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
+          if (typeof safeArgs.path !== 'string' || !safeArgs.path) return "Error: Missing or invalid 'path' parameter";
+          const api = (window as any).electronAPI;
+          if (!api?.agentUploadFile) return 'Error: File upload is unavailable.';
+          if (!activeWebview || typeof activeWebview.getWebContentsId !== 'function') return 'Error: No active webview available.';
+          let wcId: number;
+          try { wcId = activeWebview.getWebContentsId(); } catch (_) { return 'Error: No active webview available.'; }
+          const result = await api.agentUploadFile(wcId, safeArgs.selector, safeArgs.path);
+          return result?.ok ? String(result.text) : `Error: ${result?.error || 'The file could not be attached.'}`;
+        }
+
         case 'browser_handle_dialog': {
           // The dialog blocks the page, so this must not go through
           // executeJavaScript; main answers it over CDP for this tab's guest.

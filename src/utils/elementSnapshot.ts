@@ -55,6 +55,7 @@ export function buildSnapshotScript(options: SnapshotScriptOptions = {}): string
         if (type === 'checkbox' || type === 'radio') return type;
         if (type === 'submit' || type === 'button' || type === 'reset' || type === 'image') return 'button';
         if (type === 'password') return 'textbox(password)';
+        if (type === 'file') return 'file-input';
         return 'textbox';
       }
       return el.isContentEditable ? 'textbox' : 'generic';

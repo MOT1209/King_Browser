@@ -237,6 +237,32 @@ export const TOOLS: McpTool[] = [
     }
   },
   {
+    name: 'browser_upload_file',
+    description: 'Attaches one local file to an <input type=file> on the active page. The file leaves the user\'s computer, so every call needs the user\'s approval. The path must be absolute and name a regular file of at most 100 MB; files in credential folders, key files and King Browser\'s own data are refused. Target the input with ref (from browser_snapshot) or selector.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string', description: 'Element ref from browser_snapshot (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the file input (alternative to ref)' },
+        path: { type: 'string', description: 'Absolute path of the file to attach' }
+      },
+      required: ['path']
+    }
+  },
+  {
+    name: 'browser_drag',
+    description: 'Drags one element onto another with the real mouse (HTML5 drag and drop, sliders, sortable lists). Both ends are named with a ref from browser_snapshot or a CSS selector. A drag can move, reorder or delete things, so every call needs the user\'s approval.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string', description: 'Ref of the element to drag (e.g., e12)' },
+        selector: { type: 'string', description: 'CSS selector of the element to drag (alternative to ref)' },
+        toRef: { type: 'string', description: 'Ref of the drop target' },
+        toSelector: { type: 'string', description: 'CSS selector of the drop target (alternative to toRef)' }
+      }
+    }
+  },
+  {
     name: 'browser_press_key',
     description: 'Presses a real keyboard key or shortcut on the focused element of the active page. Enter in a form that sends data submits it and needs the user\'s approval.',
     inputSchema: {
@@ -507,7 +533,7 @@ const PAGE_CONTEXT_TOOLS = new Set(['browser_click', 'browser_type', 'browser_se
 // need an approval after that text looked like an injection attempt.
 const INJECTION_SCAN_TOOLS = new Set(['browser_handle_dialog', 'browser_read_page', 'browser_snapshot', 'browser_get_element_text', 'browser_console_messages']);
 const INJECTION_GATED_TOOLS = new Set([
-  'browser_navigate', 'browser_new_tab', 'browser_click', 'browser_type', 'browser_select_option', 'browser_press_key'
+  'browser_upload_file', 'browser_drag', 'browser_navigate', 'browser_new_tab', 'browser_click', 'browser_type', 'browser_select_option', 'browser_press_key'
 ]);
 
 // Tools that read or act on the current page: per-site rules apply to them too,
@@ -517,7 +543,7 @@ const SITE_RULE_TOOLS = new Set([
   'browser_read_page', 'browser_snapshot', 'browser_screenshot',
   'browser_get_element_text', 'browser_find_element', 'browser_run_js',
   'browser_scroll', 'browser_scroll_to_element', 'browser_hover', 'browser_focus',
-  'browser_wait_for', 'browser_console_messages', 'browser_element_screenshot', 'browser_handle_dialog'
+  'browser_wait_for', 'browser_console_messages', 'browser_element_screenshot', 'browser_handle_dialog', 'browser_upload_file', 'browser_drag'
 ]);
 
 // Tool permission levels
@@ -579,6 +605,10 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_element_screenshot: 'medium',
   // Shows page-supplied dialog text; accepting is gated by the policy engine.
   browser_handle_dialog: 'medium',
+  // Sends a local file to a website; always approved by the user.
+  browser_upload_file: 'sensitive',
+  // Can move, reorder or delete; always approved by the user.
+  browser_drag: 'sensitive',
   // Each field is executed as a browser_type call and checked as one.
   browser_fill_form: 'sensitive',
 };

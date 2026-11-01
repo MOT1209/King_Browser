@@ -53,3 +53,15 @@ console.log('\n--- Page Dialogs Test Suite ---');
   assert.equal(risk({ action: 'ACCEPT ' }), 'sensitive', 'an unrecognised action fails closed');
   console.log('[PASS] Page dialogs - accepting needs approval, reading and cancelling do not');
 }
+
+{
+  const up = classifyAction({ toolName: 'browser_upload_file', args: { selector: '#f', path: '/home/me/a.pdf' } } as any);
+  assert.equal(up.risk, 'sensitive', 'a file leaving the computer always needs a human');
+  assert.ok(up.triggers.includes('share_private'));
+  console.log('[PASS] Upload - browser_upload_file always requires approval');
+}
+
+{
+  assert.equal(classifyAction({ toolName: 'browser_drag', args: { selector: '#a', toSelector: '#b' } } as any).risk, 'sensitive');
+  console.log('[PASS] Drag - browser_drag always requires approval');
+}

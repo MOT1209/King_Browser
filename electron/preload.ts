@@ -63,6 +63,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /** Reads or answers the JS dialog blocking a tab (status, accept, dismiss). */
   agentPageDialog: (webContentsId: number, action: string, promptText?: string) =>
     ipcRenderer.invoke('agent-page-dialog', webContentsId, action, promptText),
+  /** Attaches one local file to a file input of a tab; main validates the path. */
+  agentUploadFile: (webContentsId: number, selector: string, filePath: string) =>
+    ipcRenderer.invoke('agent-upload-file', webContentsId, selector, filePath),
+  /** Drags between two points (page coordinates) of a tab with real mouse input. */
+  agentDrag: (webContentsId: number, from: { x: number; y: number }, to: { x: number; y: number }) =>
+    ipcRenderer.invoke('agent-drag', webContentsId, from, to),
   onUpdateDownloaded: (callback: (event: any, info: any) => void) => {
     const handler = (_event: any, info: any) => callback(null, info);
     ipcRenderer.on('update-downloaded', handler);

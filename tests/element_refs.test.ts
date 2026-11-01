@@ -77,3 +77,12 @@ console.log('\n--- Element Refs Test Suite ---');
   assert.equal(dom.window.document.querySelectorAll('[data-king-ref]').length, 10);
   console.log('[PASS] Element refs — long pages are capped');
 }
+
+{
+  assert.deepEqual(resolveElementRef('browser_drag', { ref: 'e1', toRef: 'e2' }), { selector: '[data-king-ref="e1"]', toSelector: '[data-king-ref="e2"]' });
+  assert.deepEqual(resolveElementRef('browser_drag', { selector: '#a', toRef: 'e2' }), { selector: '#a', toSelector: '[data-king-ref="e2"]' });
+  assert.throws(() => resolveElementRef('browser_drag', { ref: 'e1' }), /drop target/);
+  assert.throws(() => resolveElementRef('browser_drag', { toRef: 'e2' }), /source/);
+  assert.throws(() => resolveElementRef('browser_drag', { ref: 'e1"]', toRef: 'e2' }), /Invalid element ref/);
+  console.log('[PASS] Element refs — browser_drag resolves both ends and refuses a missing one');
+}
