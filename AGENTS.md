@@ -90,6 +90,7 @@ Run before pushing: `npm run verify`. When you touched `electron/`, also `npm ru
 | New MCP tool | `electron/mcpServer.ts`, renderer handler in `src/hooks/useBrowserAgentBridge.ts`, a policy classification, tests, README tool count |
 | User-defined (custom) MCP tools, Tool Manager | `electron/main/customTools.ts` (rules, store, executor), glue in `electron/mcpServer.ts`, UI `src/components/settings/McpToolManager.tsx`, tests `tests/custom_tools.test.ts` and `tests/mcp_custom_tools_integration.test.ts`, guide `docs/engineering/custom-mcp-tools.md` |
 | Element targeting by ref (`e12`) | `electron/main/elementRefs.ts`, `src/utils/elementSnapshot.ts` |
+| Agent actions that need CDP (page dialogs, file upload, drag, accessibility snapshot) | `electron/main/agentCdp.ts` (handlers), decisions in `pageDialogs.ts`, `uploadPolicy.ts`, `dragPlan.ts`, `axSnapshot.ts`; live checks `tests/electron/agent_cdp.spec.ts` |
 | Activity log | `electron/main/activityLog.ts`, `activityStore.ts` |
 | New IPC channel | `electron/main.ts` + `electron/preload.ts` + `isTrustedSender` check + test |
 | URL or navigation rule | `src/utils/safeNavigation.ts`, `electron/main/agentNavigationGuard.ts` |

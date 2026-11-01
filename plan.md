@@ -43,7 +43,7 @@
 - الصعوبة: منخفضة. الوقت: أيام.
 
 ### WP9 — صيانة تقنية (أنا، تدريجياً)
-- تقسيم `electron/main.ts` (نحو 5900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة.
+- تقسيم `electron/main.ts` (نحو 5900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة. **أُنجز جزء:** معالجات CDP للوكيل نُقلت إلى `electron/main/agentCdp.ts`.
 - تخفيض تحذيرات ESLint في `src` و`electron` (860) تدريجياً، لا دفعة واحدة.
 - تحديث Electron ضمن الإصدار الرئيسي نفسه مع كل إصدار (تحديثات Chromium الأمنية التزام دائم).
 - حماية المزامنة من إعادة تقديم نسخة قديمة (تحتاج صيغة تشفير جديدة وترحيلاً؛ قرارك قبل البدء).
@@ -107,7 +107,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich" = per Code umsetzbar; „du" 
 - Schwierigkeit: niedrig. Zeit: Tage.
 
 ### WP9 — Technische Wartung (ich, schrittweise)
-- `electron/main.ts` (ca. 5900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug.
+- `electron/main.ts` (ca. 5900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug. **Teilweise erledigt:** die CDP-Handler des Agenten liegen jetzt in `electron/main/agentCdp.ts`.
 - ESLint-Warnungen in `src` und `electron` (860) schrittweise abbauen, nicht in einem Zug.
 - Electron mit jedem Release innerhalb der Hauptversion aktualisieren (Chromium-Sicherheitsupdates sind eine Dauerverpflichtung).
 - Sync gegen das erneute Ausliefern einer alten Version schützen (braucht ein neues Verschlüsselungsformat und eine Migration; vorher deine Entscheidung).
