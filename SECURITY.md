@@ -8,8 +8,8 @@ King Browser operates on a rolling release cadence. Security patches and hardeni
 
 | Version | Supported | Notes |
 | :--- | :--- | :--- |
-| >= 1.5.0 | Yes | Current active supported release series with active security patches |
-| < 1.5.0 | No | End of life / Unsupported legacy versions. Upgrade to v1.5.0+ required. |
+| Latest `0.0.x` release | Yes | Security fixes land on `main` and ship in the next tagged release |
+| Older `0.0.x` releases and the `nightly` pre-release | No | Update to the latest release. Version 1.5.0 is the upstream Nova Browser release King was derived from, not a King version |
 
 ## Threat Model & Security Architecture
 
