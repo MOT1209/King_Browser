@@ -20,7 +20,9 @@ export const REF_TOOLS: ReadonlySet<string> = new Set([
   'browser_focus',
   'browser_get_element_text',
   'browser_element_screenshot',
-  'browser_scroll_to_element'
+  'browser_scroll_to_element',
+  'browser_upload_file',
+  'browser_drag'
 ]);
 
 const REF_PATTERN = /^e[1-9][0-9]{0,4}$/;
@@ -40,6 +42,20 @@ export function refToSelector(ref: string): string {
  */
 export function resolveElementRef(toolName: string, args: Record<string, any>): Record<string, any> {
   if (!REF_TOOLS.has(toolName)) return args;
+  if (toolName === 'browser_drag') {
+    // Two ends: the source (ref/selector) and the drop target (toRef/toSelector).
+    const out: Record<string, any> = { ...args };
+    for (const [refKey, selKey] of [['ref', 'selector'], ['toRef', 'toSelector']] as const) {
+      const { [refKey]: ref, ...rest } = out;
+      if (ref !== undefined && ref !== null && ref !== '') {
+        delete out[refKey];
+        out[selKey] = refToSelector(String(ref));
+      } else if (typeof rest[selKey] !== 'string' || !rest[selKey]) {
+        throw new Error(`browser_drag needs ${refKey === 'ref' ? 'the source' : 'the drop target'}: pass "${refKey}" from browser_snapshot or a CSS "${selKey}".`);
+      }
+    }
+    return out;
+  }
   const hasRef = args.ref !== undefined && args.ref !== null && args.ref !== '';
   if (hasRef) {
     const { ref, ...rest } = args;

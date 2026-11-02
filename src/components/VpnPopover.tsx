@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, ShieldAlert, Globe, MapPin, Plus, Trash2, Check, X } from 'lucide-react';
+import { Shield, ShieldAlert, Globe, MapPin, Plus, Trash2 } from 'lucide-react';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { generateId } from '../utils/idGenerator';
 import { isValidProxyUrl, SECURE_PROXY_ERROR } from '../utils/proxyValidation';

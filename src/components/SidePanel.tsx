@@ -1,31 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Sparkles,
-  X,
-  Copy,
-  Check,
-  RotateCcw,
-  Volume2,
-  VolumeX,
-  Loader2,
-  ChevronDown,
-  Brain,
-  Plus,
-  Layers,
-  Search,
-  Zap,
-} from 'lucide-react';
+import { Sparkles, X, Copy, Check, RotateCcw, Volume2, VolumeX, Loader2, ChevronDown, Brain, Plus, Layers, Search, Zap } from 'lucide-react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Tab } from '../types/browser';
-import {
-  aiAgent,
-  AVAILABLE_AI_MODELS,
-  detectDirectIntent,
-} from '../services/aiAgent';
+import { aiAgent, AVAILABLE_AI_MODELS, detectDirectIntent } from '../services/aiAgent';
 import { tts } from '../services/tts';
-import { getLocale } from '../services/i18n';
+import '../services/i18n';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { AssistantApprovalCard } from './AssistantApprovalCard';

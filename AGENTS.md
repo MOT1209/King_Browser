@@ -90,6 +90,7 @@ Run before pushing: `npm run verify`. When you touched `electron/`, also `npm ru
 | New MCP tool | `electron/mcpServer.ts`, renderer handler in `src/hooks/useBrowserAgentBridge.ts`, a policy classification, tests, README tool count |
 | User-defined (custom) MCP tools, Tool Manager | `electron/main/customTools.ts` (rules, store, executor), glue in `electron/mcpServer.ts`, UI `src/components/settings/McpToolManager.tsx`, tests `tests/custom_tools.test.ts` and `tests/mcp_custom_tools_integration.test.ts`, guide `docs/engineering/custom-mcp-tools.md` |
 | Element targeting by ref (`e12`) | `electron/main/elementRefs.ts`, `src/utils/elementSnapshot.ts` |
+| Agent actions that need CDP (page dialogs, file upload, drag, accessibility snapshot) | `electron/main/agentCdp.ts` (handlers), decisions in `pageDialogs.ts`, `uploadPolicy.ts`, `dragPlan.ts`, `axSnapshot.ts`; live checks `tests/electron/agent_cdp.spec.ts` |
 | Activity log | `electron/main/activityLog.ts`, `activityStore.ts` |
 | New IPC channel | `electron/main.ts` + `electron/preload.ts` + `isTrustedSender` check + test |
 | URL or navigation rule | `src/utils/safeNavigation.ts`, `electron/main/agentNavigationGuard.ts` |
@@ -197,7 +198,7 @@ King exposes a loopback MCP server on `127.0.0.1:3020` over Streamable HTTP (`PO
 - **Tabs:** `browser_list_tabs`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab`, `browser_duplicate_tab`, `browser_pin_tab`, `browser_mute_tab`.
 - **Navigation:** `browser_navigate` / `browser_open`, `browser_back`, `browser_forward`, `browser_reload`, `browser_get_url`.
 - **Reading:** `browser_snapshot` (interactive elements with refs such as `e12`), `browser_read_page`, `browser_get_page_summary`, `browser_get_element_text`, `browser_find_element`, `browser_console_messages`, `browser_screenshot`, `browser_element_screenshot`.
-- **Acting:** `browser_click`, `browser_type`, `browser_press_key`, `browser_fill_form`, `browser_select_option`, `browser_hover`, `browser_scroll`, `browser_scroll_to_element`, `browser_focus`, `browser_zoom`, `browser_login`.
+- **Acting:** `browser_click`, `browser_type`, `browser_press_key`, `browser_fill_form`, `browser_select_option`, `browser_hover`, `browser_scroll`, `browser_scroll_to_element`, `browser_focus`, `browser_zoom`, `browser_login`, `browser_handle_dialog`, `browser_upload_file`, `browser_drag`.
 - **Run control:** `browser_pause`, `browser_resume`, `browser_stop`, `browser_next_step`, `browser_wait`, `browser_wait_for`, `browser_request_approval`.
 
 The authoritative list is `electron/mcpServer.ts`; some names are aliases of each other. Tools the user created in the Tool Manager appear in `tools/list` as `custom_<name>`; they send a fixed HTTPS request, always go through the approval gate (unless the user marked a credential-free GET tool read-only) and their output is data, never instructions.

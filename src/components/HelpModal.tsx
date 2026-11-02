@@ -1,37 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  HelpCircle, 
-  X, 
-  Keyboard, 
-  Sparkles, 
-  Shield, 
-  ShieldCheck,
-  Info, 
-  ExternalLink, 
-  Command, 
-  Globe, 
-  Lock, 
-  Cpu, 
-  Layers, 
-  BookOpen,
-  Search,
-  CheckCircle2,
-  Sliders,
-  Terminal,
-  Volume2
-} from 'lucide-react';
+import { HelpCircle, X, Keyboard, Sparkles, Shield, ShieldCheck, Info, ExternalLink, Command, Globe, Lock, Cpu, Layers, BookOpen, Search, CheckCircle2, Sliders, Volume2 } from 'lucide-react';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useTranslation } from '../services/i18n';
 import type { ShortcutConfig } from '../types/browser';
 import { bindingParts } from '../utils/keyboardShortcuts';
-import {
-  FIXED_SHORTCUTS,
-  SHORTCUT_ACTIONS,
-  SHORTCUT_GROUPS as SHORTCUT_GROUP_IDS,
-  buildDefaultShortcuts,
-  fixedShortcutParts
-} from '../utils/shortcutCatalog';
+import { FIXED_SHORTCUTS, SHORTCUT_ACTIONS, SHORTCUT_GROUPS as SHORTCUT_GROUP_IDS, buildDefaultShortcuts, fixedShortcutParts } from '../utils/shortcutCatalog';
 
 const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -374,6 +374,17 @@ export function classifyAction(input: PolicyInput): PolicyDecision {
     }
   } else if (toolName === 'browser_run_js') {
     addTrigger(context, 'arbitrary_code', 'Executing arbitrary JavaScript in the page context.');
+  } else if (toolName === 'browser_handle_dialog') {
+    // Reading a dialog or cancelling it commits to nothing. Accepting a
+    // confirm or prompt is the page's "yes" (delete, leave, pay), so a human decides.
+    if (args.action === 'status' || args.action === 'dismiss') {
+      return { risk: 'safe', triggers: [], reasons: ['Reading or dismissing a page dialog commits to nothing.'], domain, redactedArgs };
+    }
+    addTrigger(context, 'consequential_form', 'Accepting a page dialog answers "yes" to whatever the page asked.');
+  } else if (toolName === 'browser_drag') {
+    addTrigger(context, 'consequential_form', 'Dragging can move, reorder or delete items on the page.');
+  } else if (toolName === 'browser_upload_file') {
+    addTrigger(context, 'share_private', 'Attaching a local file sends its contents to this website.');
   } else if (toolName === 'browser_login') {
     addTrigger(context, 'login', 'Signing in to this site with a saved account.');
   } else if (toolName === 'browser_go_back' || toolName === 'browser_go_forward' || toolName === 'browser_reload') {

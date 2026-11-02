@@ -3,65 +3,17 @@ import { createPortal } from 'react-dom';
 import { DownloadsPopover } from './DownloadsPopover';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import {
-  ArrowLeft,
-  ArrowRight,
-  RotateCw,
-  Home,
-  Search,
-  Plus,
-  Star,
-  Globe,
-  X,
-  Menu,
-  BookOpen,
-  Clock,
-  Download,
-  Columns,
-  Columns2,
-  Pin,
-  PinOff,
-  Volume2,
-  VolumeX,
-  Share2,
-  CopyPlus,
-  ShieldOff,
-  Shield,
-  ZoomIn,
-  ZoomOut,
-  Settings,
-  Camera,
-  Sparkles,
-  Puzzle,
-  ShieldCheck,
-  Cpu,
-  Lock,
-  Unlock,
-  ShieldAlert,
-  HelpCircle,
-  Network,
-  MonitorSmartphone,
-  ScanSearch,
-  VenetianMask,
-  Moon,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  User,
-  Compass,
-  Cloud,
-  Languages
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCw, Home, Search, Plus, Globe, X, Menu, Clock, Download, Columns, Columns2, Volume2, VolumeX, Share2, ShieldOff, Shield, ZoomIn, ZoomOut, Settings, Camera, Puzzle, Cpu, HelpCircle, Network, VenetianMask, Moon, ChevronLeft, ChevronRight, User, Compass, Cloud } from 'lucide-react';
 import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, DownloadItem } from '../types/browser';
-import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
-import { getLanguage, getLocale, useTranslation, displayTabTitle, displayWorkspaceName } from '../services/i18n';
+import '../utils/searchEngine';
+import { useTranslation, displayTabTitle, displayWorkspaceName } from '../services/i18n';
 import { ADBLOCK_WHITELIST_EVENT } from '../utils/adblockWhitelist';
 import { KingAssistantIcon } from './ui/KingAssistantIcon';
 import { AgentTabMarker } from './ui/AgentTabMarker';
 import { useAgentTabId } from '../services/agentTabStore';
 import { logger } from '../utils/logger';
 import { syncService, SyncStatus } from '../services/syncService';
-import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
+import '../utils/suggestionCache';
 import { TabHoverPreview } from './TabHoverPreview';
 import { getElectronAPI } from '../utils/electronBridge';
 import { OmniboxBar } from './topbar/OmniboxBar';

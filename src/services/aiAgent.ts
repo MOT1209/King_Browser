@@ -4,7 +4,7 @@ import { tts } from "./tts";
 import { orchestrator } from "./agentOrchestrator";
 import { generateId } from "../utils/idGenerator";
 import { logger } from "../utils/logger";
-import { getLocale } from "./i18n";
+import "./i18n";
 import { subscribeActionContext } from "./aiActionContext";
 import { sanitizeAgentInput } from "./aiAgent/inputSanitizer";
 
@@ -176,7 +176,7 @@ export const AVAILABLE_AI_MODELS: AIModelOption[] = [
   }
 ];
 
-import { detectDirectIntent, isTurkishContext, parseReActAction, replyLanguage, say } from './aiAgent/intentParser';
+import { detectDirectIntent, parseReActAction, replyLanguage, say } from './aiAgent/intentParser';
 export { detectDirectIntent, isTurkishContext, parseReActAction } from './aiAgent/intentParser';
 
 class AIAgent {

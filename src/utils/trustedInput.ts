@@ -13,6 +13,8 @@
  * parsing and the locate script can be tested in plain Node.
  */
 
+import { DEEP_QUERY_SOURCE } from './deepQuery';
+
 export type InputModifier = 'shift' | 'control' | 'alt' | 'meta';
 
 export interface KeyCombo {
@@ -163,10 +165,10 @@ export interface LocateResult {
  * between a native click and an error naming the cover.
  */
 export function buildLocateScript(selector: string): string {
-  return `
+  return `${DEEP_QUERY_SOURCE}
     (() => {
       try {
-        const el = document.querySelector(${JSON.stringify(selector)});
+        const el = __kingQuery(${JSON.stringify(selector)});
         if (!el) return { found: false };
         // A styled checkbox or radio is often hidden behind its label; a
         // person clicks the label, so aim there when the control has no size.
@@ -175,10 +177,20 @@ export function buildLocateScript(selector: string): string {
         if ((own.width === 0 || own.height === 0) && el.labels && el.labels.length) target = el.labels[0];
         if (typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'center', inline: 'center' });
         const rect = target.getBoundingClientRect();
-        const x = rect.left + rect.width / 2;
-        const y = rect.top + rect.height / 2;
+        // Inside a same-origin iframe the rect is relative to that frame; native
+        // input needs a point on the page, so add the frames' offsets.
+        const off = __kingOffset(target);
+        const x = rect.left + off.x + rect.width / 2;
+        const y = rect.top + off.y + rect.height / 2;
         const inView = rect.width > 0 && rect.height > 0 && x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight;
-        const top = inView && typeof document.elementFromPoint === 'function' ? document.elementFromPoint(x, y) : null;
+        const hitDoc = target.ownerDocument || document;
+        let top = inView && typeof hitDoc.elementFromPoint === 'function' ? hitDoc.elementFromPoint(x - off.x, y - off.y) : null;
+        // elementFromPoint stops at a shadow host; descend to the real element.
+        while (top && top.shadowRoot && typeof top.shadowRoot.elementFromPoint === 'function') {
+          const inner = top.shadowRoot.elementFromPoint(x - off.x, y - off.y);
+          if (!inner || inner === top) break;
+          top = inner;
+        }
         const label = top && typeof top.closest === 'function' ? top.closest('label') : null;
         const hit = !!top && (top === target || target.contains(top) || top === el || (!!label && label.control === el));
         let covering = '';

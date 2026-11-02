@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Loader2, Globe, Clock, ExternalLink } from 'lucide-react';
 import { Readability } from '@mozilla/readability';

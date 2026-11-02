@@ -2,53 +2,16 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { AgentTabMarker } from './ui/AgentTabMarker';
 import { FOLDER_COLOR_CLASSES, FOLDER_COLOR_KEYS, normalizeFolderColor } from '../utils/folderColors';
 import { useAgentTabId } from '../services/agentTabStore';
-import { createPortal } from 'react-dom';
+
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Plus,
-  X,
-  Globe,
-  VolumeX,
-  Volume2,
-  ChevronDown,
-  ChevronRight,
-  Folder as FolderIcon,
-  Palette,
-  FolderPlus,
-  Check,
-  Settings,
-  Clock,
-  Download,
-  VenetianMask,
-  Moon,
-  ArrowLeft,
-  ArrowRight,
-  RotateCw,
-  Search,
-  Shield,
-  ShieldCheck,
-  ShieldOff,
-  Puzzle,
-  Package,
-  Orbit,
-  Layers,
-  LayoutGrid,
-  Trash2,
-  PanelLeft,
-  Pin,
-  Columns2,
-  HelpCircle,
-  Compass,
-  Cloud,
-  Sparkles
-} from 'lucide-react';
+import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, Palette, FolderPlus, Check, Settings, Clock, Download, VenetianMask, Moon, ArrowLeft, ArrowRight, RotateCw, Search, Shield, ShieldCheck, ShieldOff, Puzzle, Package, Orbit, PanelLeft, Pin, Columns2, HelpCircle, Compass, Cloud, Sparkles } from 'lucide-react';
 import { Tab, Bookmark, Workspace, Folder, UserSettings } from '../types/browser';
 import { useTitlebarInsets } from '../hooks/useTitlebarInsets';
 import { formatSearchUrl } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
-import { tabThumbnailCache } from '../services/thumbnailCache';
+import '../services/thumbnailCache';
 import { TabHoverPreview } from './TabHoverPreview';
 import { generateId } from '../utils/idGenerator';
 import { getLocale, getLanguage, useTranslation, displayTabTitle, displayWorkspaceName } from '../services/i18n';
