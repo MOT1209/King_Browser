@@ -183,13 +183,13 @@ class TTSService {
     const targetLang = lang || detectLanguage(text);
 
     // Prefer Native macOS Speech Engine
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsSpeak) {
+    if (typeof window !== 'undefined' && window.electronAPI?.nativeTtsSpeak) {
       this._isSpeaking = true;
       this.notify();
 
       const chosenVoice = voiceName || getMacDefaultVoice(targetLang);
       try {
-        const res = await (window as any).electronAPI.nativeTtsSpeak(text, chosenVoice, rate);
+        const res = await window.electronAPI.nativeTtsSpeak(text, chosenVoice, rate);
         if (sessionId !== this.currentSessionId) return; // Stale session, ignore result
 
         if (res && res.success) {
@@ -300,8 +300,8 @@ class TTSService {
       window.speechSynthesis.removeEventListener('voiceschanged', this.pendingVoicesListener);
       this.pendingVoicesListener = null;
     }
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsStop) {
-      (window as any).electronAPI.nativeTtsStop().catch(() => {});
+    if (typeof window !== 'undefined' && window.electronAPI?.nativeTtsStop) {
+      window.electronAPI.nativeTtsStop().catch(() => {});
     }
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();

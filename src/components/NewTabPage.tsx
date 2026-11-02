@@ -420,8 +420,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
     const timer = setTimeout(async () => {
       try {
-        if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
+        if (typeof window !== 'undefined' && window.electronAPI?.getSuggestions) {
+          const results = await window.electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
             if (Array.isArray(results)) {
               setClientCachedSuggestions(cacheKey, results, clientLocale);

@@ -159,7 +159,7 @@ function fetchLiveFromMain(forceRefresh = false): Promise<ChangelogResult> {
 
 async function requestLiveFromMain(forceRefresh: boolean): Promise<ChangelogResult> {
   try {
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (api?.getChangelogReleases) {
       const remoteReleases = await api.getChangelogReleases(forceRefresh);
       if (Array.isArray(remoteReleases) && remoteReleases.length > 0) {

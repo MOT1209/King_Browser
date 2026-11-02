@@ -514,7 +514,6 @@ export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
 
     const lightVars = buildPaletteVariables(activeLightPalette, false);
     const darkVars = buildPaletteVariables(activeDarkPalette, true);
-    const activePalette = isDark ? activeDarkPalette : activeLightPalette;
     const currentVars = isDark ? darkVars : lightVars;
 
     // Apply directly to root style object for immediate reactivity

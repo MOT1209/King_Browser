@@ -466,7 +466,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   // Security: Harden per-tab incognito partition as soon as incognito tab mounts
   useEffect(() => {
     if (isIncognito && tab?.id) {
-      (window as any).electronAPI?.initIncognitoPartition?.(tab.id);
+      window.electronAPI?.initIncognitoPartition?.(tab.id);
     }
   }, [isIncognito, tab?.id]);
 
@@ -764,7 +764,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
       let isUpdate = false;
       try {
-        const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+        const raw = await window.electronAPI?.secureStoreGet?.('passwords');
         if (raw) {
           const all = JSON.parse(raw);
           const existing = all.find((p: any) => {
@@ -821,12 +821,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         if (!hostname || !actualHostname || actualHostname !== hostname) return;
 
         (window as any).electronAPI?.secureStoreGet?.('passwords').then((raw: string) => {
-          let currentHostname = '';
           let currentOrigin = '';
           try {
             const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
             const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
-            currentHostname = parsed.hostname;
             currentOrigin = parsed.origin;
           } catch (_) {}
           if (!isAutofillLookupCurrent(webviewRef.current, webview, currentOrigin, actualOrigin)) return;
@@ -1099,8 +1097,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             const targetLang = detail.targetLang || 'en';
             const sourceLang = detail.sourceLang || 'auto';
 
-            if (typeof (window as any).electronAPI?.translateTextBatch === 'function') {
-              const response = await (window as any).electronAPI.translateTextBatch(extractResult.texts, sourceLang, targetLang);
+            if (typeof window.electronAPI?.translateTextBatch === 'function') {
+              const response = await window.electronAPI.translateTextBatch(extractResult.texts, sourceLang, targetLang);
 
               if (typeof webview.isDestroyed === 'function' && webview.isDestroyed()) return;
 
@@ -1522,7 +1520,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               const finalUsername = customUsername || passwordPrompt.username;
               const finalPassword = customPassword || passwordPrompt.password;
               try {
-                const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+                const raw = await window.electronAPI?.secureStoreGet?.('passwords');
                 let passwords = raw ? JSON.parse(raw) : [];
 
                 // Remove existing password for this origin (or hostname if legacy) & username if any
@@ -1541,7 +1539,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                   timestamp: Date.now()
                 });
 
-                await (window as any).electronAPI?.secureStoreSet?.('passwords', JSON.stringify(passwords));
+                await window.electronAPI?.secureStoreSet?.('passwords', JSON.stringify(passwords));
               } catch (e) {
                 console.error('Failed to save password', e);
               }

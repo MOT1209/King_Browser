@@ -30,10 +30,6 @@ function sanitizeBlobUrl(url: string): string {
   return '';
 }
 
-function sanitizeAttachmentName(name: string): string {
-  if (typeof name !== 'string') return 'attachment';
-  return name.replace(/[<>"'&]/g, '').slice(0, 100);
-}
 
 // ----------------------------------------------------------------------
 // Sub-components
@@ -791,7 +787,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         pendingAttachmentUrlsRef.current.forEach((url) => safeRevokeUrl(url));
         pendingAttachmentUrlsRef.current.clear();
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
     }, [releaseMicrophone]);
 
 
@@ -800,7 +796,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         setIsSmoothResize(false);
         setExpanded(true);
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
     }, [value, expanded, hasAttachments]);
 
     useEffect(() => {
@@ -836,7 +832,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       setIsScrolling(scrollHeight > 160);
 
       setTimeout(updateFades, 0);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
     }, [value, expanded]);
 
     useEffect(() => {

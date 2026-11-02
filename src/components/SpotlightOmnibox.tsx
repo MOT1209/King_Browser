@@ -83,8 +83,8 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     const currentReqId = ++suggestionRequestIdRef.current;
     const fetchSuggestions = async () => {
       try {
-        if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
+        if (typeof window !== 'undefined' && window.electronAPI?.getSuggestions) {
+          const results = await window.electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
             if (Array.isArray(results)) {
               setClientCachedSuggestions(cacheKey, results, clientLocale);

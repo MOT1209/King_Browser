@@ -19,9 +19,9 @@ export interface AlertDialogOptions {
  */
 export async function showConfirm(options: ConfirmDialogOptions | string): Promise<boolean> {
   const opts: ConfirmDialogOptions = typeof options === 'string' ? { message: options } : options;
-  if (typeof window !== 'undefined' && (window as any).electronAPI?.showConfirmDialog) {
+  if (typeof window !== 'undefined' && window.electronAPI?.showConfirmDialog) {
     try {
-      return await (window as any).electronAPI.showConfirmDialog(opts);
+      return await window.electronAPI.showConfirmDialog(opts);
     } catch (_) {}
   }
   if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
@@ -36,9 +36,9 @@ export async function showConfirm(options: ConfirmDialogOptions | string): Promi
  */
 export async function showAlert(options: AlertDialogOptions | string): Promise<void> {
   const opts: AlertDialogOptions = typeof options === 'string' ? { message: options } : options;
-  if (typeof window !== 'undefined' && (window as any).electronAPI?.showConfirmDialog) {
+  if (typeof window !== 'undefined' && window.electronAPI?.showConfirmDialog) {
     try {
-      await (window as any).electronAPI.showConfirmDialog({
+      await window.electronAPI.showConfirmDialog({
         title: opts.title || 'King Browser',
         message: opts.message,
         detail: opts.detail,

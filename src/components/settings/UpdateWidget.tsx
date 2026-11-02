@@ -2,11 +2,6 @@ import React from 'react';
 import { Check, Download, RefreshCw, ExternalLink, X, AlertTriangle } from 'lucide-react';
 import { useTranslation } from '../../services/i18n';
 
-interface UpdateInfo {
-  version: string;
-  releaseDate: string;
-}
-
 function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return '0 B';
   const sizes = ['B', 'KB', 'MB', 'GB'];
@@ -38,7 +33,7 @@ export const UpdateWidget = () => {
 
   React.useEffect(() => {
     const unsubs: (() => void)[] = [];
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (api) {
       if (api.getUpdateInfo) {
         api.getUpdateInfo().then((info: any) => {
@@ -113,7 +108,7 @@ export const UpdateWidget = () => {
     setTotal(0);
     setSpeed(0);
     setErrorMsg('');
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (api?.downloadUpdate) {
       try {
         const res = await api.downloadUpdate(downloadUrl);
@@ -140,7 +135,7 @@ export const UpdateWidget = () => {
 
   const install = async () => {
     setIsRestarting(true);
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (api?.installUpdate) {
       try {
         await api.installUpdate();
@@ -152,14 +147,14 @@ export const UpdateWidget = () => {
   };
 
   const showInFolder = () => {
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (downloadedFilePath && api?.showDownloadInFolder) {
       api.showDownloadInFolder(downloadedFilePath);
     }
   };
 
   const openDownload = async (url: string) => {
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (api?.openExternal) {
       try {
         const ok = await api.openExternal(url);

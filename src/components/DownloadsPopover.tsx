@@ -94,7 +94,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                       key={item.id} 
                       onClick={() => {
                         if (isCompleted && item.savePath) {
-                          (window as any).electronAPI?.openDownload?.(item.savePath);
+                          window.electronAPI?.openDownload?.(item.savePath);
                         }
                       }}
                       className={`group flex items-start gap-3 p-2.5 hover:bg-slate-100/70 dark:hover:bg-white/[0.04] rounded-xl transition-colors ${isCompleted ? 'cursor-pointer' : ''}`}
@@ -134,7 +134,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!);
+                              window.electronAPI?.showDownloadInFolder?.(item.savePath!);
                             }}
                             className="p-1.5 text-slate-400 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg transition-colors"
                             title={l({ en: 'Show in Folder', ar: 'إظهار في المجلد', de: 'Im Ordner anzeigen' })}
@@ -149,7 +149,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  (window as any).electronAPI?.resumeDownload?.(item.id);
+                                  window.electronAPI?.resumeDownload?.(item.id);
                                 }}
                                 className="p-1.5 text-slate-400 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg transition-colors"
                                 title={l({ en: 'Resume', ar: 'استئناف', de: 'Fortsetzen' })}
@@ -160,7 +160,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  (window as any).electronAPI?.pauseDownload?.(item.id);
+                                  window.electronAPI?.pauseDownload?.(item.id);
                                 }}
                                 className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-colors"
                                 title={l({ en: 'Pause', ar: 'إيقاف مؤقت', de: 'Pausieren' })}
@@ -171,7 +171,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                (window as any).electronAPI?.cancelDownload?.(item.id);
+                                window.electronAPI?.cancelDownload?.(item.id);
                               }}
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                               title={l({ en: 'Cancel', ar: 'إلغاء', de: 'Abbrechen' })}

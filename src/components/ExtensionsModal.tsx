@@ -185,13 +185,13 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
     if (ext.popupUrl) {
       const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
       const url = `chrome-extension://${ext.id}/${cleanPopup}`;
-      if ((window as any).electronAPI?.openExtensionPopup) {
+      if (window.electronAPI?.openExtensionPopup) {
         let bounds: any = undefined;
         if (e) {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
           bounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
         }
-        (window as any).electronAPI.openExtensionPopup(
+        window.electronAPI.openExtensionPopup(
           url, 
           bounds,
           activeTab ? {
@@ -220,10 +220,10 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
 
   const handleLoadUnpacked = async () => {
     try {
-      if ((window as any).electronAPI?.selectExtensionFolder && (window as any).electronAPI?.installExtension) {
-        const result = await (window as any).electronAPI.selectExtensionFolder();
+      if (window.electronAPI?.selectExtensionFolder && window.electronAPI?.installExtension) {
+        const result = await window.electronAPI.selectExtensionFolder();
         if (!result.canceled && result.folderPath) {
-          const installRes = await (window as any).electronAPI.installExtension(result.folderPath);
+          const installRes = await window.electronAPI.installExtension(result.folderPath);
           if (installRes.error) {
             void showAlert({ title: l({ en: 'Extensions', ar: 'الإضافات', de: 'Erweiterungen' }), message: l({ en: 'Extension load error: {error}', ar: 'خطأ في تحميل الإضافة: {error}', de: 'Fehler beim Laden der Erweiterung: {error}' }, { error: String(installRes.error) }) });
           }

@@ -1665,8 +1665,6 @@ CRITICAL RULES:
     const startTime = Date.now();
     const callId = generateId('goal');
     const replyLang = replyLanguage(goalPrompt);
-    const offset = this.getWebviewOffset();
-
     const isCancelled = () => generation === undefined
       ? this.isInterrupted
       : !this.isOperationActive(generation);
@@ -1686,8 +1684,6 @@ CRITICAL RULES:
     }
 
     const steps: GoalStep[] = [];
-    const normalized = goalPrompt.trim().toLowerCase();
-
     // Check if compound steps connected by "sonra", "ardından", "then", etc.
     const subParts = goalPrompt
       .split(/(?:\s+(?:sonra|ardından|ve ardından|daha sonra|sonrasında|then|and then|after that)\s+)/i)
@@ -1833,7 +1829,6 @@ CRITICAL RULES:
 
       // Perform the step
       try {
-        const liveOffset = this.getWebviewOffset();
         if (step.action === 'youtube_search_and_play') {
           const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(step.target || '')}`;
           if (this.actionContext?.onNavigate) {

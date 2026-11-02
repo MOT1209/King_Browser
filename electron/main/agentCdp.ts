@@ -79,7 +79,7 @@ ipcMain.handle('agent-ax-snapshot', async (event, webContentsId: unknown) => {
   try {
     if (!wc.debugger.isAttached()) { wc.debugger.attach('1.3'); attachedHere = true; }
     await wc.debugger.sendCommand('Accessibility.enable');
-    const tree: any = await wc.debugger.sendCommand('Accessibility.getFullAXTree');
+    const tree = await wc.debugger.sendCommand('Accessibility.getFullAXTree') as { nodes?: unknown };
     const { entries, truncated } = selectInteractiveNodes(tree?.nodes);
     // Earlier refs belong to the previous snapshot: clear them everywhere, then stamp the new ones.
     await wc.debugger.sendCommand('Runtime.evaluate', {
@@ -88,7 +88,7 @@ ipcMain.handle('agent-ax-snapshot', async (event, webContentsId: unknown) => {
     const stamped = [];
     for (const entry of entries) {
       try {
-        const resolved: any = await wc.debugger.sendCommand('DOM.resolveNode', { backendNodeId: entry.backendNodeId });
+        const resolved = await wc.debugger.sendCommand('DOM.resolveNode', { backendNodeId: entry.backendNodeId }) as { object?: { objectId?: string } };
         const objectId = resolved?.object?.objectId;
         if (!objectId) continue;
         await wc.debugger.sendCommand('Runtime.callFunctionOn', {
@@ -120,7 +120,7 @@ ipcMain.handle('agent-drag', async (event, webContentsId: unknown, fromRaw: unkn
   if (!hostVerdict.allowed) return { ok: false, error: `Drag blocked for security (${hostVerdict.reason}).` };
   let attachedHere = false;
   let dragData: unknown = null;
-  const onMessage = (_e: unknown, method: string, params: any) => {
+  const onMessage = (_e: unknown, method: string, params: { data?: unknown } | undefined) => {
     if (method === 'Input.dragIntercepted') dragData = params?.data ?? null;
   };
   try {
@@ -175,7 +175,7 @@ ipcMain.handle('agent-upload-file', async (event, webContentsId: unknown, select
   let attachedHere = false;
   try {
     if (!wc.debugger.isAttached()) { wc.debugger.attach('1.3'); attachedHere = true; }
-    const found: any = await wc.debugger.sendCommand('Runtime.evaluate', {
+    const found = await wc.debugger.sendCommand('Runtime.evaluate', {
       expression: `(() => { ${DEEP_QUERY_SOURCE}\nvar el = __kingQuery(${JSON.stringify(selector)}); return el && el.tagName === 'INPUT' && el.type === 'file' && !el.disabled ? el : null; })()`
     });
     const objectId = found?.result?.objectId;

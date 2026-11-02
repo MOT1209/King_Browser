@@ -103,9 +103,9 @@ const DownloadRowItem: React.FC<DownloadRowItemProps> = React.memo(({
             <button
               onClick={() => {
                 if (item.isPaused) {
-                  (window as any).electronAPI?.resumeDownload?.(item.id);
+                  window.electronAPI?.resumeDownload?.(item.id);
                 } else {
-                  (window as any).electronAPI?.pauseDownload?.(item.id);
+                  window.electronAPI?.pauseDownload?.(item.id);
                 }
               }}
               className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-cyan-500 transition-colors"
@@ -115,7 +115,7 @@ const DownloadRowItem: React.FC<DownloadRowItemProps> = React.memo(({
             </button>
             <button
               onClick={() => {
-                (window as any).electronAPI?.cancelDownload?.(item.id);
+                window.electronAPI?.cancelDownload?.(item.id);
               }}
               className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors"
               title={t('downloads.cancel')}
@@ -127,13 +127,13 @@ const DownloadRowItem: React.FC<DownloadRowItemProps> = React.memo(({
         {item.state === 'completed' && item.savePath && (
           <div className="flex items-center gap-3">
             <button
-              onClick={() => (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!)}
+              onClick={() => window.electronAPI?.showDownloadInFolder?.(item.savePath!)}
               className="text-xs font-semibold text-slate-600 hover:text-cyan-500 dark:text-slate-400 dark:hover:text-cyan-400 transition-colors flex items-center gap-1"
             >
               <FolderOpen className="w-3.5 h-3.5" /> {t('downloads.openFolder')}
             </button>
             <button
-              onClick={() => (window as any).electronAPI?.openDownload?.(item.savePath!)}
+              onClick={() => window.electronAPI?.openDownload?.(item.savePath!)}
               className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 transition-colors"
             >
               {t('downloads.openFile')}

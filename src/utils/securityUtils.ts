@@ -16,8 +16,6 @@ export interface SecurityInfo {
 }
 
 // Internal king:// pages are always safe
-const INTERNAL_PROTOCOLS = ['king:', 'about:', 'chrome-extension:'];
-
 /**
  * Extract the hostname from a URL string safely.
  */

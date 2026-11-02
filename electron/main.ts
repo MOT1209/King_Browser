@@ -5193,7 +5193,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
 
   if (bounds && typeof bounds.x === 'number' && typeof bounds.y === 'number') {
     const [winX, winY] = win.getPosition();
-    const [winW, winH] = win.getSize();
+    const [winW] = win.getSize();
 
     // Calculate screen coordinate anchored directly under the button
     const btnCenterX = winX + Math.round(bounds.x) + Math.round((bounds.width || 28) / 2);

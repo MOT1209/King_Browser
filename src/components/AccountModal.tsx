@@ -78,7 +78,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       const rawB = localStorage.getItem('bookmarks');
       const rawF = localStorage.getItem('folders_session');
       const rawH = localStorage.getItem('browsing_history');
-      const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+      const rawP = await window.electronAPI?.secureStoreGet?.('passwords');
       const rawW = localStorage.getItem('workspaces_session');
       const rawS = localStorage.getItem('user_settings');
 
