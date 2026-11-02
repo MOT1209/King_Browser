@@ -1,20 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import {
-  Search,
-  Sparkles,
-  Star,
-  BookOpen,
-  Lock,
-  Unlock,
-  ShieldAlert,
-  HelpCircle,
-  Settings,
-  Clock,
-  Download,
-  Globe,
-  Languages,
-  VenetianMask
-} from 'lucide-react';
+import { Search, Star, BookOpen, Lock, Unlock, ShieldAlert, HelpCircle, Settings, Clock, Download, Globe, Languages, VenetianMask } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tab, Bookmark, UserSettings, PermissionRequest } from '../../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../../utils/searchEngine';

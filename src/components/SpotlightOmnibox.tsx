@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, Plus, X } from 'lucide-react';
+import { Search, Globe, X } from 'lucide-react';
 import { Tab, UserSettings } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';

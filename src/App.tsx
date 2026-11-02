@@ -11,19 +11,7 @@ import { useDownloads } from './hooks/useDownloads';
 import { useHistoryRecorder } from './hooks/useHistoryRecorder';
 import { usePermissionRequests } from './hooks/usePermissionRequests';
 import { useTabHibernation } from './hooks/useTabHibernation';
-import type {
-  DownloadItem,
-  HistoryItem,
-  UserSettings,
-  BrowserDemoOptions,
-  VpnLocation,
-  Tab,
-  Folder,
-  Bookmark,
-  Extension,
-  Workspace,
-  ShortcutConfig
-} from './types/browser';
+import type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLocation, Tab, Workspace } from './types/browser';
 export type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLocation };
 import type { BlockedSiteAlertData } from './components/BlockedSiteModal';
 import { SidebarTabs } from './components/SidebarTabs';
@@ -31,7 +19,6 @@ import { AgentControlPanel } from './components/AgentControlPanel';
 import { repairTabFolderAssignments } from './utils/verticalTabs';
 import { generateId } from './utils/idGenerator';
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from './utils/safeStorage';
-import { showConfirm, showAlert } from './utils/confirmDialog';
 import { isSafeNavigationUrl } from './utils/safeNavigation';
 import { syncMcpServerWithSetting } from './utils/mcpServerSync';
 import { matchesShortcut, shortcutKey } from './utils/keyboardShortcuts';
@@ -113,13 +100,7 @@ import { useAgentTabId, useAgentTakenOver } from './services/agentTabStore';
 import { handoffUrlForAgent } from './utils/handoffUrl';
 import { customizedBindings } from './utils/shortcutCatalog';
 import { logger } from './utils/logger';
-import {
-  EMPTY_ARRAY,
-  normalizeAIActionPayload,
-  getDemoParams,
-  isMac,
-  isWindows,
-} from './utils/appConstants';
+import { EMPTY_ARRAY, normalizeAIActionPayload, getDemoParams, isMac, isWindows } from './utils/appConstants';
 
 
 

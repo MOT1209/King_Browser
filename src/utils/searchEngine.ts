@@ -1,6 +1,6 @@
 import { UserSettings } from '../types/browser';
 import { DANGEROUS_PROTOCOLS } from './safeNavigation';
-import { getLanguage } from '../services/i18n';
+import '../services/i18n';
 
 const INTRANET_DOMAIN_REGEX = /^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker|localhost)(:\d+)?(\/.*)?$/i;
 

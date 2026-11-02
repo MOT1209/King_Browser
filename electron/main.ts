@@ -9,15 +9,11 @@ import { openPageSourceViewer as createPageSourceViewer } from './windows/source
 import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
 import { buildPhishingBlockScript } from './main/phishingBlockPage';
 import { isAllowedWebviewPartition, evaluateWebviewSrc } from './main/webviewPolicy';
-import {
-  PERMISSION_TTL_MS, permissionKeys, permissionOriginFor, rememberedDecision,
-  parseRememberedPermissions, writeRememberedPermissions, purgeExpiredPermissions,
-  type PermissionDecisions
-} from './main/permissionStore';
+import { PERMISSION_TTL_MS, permissionKeys, permissionOriginFor, rememberedDecision, parseRememberedPermissions, writeRememberedPermissions, purgeExpiredPermissions, type PermissionDecisions } from './main/permissionStore';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import { promisify } from 'util';
-import { once } from 'events';
+
 import fs from 'fs';
 import createDOMPurify from 'dompurify';
 import { checkPhishingDomain, matchesExtensionHostPermission } from '../src/utils/securityUtils.js';
@@ -127,14 +123,8 @@ if (!gotSingleInstanceLock) {
 import child_process from 'child_process';
 import crypto from 'crypto';
 import os from 'os';
-import { isIP } from 'net';
-import {
-  initAdBlocker as initAdBlockerEngine,
-  updateAdblockWhitelist,
-  applyAdBlockerToSession,
-  applyAdBlockerToAllSessions,
-  getBlocker
-} from './main/adblockManager.js';
+
+import { initAdBlocker as initAdBlockerEngine, updateAdblockWhitelist, applyAdBlockerToSession, applyAdBlockerToAllSessions, getBlocker } from './main/adblockManager.js';
 import { BrowserMCPServer } from './mcpServer.js';
 import { registerEngineIpc } from './main/engineIpc.js';
 import { decideLinuxSandbox, readLinuxSandboxInput } from './main/linuxSandbox.js';
@@ -148,7 +138,7 @@ import { isStorageAccessPermission, shouldOpenAsPopupWindow } from './main/windo
 import { approvalNotificationStrings, contextMenuLabels, googleSigninDialogStrings, normalizeUiLanguage, type UiLanguage } from './main/uiStrings.js';
 import { createApprovalAttention } from './main/approvalAttention.js';
 import { resolveMenuAccelerators, sanitizeMenuBindings, type ShortcutBinding as MenuShortcutBinding } from './main/shortcutAccelerators.js';
-import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
+import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';

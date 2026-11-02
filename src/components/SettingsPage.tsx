@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Search, ShieldCheck, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Key, RefreshCw, ShieldAlert, Keyboard, Puzzle, X, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp, Bookmark, Power, Plus } from 'lucide-react';
+
+import { Settings, ShieldCheck, Bot, Paintbrush, Cpu, Key, Keyboard, Puzzle, Cloud } from 'lucide-react';
 import { UserSettings } from '../types/browser';
 import { useTranslation } from '../services/i18n';
 

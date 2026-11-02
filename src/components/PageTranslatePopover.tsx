@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Languages, Check, ArrowRight, RotateCcw, Loader2, X, Globe } from 'lucide-react';
-import { SUPPORTED_LANGUAGES, SupportedLanguage } from '../services/translationService';
+import { SUPPORTED_LANGUAGES } from '../services/translationService';
 import { useTranslation } from '../services/i18n';
 
 export interface PageTranslatePopoverProps {

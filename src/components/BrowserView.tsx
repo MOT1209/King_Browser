@@ -5,11 +5,7 @@ import { Moon, Zap, Key } from 'lucide-react';
 import { Tab, HistoryItem, UserSettings } from '../types/browser';
 import type { DownloadItemPage } from './DownloadsPage';
 import { tabThumbnailCache } from '../services/thumbnailCache';
-import {
-  getExtractTextNodesScript,
-  getApplyTranslationScript,
-  getRestoreOriginalScript
-} from '../services/translationService';
+import { getExtractTextNodesScript, getApplyTranslationScript, getRestoreOriginalScript } from '../services/translationService';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { AGENT_PARTITION, AGENT_PERSIST_PARTITION } from '../utils/appConstants';
 import { recordConsoleMessage, clearConsoleMessages } from '../utils/consoleBuffer';

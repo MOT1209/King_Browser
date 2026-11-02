@@ -16,7 +16,7 @@
  * accounts cannot sync. Legacy sync-chain/pairing APIs are deprecated (throw).
  */
 
-import { Bookmark, Folder, Tab, Workspace, HistoryItem, UserSettings, SavedPassword, defaultSettings } from '../types/browser';
+import { Bookmark, Folder, Workspace, HistoryItem, UserSettings, SavedPassword, defaultSettings } from '../types/browser';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabaseClient, isSupabaseConfigured, hasElectronSecureStore, SUPABASE_AUTH_STORAGE_KEY } from './supabaseClient';
 import { base64ToBytes, bytesToBase64, decryptSyncPayload, deriveKey as deriveSyncCryptoKey, encryptSyncPayload, EncryptedSyncEnvelope } from './syncCrypto';

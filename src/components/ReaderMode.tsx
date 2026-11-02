@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square,
-  Trash2, Clock, BookOpen, Volume2, Globe, Sparkles, SkipBack, SkipForward,
-  Check, ChevronDown
-} from 'lucide-react';
+import { Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square, Trash2, Clock, BookOpen, Volume2, Globe, Sparkles, SkipBack, SkipForward } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { Readability } from '@mozilla/readability';
 import { detectLanguage, getBestVoice, getMacDefaultVoice, splitIntoSentences, NativeVoiceInfo, tts } from '../services/tts';

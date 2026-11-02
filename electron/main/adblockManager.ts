@@ -1,4 +1,4 @@
-import { app, session } from 'electron';
+
 import path from 'path';
 import fs from 'fs';
 import fetch from 'cross-fetch';

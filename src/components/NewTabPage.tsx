@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Compass } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Trash2, ListTodo, VenetianMask, Shuffle, Compass } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
@@ -11,7 +11,7 @@ import { useTranslation, getLocale, l } from '../services/i18n';
 import { SpeedDialIcon, getCleanDomain, normalizeNavigationUrl } from './SpeedDialIcon';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useSharedLocalStorageState } from '../hooks/useSharedLocalStorage';
-import { logger } from '../utils/logger';
+import '../utils/logger';
 
 interface Todo {
   id: string;

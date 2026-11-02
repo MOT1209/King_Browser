@@ -1,22 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Lock, 
-  Unlock, 
-  ShieldCheck, 
-  ShieldAlert, 
-  Cookie, 
-  Camera, 
-  Mic, 
-  Bell, 
-  MapPin, 
-  ExternalLink, 
-  X, 
-  Check, 
-  Info,
-  Layers,
-  Sparkles
-} from 'lucide-react';
+import { Lock, Unlock, ShieldCheck, ShieldAlert, Cookie, Camera, Mic, Bell, MapPin, X, Sparkles } from 'lucide-react';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { useTranslation } from '../services/i18n';
 
