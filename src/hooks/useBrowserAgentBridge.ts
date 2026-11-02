@@ -364,7 +364,7 @@ export function useBrowserAgentBridge({
             return "Error: Invalid 'mode' parameter: use dom or accessibility.";
           }
           if (safeArgs.mode === 'accessibility') {
-            const api = (window as any).electronAPI;
+            const api = window.electronAPI;
             if (!api?.agentAxSnapshot) return 'Error: Accessibility snapshots are unavailable.';
             if (!activeWebview || typeof activeWebview.getWebContentsId !== 'function') return 'Error: No active webview available.';
             let wcId: number;
@@ -652,7 +652,7 @@ export function useBrowserAgentBridge({
 
         case 'browser_login': {
           if (!activeWebview || !activeWebview.executeJavaScript) return "Error: No active webview available.";
-          const api = (window as any).electronAPI;
+          const api = window.electronAPI;
           if (!api?.secureStoreGet) return "Error: Saved accounts are not available.";
           let records: any[] = [];
           try {
@@ -762,7 +762,7 @@ export function useBrowserAgentBridge({
         case 'browser_drag': {
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (typeof safeArgs.toSelector !== 'string' || !safeArgs.toSelector) return "Error: Missing or invalid 'toSelector' parameter";
-          const api = (window as any).electronAPI;
+          const api = window.electronAPI;
           if (!api?.agentDrag) return 'Error: Dragging is unavailable.';
           if (!activeWebview || typeof activeWebview.getWebContentsId !== 'function' || !activeWebview.executeJavaScript) return 'Error: No active webview available.';
           if (!await previewTarget(safeArgs.selector)) return "Error: MCP action was cancelled or expired.";
@@ -783,7 +783,7 @@ export function useBrowserAgentBridge({
         case 'browser_upload_file': {
           if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (typeof safeArgs.path !== 'string' || !safeArgs.path) return "Error: Missing or invalid 'path' parameter";
-          const api = (window as any).electronAPI;
+          const api = window.electronAPI;
           if (!api?.agentUploadFile) return 'Error: File upload is unavailable.';
           if (!activeWebview || typeof activeWebview.getWebContentsId !== 'function') return 'Error: No active webview available.';
           let wcId: number;
@@ -799,7 +799,7 @@ export function useBrowserAgentBridge({
           if (action !== 'status' && action !== 'accept' && action !== 'dismiss') {
             return "Error: Invalid 'action' parameter: use status, accept or dismiss.";
           }
-          const api = (window as any).electronAPI;
+          const api = window.electronAPI;
           if (!api?.agentPageDialog) return 'Error: Page dialog control is unavailable.';
           if (!activeWebview || typeof activeWebview.getWebContentsId !== 'function') return 'Error: No active webview available.';
           let wcId: number;

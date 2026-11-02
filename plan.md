@@ -44,7 +44,7 @@
 
 ### WP9 — صيانة تقنية (أنا، تدريجياً)
 - تقسيم `electron/main.ts` (نحو 5900 سطر) عند لمس أجزاء منه فقط، لا دفعة واحدة. **أُنجز جزء:** معالجات CDP للوكيل نُقلت إلى `electron/main/agentCdp.ts`.
-- تخفيض تحذيرات ESLint في `src` و`electron` (768 بعد حذف الاستيرادات والمتغيرات غير المستخدمة؛ بقي نحو 700 `any` و61 `exhaustive-deps`) تدريجياً، لا دفعة واحدة.
+- تخفيض تحذيرات ESLint في `src` و`electron` (665 بعد حذف غير المستخدم وكتابة نوع `electronAPI`؛ بقي نحو 600 `any` و61 `exhaustive-deps`) تدريجياً، لا دفعة واحدة.
 - تحديث Electron ضمن الإصدار الرئيسي نفسه مع كل إصدار (تحديثات Chromium الأمنية التزام دائم).
 - حماية المزامنة من إعادة تقديم نسخة قديمة (تحتاج صيغة تشفير جديدة وترحيلاً؛ قرارك قبل البدء).
 
@@ -108,7 +108,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich" = per Code umsetzbar; „du" 
 
 ### WP9 — Technische Wartung (ich, schrittweise)
 - `electron/main.ts` (ca. 5900 Zeilen) nur bei ohnehin anstehenden Änderungen aufteilen, nicht in einem Zug. **Teilweise erledigt:** die CDP-Handler des Agenten liegen jetzt in `electron/main/agentCdp.ts`.
-- ESLint-Warnungen in `src` und `electron` (768 nach Entfernen ungenutzter Imports und Variablen; rund 700 `any` und 61 `exhaustive-deps` bleiben) schrittweise abbauen, nicht in einem Zug.
+- ESLint-Warnungen in `src` und `electron` (665 nach Entfernen von Ungenutztem und Typisierung von `electronAPI`; rund 600 `any` und 61 `exhaustive-deps` bleiben) schrittweise abbauen, nicht in einem Zug.
 - Electron mit jedem Release innerhalb der Hauptversion aktualisieren (Chromium-Sicherheitsupdates sind eine Dauerverpflichtung).
 - Sync gegen das erneute Ausliefern einer alten Version schützen (braucht ein neues Verschlüsselungsformat und eine Migration; vorher deine Entscheidung).
 

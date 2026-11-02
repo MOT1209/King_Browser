@@ -71,7 +71,7 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
     setSitePerms({});
     if (!isOpen || isInternal || !domain) return;
     let isCancelled = false;
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (api?.getSitePermissions) {
       api.getSitePermissions(origin).then((perms: any) => {
         if (!isCancelled && perms && typeof perms === 'object') {

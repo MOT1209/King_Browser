@@ -137,10 +137,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const handleImport = async () => {
-    if (!(window as any).electronAPI?.importChromeBookmarks) return;
+    if (!window.electronAPI?.importChromeBookmarks) return;
     setIsImporting(true);
     try {
-      const res = await (window as any).electronAPI.importChromeBookmarks();
+      const res = await window.electronAPI.importChromeBookmarks();
       if (res.success && res.bookmarks) {
         setImportedData(res.bookmarks);
         setImportStatus('success');

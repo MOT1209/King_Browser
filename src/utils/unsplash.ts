@@ -598,8 +598,8 @@ export async function fetchDaily4KWallpapers(): Promise<WallpaperPhoto[]> {
 
   // 1. Try Native Electron IPC pipeline
   try {
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.fetchWallpaperPhotos) {
-      const ipcResults = await (window as any).electronAPI.fetchWallpaperPhotos('daily');
+    if (typeof window !== 'undefined' && window.electronAPI?.fetchWallpaperPhotos) {
+      const ipcResults = await window.electronAPI.fetchWallpaperPhotos('daily');
       if (ipcResults && Array.isArray(ipcResults) && ipcResults.length > 0) {
         for (const item of ipcResults) {
           const sanitized = sanitizeWallpaperPhoto(item);

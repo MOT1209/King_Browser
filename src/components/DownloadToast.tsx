@@ -172,7 +172,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                 <>
                   <button
                     onClick={() => {
-                      (window as any).electronAPI?.showDownloadInFolder?.(activeToast.savePath!);
+                      window.electronAPI?.showDownloadInFolder?.(activeToast.savePath!);
                       dismissToast();
                     }}
                     className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-white/5 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
@@ -182,7 +182,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                   </button>
                   <button
                     onClick={() => {
-                      (window as any).electronAPI?.openDownload?.(activeToast.savePath!);
+                      window.electronAPI?.openDownload?.(activeToast.savePath!);
                       dismissToast();
                     }}
                     className="flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
@@ -198,9 +198,9 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                   <button
                     onClick={() => {
                       if (activeToast.isPaused) {
-                        (window as any).electronAPI?.resumeDownload?.(activeToast.id);
+                        window.electronAPI?.resumeDownload?.(activeToast.id);
                       } else {
-                        (window as any).electronAPI?.pauseDownload?.(activeToast.id);
+                        window.electronAPI?.pauseDownload?.(activeToast.id);
                       }
                     }}
                     className="flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
@@ -209,7 +209,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                     <span>{activeToast.isPaused ? l({ en: 'Resume', ar: 'استئناف', de: 'Fortsetzen' }) : l({ en: 'Pause', ar: 'إيقاف مؤقت', de: 'Pausieren' })}</span>
                   </button>
                   <button
-                    onClick={() => (window as any).electronAPI?.cancelDownload?.(activeToast.id)}
+                    onClick={() => window.electronAPI?.cancelDownload?.(activeToast.id)}
                     className="flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:bg-red-500/10 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
                   >
                     Cancel

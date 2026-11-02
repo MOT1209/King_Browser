@@ -250,8 +250,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
   // Fetch Native macOS voices & Web Speech voices
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsGetVoices) {
-      (window as any).electronAPI.nativeTtsGetVoices().then((voices: NativeVoiceInfo[]) => {
+    if (typeof window !== 'undefined' && window.electronAPI?.nativeTtsGetVoices) {
+      window.electronAPI.nativeTtsGetVoices().then((voices: NativeVoiceInfo[]) => {
         if (Array.isArray(voices) && voices.length > 0) {
           setNativeVoices(voices);
         }
@@ -460,7 +460,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
     setHighlights(updated);
     if (url) {
       const storageKey = 'reader_highlights_' + safeBase64(url);
-      (window as any).electronAPI?.storeSet(storageKey, JSON.stringify(updated));
+      window.electronAPI?.storeSet(storageKey, JSON.stringify(updated));
     }
 
     setPopoverState({ visible: false, top: 0, left: 0, text: '' });
@@ -485,7 +485,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
     if (url) {
       const storageKey = 'reader_highlights_' + safeBase64(url);
-      (window as any).electronAPI?.storeSet(storageKey, JSON.stringify(updated));
+      window.electronAPI?.storeSet(storageKey, JSON.stringify(updated));
     }
 
     setViewingNote({ visible: false, note: '', top: 0, left: 0 });
@@ -555,10 +555,10 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
     setCurrentSentenceIndex(index);
 
     // Check if macOS native TTS is available
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsSpeak) {
+    if (typeof window !== 'undefined' && window.electronAPI?.nativeTtsSpeak) {
       const voice = selectedVoiceName || getMacDefaultVoice(effectiveLanguage);
       try {
-        const res = await (window as any).electronAPI.nativeTtsSpeak(currentSentence, voice, rate, effectiveLanguage);
+        const res = await window.electronAPI.nativeTtsSpeak(currentSentence, voice, rate, effectiveLanguage);
         if (!isPlayingRef.current || sessionId !== readerSessionIdRef.current) return;
         if (res && res.success) {
           const next = index + 1;
@@ -699,7 +699,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
       readerSessionIdRef.current++;
       const currentSession = readerSessionIdRef.current;
       isPlayingRef.current = true;
-      if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
+      if (window.electronAPI?.nativeTtsStop) window.electronAPI.nativeTtsStop();
       if (window.speechSynthesis) window.speechSynthesis.cancel();
       speakSentence(currentSentenceIndex, nextRate, sentences, currentSession);
     }
@@ -736,9 +736,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
             console.warn('ReaderMode webview.executeJavaScript failed, trying fallback', e);
           }
         }
-        if (!html && (window as any).electronAPI?.fetchPageHtml) {
+        if (!html && window.electronAPI?.fetchPageHtml) {
           try {
-            const res = await (window as any).electronAPI.fetchPageHtml(url);
+            const res = await window.electronAPI.fetchPageHtml(url);
             if (cancelled) return;
             html = typeof res === 'string' ? res : (res?.html ?? '');
           } catch (e) {

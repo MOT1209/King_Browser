@@ -221,7 +221,7 @@ export const ExtensionsSection: React.FC = () => {
                           // Routed through the main process, which checks that the
                           // extension is installed and confines the path. window.open
                           // would create an unmanaged BrowserWindow instead.
-                          (window as any).electronAPI?.openExtensionPopup?.(
+                          window.electronAPI?.openExtensionPopup?.(
                             `chrome-extension://${ext.id}/${cleanOptions}`
                           );
                         }}

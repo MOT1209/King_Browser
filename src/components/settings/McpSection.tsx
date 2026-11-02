@@ -44,29 +44,29 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const { setSafeTimeout } = useSafeTimeout();
 
   const fetchMcpStatus = useCallback(async () => {
-    if ((window as any).electronAPI?.getMcpStatus) {
-      const status = await (window as any).electronAPI.getMcpStatus();
+    if (window.electronAPI?.getMcpStatus) {
+      const status = await window.electronAPI.getMcpStatus();
       setMcpStatus(status);
     }
-    if ((window as any).electronAPI?.getMcpTokenStatus) {
-      const tokenStatus = await (window as any).electronAPI.getMcpTokenStatus();
+    if (window.electronAPI?.getMcpTokenStatus) {
+      const tokenStatus = await window.electronAPI.getMcpTokenStatus();
       if (tokenStatus?.configured) {
         setMcpToken(tokenStatus.prefix || 'king_mcp_••••••••');
       } else {
         setMcpToken('');
       }
     }
-    if ((window as any).electronAPI?.getMcpSiteRules) {
-      setSiteRules(await (window as any).electronAPI.getMcpSiteRules());
+    if (window.electronAPI?.getMcpSiteRules) {
+      setSiteRules(await window.electronAPI.getMcpSiteRules());
     }
-    if ((window as any).electronAPI?.getMcpApprovalMode) {
-      setApprovalMode(await (window as any).electronAPI.getMcpApprovalMode());
+    if (window.electronAPI?.getMcpApprovalMode) {
+      setApprovalMode(await window.electronAPI.getMcpApprovalMode());
     }
   }, []);
 
   const loadActivity = useCallback(async () => {
     try {
-      const raw = await (window as any).electronAPI?.exportEngineLog?.('json');
+      const raw = await window.electronAPI?.exportEngineLog?.('json');
       const parsed = raw ? JSON.parse(raw) : null;
       setActivity(Array.isArray(parsed?.entries) ? parsed.entries.slice().reverse().slice(0, 100) : []);
     } catch (_) {
@@ -78,7 +78,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
 
   const loadRecordings = useCallback(async () => {
     try {
-      const state = await (window as any).electronAPI?.getRecordingState?.();
+      const state = await window.electronAPI?.getRecordingState?.();
       if (state) setRecState(state);
     } catch (_) {}
   }, []);
@@ -86,13 +86,13 @@ export const McpSection: React.FC<McpSectionProps> = ({
 
   const startRecording = useCallback(async () => {
     setRecMessage('');
-    const ok = await (window as any).electronAPI?.startRecording?.();
+    const ok = await window.electronAPI?.startRecording?.();
     if (!ok) setRecMessage('Could not start: start the MCP server first, and finish any recording or replay in progress.');
     await loadRecordings();
   }, [loadRecordings]);
 
   const stopRecording = useCallback(async () => {
-    const result = await (window as any).electronAPI?.stopRecording?.(recName);
+    const result = await window.electronAPI?.stopRecording?.(recName);
     setRecName('');
     const skipped = result?.skipped?.length ? ' ' + l({ en: '{n} step(s) could not be recorded.', ar: 'تعذّر تسجيل {n} من الخطوات.', de: '{n} Schritt(e) konnten nicht aufgezeichnet werden.' }, { n: result.skipped.length }) : '';
     setRecMessage(result?.saved ? l({ en: 'Saved "{name}" with {n} step(s).', ar: 'حُفظ "{name}" بعدد {n} من الخطوات.', de: '„{name}“ mit {n} Schritt(en) gespeichert.' }, { name: result.saved.name, n: result.saved.steps }) + skipped : l({ en: 'Nothing to save: no repeatable steps were recorded.', ar: 'لا شيء للحفظ: لم تُسجَّل خطوات قابلة للإعادة.', de: 'Nichts zu speichern: Es wurden keine wiederholbaren Schritte aufgezeichnet.' }) + skipped);
@@ -102,24 +102,24 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const replayRecording = useCallback(async (id: string) => {
     setRecMessage(l({ en: 'Replaying... approvals appear as usual.', ar: 'جارٍ الإعادة... تظهر طلبات الموافقة كالمعتاد.', de: 'Wird wiedergegeben... Freigaben erscheinen wie gewohnt.' }));
     setRecState(prev => ({ ...prev, replaying: true }));
-    const report = await (window as any).electronAPI?.replayRecording?.(id);
+    const report = await window.electronAPI?.replayRecording?.(id);
     setRecMessage(report?.message ?? l({ en: 'Replay finished.', ar: 'انتهت الإعادة.', de: 'Wiedergabe beendet.' }));
     await loadRecordings();
   }, [loadRecordings]);
 
   const deleteRecording = useCallback(async (id: string) => {
-    await (window as any).electronAPI?.deleteRecording?.(id);
+    await window.electronAPI?.deleteRecording?.(id);
     await loadRecordings();
   }, [loadRecordings]);
 
   const changeApprovalMode = useCallback(async (mode: 'balanced' | 'strict') => {
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (!api?.setMcpApprovalMode) return;
     setApprovalMode(await api.setMcpApprovalMode(mode));
   }, []);
 
   const saveSiteRules = useCallback(async (next: Array<{ domain: string; mode: 'ask' | 'block' }>) => {
-    const api = (window as any).electronAPI;
+    const api = window.electronAPI;
     if (!api?.setMcpSiteRules) return;
     // The main process validates and de-duplicates; show what it actually stored.
     setSiteRules(await api.setMcpSiteRules(next));
@@ -130,13 +130,13 @@ export const McpSection: React.FC<McpSectionProps> = ({
 
     let cleanup: (() => void) | void;
     let cleanupStatus: (() => void) | void;
-    if ((window as any).electronAPI?.onMcpClientChanged) {
-      cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
+    if (window.electronAPI?.onMcpClientChanged) {
+      cleanup = window.electronAPI.onMcpClientChanged((_: any, data: any) => {
         setMcpStatus(prev => prev ? { ...prev, clientCount: data.count, clients: data.clients } : null);
       });
     }
-    if ((window as any).electronAPI?.onMcpStatusChanged) {
-      cleanupStatus = (window as any).electronAPI.onMcpStatusChanged((_: any, status: any) => {
+    if (window.electronAPI?.onMcpStatusChanged) {
+      cleanupStatus = window.electronAPI.onMcpStatusChanged((_: any, status: any) => {
         const isRunning = typeof status === 'object' && status !== null ? Boolean(status.running) : Boolean(status);
         const port = typeof status === 'object' && status?.port ? Number(status.port) : 3020;
         setMcpStatus(prev => prev ? { ...prev, running: isRunning, port: port || prev.port } : { running: isRunning, port, clientCount: 0, clients: [] });
@@ -151,18 +151,18 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const handleToggleMcp = async () => {
     const isRunning = mcpStatus?.running || false;
     if (isRunning) {
-      await (window as any).electronAPI?.stopMcpServer?.();
+      await window.electronAPI?.stopMcpServer?.();
       onUpdateSettings({ mcpServerEnabled: false });
     } else {
-      await (window as any).electronAPI?.startMcpServer?.();
+      await window.electronAPI?.startMcpServer?.();
       onUpdateSettings({ mcpServerEnabled: true });
     }
     setSafeTimeout(fetchMcpStatus, 300);
   };
 
   const handleRotateToken = async () => {
-    if ((window as any).electronAPI?.rotateMcpToken) {
-      await (window as any).electronAPI.rotateMcpToken();
+    if (window.electronAPI?.rotateMcpToken) {
+      await window.electronAPI.rotateMcpToken();
       await fetchMcpStatus();
     }
   };
@@ -170,8 +170,8 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const handleCopyToken = async () => {
     // Real token lives in main process — copy via IPC, never the masked prefix.
     try {
-      if ((window as any).electronAPI?.copyMcpToken) {
-        const ok = await (window as any).electronAPI.copyMcpToken();
+      if (window.electronAPI?.copyMcpToken) {
+        const ok = await window.electronAPI.copyMcpToken();
         if (ok) {
           setTokenCopied(true);
           setSafeTimeout(() => setTokenCopied(false), 2000);
@@ -206,7 +206,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
     if (logExporting) return;
     setLogExporting(true);
     try {
-      const api = (window as any).electronAPI;
+      const api = window.electronAPI;
       if (api?.exportEngineLog) {
         const content = await api.exportEngineLog(format);
         if (typeof content === 'string' && content) {
@@ -231,7 +231,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
 
   const handleCopyOpenCodeConfig = async () => {
     try {
-      const result = await (window as any).electronAPI?.copyMcpConfig?.('opencode');
+      const result = await window.electronAPI?.copyMcpConfig?.('opencode');
       if (result) {
         setMcpCopied(true);
         setSafeTimeout(() => setMcpCopied(false), 2000);
@@ -243,8 +243,8 @@ export const McpSection: React.FC<McpSectionProps> = ({
     // Main builds the config with the real token — prefer IPC over the
     // status prefix shown in the UI.
     try {
-      if ((window as any).electronAPI?.copyMcpConfig) {
-        const ok = await (window as any).electronAPI.copyMcpConfig();
+      if (window.electronAPI?.copyMcpConfig) {
+        const ok = await window.electronAPI.copyMcpConfig();
         if (ok) {
           setMcpCopied(true);
           setSafeTimeout(() => setMcpCopied(false), 2000);
@@ -437,7 +437,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
           <button
             onClick={async () => {
               if (!await showConfirm({ message: l({ en: 'Clear everything the agent has stored (cookies, logins, caches)?', ar: 'هل تريد مسح كل ما خزّنه الوكيل (ملفات تعريف الارتباط، تسجيلات الدخول، الذاكرة المؤقتة)؟', de: 'Alles löschen, was der Agent gespeichert hat (Cookies, Anmeldungen, Caches)?' }), confirmLabel: l({ en: 'Clear', ar: 'مسح', de: 'Löschen' }) })) return;
-              await (window as any).electronAPI?.clearAgentProfile?.();
+              await window.electronAPI?.clearAgentProfile?.();
             }}
             className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-sm hover:bg-red-50 dark:hover:bg-red-950/40"
           >

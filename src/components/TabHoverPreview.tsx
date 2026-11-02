@@ -48,9 +48,9 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
     setCachedThumbnail(current);
 
     // If thumbnail is missing and webContentsId is available, attempt capture
-    if (!current && tab.webContentsId && typeof (window as any).electronAPI?.captureTabThumbnail === 'function') {
+    if (!current && tab.webContentsId && typeof window.electronAPI?.captureTabThumbnail === 'function') {
       const targetWcId = tab.webContentsId;
-      (window as any).electronAPI.captureTabThumbnail(targetWcId)
+      window.electronAPI.captureTabThumbnail(targetWcId)
         .then((thumb: string | null) => {
           if (!isCancelled && thumb && currentTabId) {
             tabThumbnailCache.set(currentTabId, thumb);

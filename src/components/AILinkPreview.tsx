@@ -135,7 +135,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
         } catch {
           domain = url;
         }
-        const api = (window as any).electronAPI;
+        const api = window.electronAPI;
         if (!api?.fetchPageHtml) throw new Error("API not available");
 
         const result = await api.fetchPageHtml(url);
