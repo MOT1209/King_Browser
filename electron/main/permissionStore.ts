@@ -66,6 +66,18 @@ export function rememberedDecision(
   return values.every(value => value === true) ? true : undefined;
 }
 
+/**
+ * The app's own remembered microphone answer, for the Settings status and the
+ * voice-input prompt. Grants are stored per media type (`media:audio`), so a
+ * lookup of the old bare `media` key never matched and the UI always reported
+ * "not-determined" even after the user had allowed or blocked the microphone.
+ */
+export function appMicrophoneDecision(
+  decisions: PermissionDecisions, now: number = Date.now()
+): boolean | undefined {
+  return rememberedDecision(decisions, 'app', ['media:audio'], now);
+}
+
 /** Removes every answer older than the TTL, and origins left with none. */
 export function purgeExpiredPermissions(decisions: PermissionDecisions, now: number = Date.now()): void {
   const cutoff = now - PERMISSION_TTL_MS;
