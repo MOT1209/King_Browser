@@ -2,11 +2,6 @@ import React from 'react';
 import { Check, Download, RefreshCw, ExternalLink, X, AlertTriangle } from 'lucide-react';
 import { useTranslation } from '../../services/i18n';
 
-interface UpdateInfo {
-  version: string;
-  releaseDate: string;
-}
-
 function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return '0 B';
   const sizes = ['B', 'KB', 'MB', 'GB'];

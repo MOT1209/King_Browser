@@ -821,12 +821,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         if (!hostname || !actualHostname || actualHostname !== hostname) return;
 
         (window as any).electronAPI?.secureStoreGet?.('passwords').then((raw: string) => {
-          let currentHostname = '';
           let currentOrigin = '';
           try {
             const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
             const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
-            currentHostname = parsed.hostname;
             currentOrigin = parsed.origin;
           } catch (_) {}
           if (!isAutofillLookupCurrent(webviewRef.current, webview, currentOrigin, actualOrigin)) return;

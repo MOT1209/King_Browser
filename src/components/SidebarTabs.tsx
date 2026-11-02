@@ -854,8 +854,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     });
   }, [tabs, activeWorkspaceId]);
 
-  const isCurrentNewTab = !activeTab?.url || activeTab.url === 'king://newtab' || activeTab.url === 'about:blank' || activeTab.url === 'https://newtab';
-
   return (
     <>
       {/* PERF: solid surface instead of backdrop-blur — a persistent blur over

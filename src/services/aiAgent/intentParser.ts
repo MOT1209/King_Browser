@@ -34,8 +34,6 @@ export function replyLanguage(...texts: unknown[]): ReplyLanguage {
 export function say(language: ReplyLanguage, texts: Record<ReplyLanguage, string>): string {
   return texts[language] ?? texts.en;
 }
-const isTurkishText = isTurkishContext;
-
 // Natural Language Intent Extractor: Instantly executes common browser commands and conversational greetings with 100% reliability
 export function detectDirectIntent(userText: string): { name: string; arguments: any; directReply?: string; isSummary?: boolean } | null {
   if (!userText || typeof userText !== 'string') return null;

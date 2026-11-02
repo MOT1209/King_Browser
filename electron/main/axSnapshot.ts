@@ -31,14 +31,18 @@ export interface AxEntry {
   href: string;
 }
 
-function str(v: any): string {
+/** A CDP AXValue: `{ type, value }` where value is page-controlled and untrusted. */
+type AxValue = { value?: unknown } | null | undefined;
+interface AxProperty { name?: unknown; value?: AxValue }
+
+function str(v: AxValue): string {
   return v && typeof v === 'object' && typeof v.value === 'string' ? v.value : '';
 }
 
-function props(node: any): Record<string, any> {
-  const out: Record<string, any> = {};
+function props(node: { properties?: unknown }): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
   if (Array.isArray(node?.properties)) {
-    for (const p of node.properties) {
+    for (const p of node.properties as AxProperty[]) {
       if (p && typeof p.name === 'string') out[p.name] = p.value && typeof p.value === 'object' ? p.value.value : undefined;
     }
   }
@@ -70,7 +74,7 @@ export function selectInteractiveNodes(rawNodes: unknown, max: number = AX_MAX_E
       name: clean(str(node.name), 80),
       checked: p.checked === true || p.checked === 'true',
       protectedField,
-      href: role === 'link' ? clean(str(node.properties?.find?.((x: any) => x?.name === 'url')?.value), 120).split('#')[0] : ''
+      href: role === 'link' ? clean(str((node.properties as AxProperty[] | undefined)?.find?.((x) => x?.name === 'url')?.value), 120).split('#')[0] : ''
     });
   }
   return { entries, truncated };
