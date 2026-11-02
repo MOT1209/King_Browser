@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   PERMISSION_TTL_MS,
+  appMicrophoneDecision,
   permissionKeys,
   permissionOriginFor,
   rememberedDecision,
@@ -67,6 +68,16 @@ assert.ok(!decisions.get('https://a.example')!.has('geolocation'), 'expired answ
 const lone: PermissionDecisions = new Map([['https://c.example', new Map([['geolocation', { allow: true, ts: NOW - PERMISSION_TTL_MS - 1 }]])]]);
 assert.equal(rememberedDecision(lone, 'https://c.example', ['geolocation'], NOW), undefined);
 assert.ok(!lone.has('https://c.example'), 'an origin with no answers left is removed');
+
+// The app's microphone answer is stored as media:audio, not the bare "media"
+// key the Settings status used to read (which made it always "not-determined").
+const appAllowed: PermissionDecisions = new Map([['app', new Map([['media:audio', { allow: true, ts: NOW - 1000 }]])]]);
+assert.equal(appMicrophoneDecision(appAllowed, NOW), true, 'a remembered app microphone grant is reported');
+const appDenied: PermissionDecisions = new Map([['app', new Map([['media:audio', { allow: false, ts: NOW - 1000 }]])]]);
+assert.equal(appMicrophoneDecision(appDenied, NOW), false, 'a remembered app microphone denial is reported');
+const legacyOnly: PermissionDecisions = new Map([['app', new Map([['media', { allow: true, ts: NOW - 1000 }]])]]);
+assert.equal(appMicrophoneDecision(legacyOnly, NOW), undefined, 'a legacy bare media record does not count as a microphone grant');
+assert.equal(appMicrophoneDecision(new Map(), NOW), undefined);
 
 // Purge.
 const purgeable: PermissionDecisions = new Map([

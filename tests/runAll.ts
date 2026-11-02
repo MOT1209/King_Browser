@@ -143,6 +143,7 @@ import './agent_login.test';
 import './mcp_engine_wiring.test';
 import './mcp_single_approval_authority.test';
 import './assistant_approval_card.test';
+import './chat_markdown_image_exfiltration.test';
 import './engine_ipc.test';
 import './runtime_error_fixes.test';
 import './website_login_fixes.test';

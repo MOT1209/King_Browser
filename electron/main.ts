@@ -9,7 +9,7 @@ import { openPageSourceViewer as createPageSourceViewer } from './windows/source
 import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
 import { buildPhishingBlockScript } from './main/phishingBlockPage';
 import { isAllowedWebviewPartition, evaluateWebviewSrc } from './main/webviewPolicy';
-import { PERMISSION_TTL_MS, permissionKeys, permissionOriginFor, rememberedDecision, parseRememberedPermissions, writeRememberedPermissions, purgeExpiredPermissions, type PermissionDecisions } from './main/permissionStore';
+import { PERMISSION_TTL_MS, appMicrophoneDecision, permissionKeys, permissionOriginFor, rememberedDecision, parseRememberedPermissions, writeRememberedPermissions, purgeExpiredPermissions, type PermissionDecisions } from './main/permissionStore';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import { promisify } from 'util';
@@ -1909,9 +1909,12 @@ app.whenReady().then(async () => {
         return { status: 'denied', canAsk: false, platform: 'darwin' };
       }
     }
-    const appPerm = rememberedPermissions.get('app')?.get('media');
-    if (appPerm && appPerm.allow) {
+    const micDecision = appMicrophoneDecision(rememberedPermissions);
+    if (micDecision === true) {
       return { status: 'granted', canAsk: false, platform: process.platform };
+    }
+    if (micDecision === false) {
+      return { status: 'denied', canAsk: false, platform: process.platform };
     }
     return { status: 'not-determined', canAsk: true, platform: process.platform };
   });
@@ -1935,9 +1938,9 @@ app.whenReady().then(async () => {
         return { granted: false, status: 'denied', platform: 'darwin' };
       }
     }
-    const appPerm = rememberedPermissions.get('app')?.get('media');
-    if (appPerm) {
-      return { granted: appPerm.allow, status: appPerm.allow ? 'granted' : 'denied', platform: process.platform };
+    const micDecision = appMicrophoneDecision(rememberedPermissions);
+    if (micDecision !== undefined) {
+      return { granted: micDecision, status: micDecision ? 'granted' : 'denied', platform: process.platform };
     }
     return { granted: false, status: 'not-determined', platform: process.platform };
   });

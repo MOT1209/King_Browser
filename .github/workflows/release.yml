@@ -39,8 +39,12 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+# Least privilege: the build jobs run `npm ci` (third-party install scripts)
+# and only upload artifacts, so they get a read-only token. Write access is
+# granted to the publish job alone, which is the only step that creates or
+# updates releases.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # Decides what this run publishes. A push to main always refreshes nightly and
@@ -136,6 +140,8 @@ jobs:
   publish:
     needs: [check, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
