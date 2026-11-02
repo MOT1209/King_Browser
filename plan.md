@@ -31,7 +31,7 @@
 - الصعوبة: منخفضة. الوقت: أسبوعان. **هذه الحزمة تحدد أولويات الباقي؛ لا تتجاوزها.**
 
 ### WP7 — التوزيع والثقة (أنت أساساً)
-- **توقيع Windows:** سياسة التوقيع منشورة (`CODE_SIGNING.md`). الخطوة التالية: طلب SignPath Foundation، ثم ربط سير الإصدار بعد الموافقة.
+- **توقيع Windows:** سياسة التوقيع منشورة (`CODE_SIGNING.md`). الخطوة التالية: طلب SignPath Foundation (أنت؛ الحقائق المتحقَّق منها وما يلزمك في `docs/engineering/windows-signing.md`)، ثم ربط سير الإصدار بعد الموافقة. **انتبه:** التوقيع يغيّر بايتات المثبّت، فيجب إعادة حساب `sha512` في `latest.yml` وإلا يرفض `updateIntegrity.ts` التحديث التلقائي.
 - **توقيع macOS:** شهادة Apple (نحو 99$ سنوياً **[افتراض]**)؛ التحديث التلقائي على macOS يحتاجها.
 - winget وHomebrew cask؛ دومين للموقع ثم canonical وsitemap؛ فيديو توضيحي قصير بصوت جديد (الحالي يقول "Nova").
 - تدقيق أمني خارجي قبل أي ادعاء أمني أقوى في README.
@@ -95,7 +95,7 @@ Schwierigkeit und Zeit sind **[Meinung]**. „Ich" = per Code umsetzbar; „du" 
 - Schwierigkeit: niedrig. Zeit: zwei Wochen. **Dieses Paket bestimmt die Prioritäten des Rests; nicht überspringen.**
 
 ### WP7 — Verteilung und Vertrauen (hauptsächlich du)
-- **Windows-Signatur:** Die Signing Policy ist veröffentlicht (`CODE_SIGNING.md`). Nächster Schritt: Antrag bei der SignPath Foundation, nach der Genehmigung den Release-Workflow anbinden.
+- **Windows-Signatur:** Die Signing Policy ist veröffentlicht (`CODE_SIGNING.md`). Nächster Schritt: Antrag bei der SignPath Foundation (du; geprüfte Fakten und deine Schritte in `docs/engineering/windows-signing.md`), nach der Genehmigung den Release-Workflow anbinden. **Achtung:** Signieren ändert die Bytes des Installers, daher muss `sha512` in `latest.yml` neu berechnet werden, sonst lehnt `updateIntegrity.ts` das automatische Update ab.
 - **macOS-Signatur:** Apple-Zertifikat (ca. 99 $/Jahr **[Annahme]**); automatische Updates unter macOS brauchen es.
 - winget und Homebrew-Cask; Domain für die Website, danach canonical und Sitemap; kurzes Demo-Video mit neuer Tonspur (die aktuelle sagt „Nova").
 - Externes Sicherheits-Audit vor stärkeren Sicherheitsaussagen im README.
