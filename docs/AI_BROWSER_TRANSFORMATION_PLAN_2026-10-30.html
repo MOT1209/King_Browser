@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>خطة تحويل King Browser إلى متصفح لوكالات الذكاء الاصطناعي</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f6fa; --surface: #fff; --ink: #172033; --muted: #566278;
+      --line: #dce2ec; --accent: #3159d9; --accent-soft: #e8edff;
+      --green: #15734e; --green-soft: #e4f5eb; --amber: #875300; --amber-soft: #fff1d2;
+      --red: #a52a2a; --red-soft: #fde9e7; --code: #edf0f5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #10141c; --surface: #191f2a; --ink: #ecf0f7; --muted: #a5b0c2;
+        --line: #303949; --accent: #91a8ff; --accent-soft: #242f52;
+        --green: #6bd2a2; --green-soft: #18352c; --amber: #f4c46d; --amber-soft: #3a2e17;
+        --red: #ff9992; --red-soft: #3b2223; --code: #242b37;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.8 system-ui, "Segoe UI", Tahoma, sans-serif; }
+    .page { width: min(1080px, 100%); margin: 0 auto; padding: 0 22px 64px; }
+    header { padding: 42px 0 26px; border-bottom: 1px solid var(--line); }
+    h1 { margin: 0 0 10px; font-size: clamp(28px, 5vw, 42px); line-height: 1.35; }
+    h2 { margin: 0 0 16px; padding-inline-start: 13px; border-inline-start: 4px solid var(--accent); font-size: 25px; line-height: 1.45; }
+    h3 { margin: 22px 0 8px; font-size: 19px; line-height: 1.5; }
+    p { margin: 8px 0 14px; }
+    a { color: var(--accent); }
+    .muted, .meta { color: var(--muted); }
+    .meta { font-size: 14px; }
+    nav { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+    nav a { padding: 4px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); text-decoration: none; font-size: 14px; }
+    section { margin-top: 42px; scroll-margin-top: 76px; }
+    .card, .stat { padding: 17px 19px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .card { margin: 12px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    .stat strong { display: block; margin-bottom: 2px; font-size: 23px; }
+    .stat span { color: var(--muted); font-size: 14px; }
+    .tag { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .good { color: var(--green); background: var(--green-soft); }
+    .warn { color: var(--amber); background: var(--amber-soft); }
+    .risk { color: var(--red); background: var(--red-soft); }
+    .info { color: var(--accent); background: var(--accent-soft); }
+    .callout { padding: 12px 16px; border-inline-start: 4px solid var(--accent); border-radius: 8px; background: var(--accent-soft); }
+    .caution { border-inline-start-color: var(--amber); background: var(--amber-soft); }
+    .phase { border-inline-start: 4px solid var(--accent); }
+    ul, ol { padding-inline-start: 24px; }
+    li { margin: 4px 0; }
+    code { direction: ltr; unicode-bidi: isolate; padding: 1px 5px; border-radius: 4px; background: var(--code); font: 13px/1.6 ui-monospace, Consolas, monospace; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); font-size: 14px; }
+    th, td { padding: 10px 12px; text-align: start; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { background: var(--code); font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    .task { margin: 12px 0; padding: 15px 17px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+    .task h3 { margin-top: 0; }
+    .task dl { display: grid; grid-template-columns: minmax(94px, auto) 1fr; gap: 3px 12px; margin: 8px 0 0; }
+    .task dt { color: var(--muted); font-weight: 700; }
+    .task dd { margin: 0; }
+    footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+    @media (max-width: 620px) { .page { padding-inline: 14px; } .task dl { grid-template-columns: 1fr; gap: 0; } .task dd { margin-bottom: 8px; } }
+    @media print { nav { display: none; } body { background: #fff; color: #111; } .page { width: 100%; padding: 0; } section { break-inside: avoid; } .card, .stat, .task { background: #fff; } }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="meta">مراجعة مستودع وخطة تطوير · 30 أكتوبر 2026 · الإصدار المعلن في <code>package.json</code>: <code>0.0.10</code></p>
+    <h1>تحويل King Browser إلى متصفح لوكالات الذكاء الاصطناعي</h1>
+    <p class="muted">تقييم لما هو موجود فعلاً، وما ينقص لبناء وكيل يستطيع إدراك صفحات الويب والتفاعل معها بثبات، مع بقاء الإنسان صاحب القرار.</p>
+  </header>
+  <nav aria-label="التنقل في التقرير">
+    <a href="#summary">الخلاصة</a><a href="#current">الحالة الحالية</a><a href="#architecture">البنية</a>
+    <a href="#findings">الفجوات</a><a href="#roadmap">خطة التنفيذ</a><a href="#acceptance">معايير الإنجاز</a>
+    <a href="#risks">المخاطر والقرارات</a><a href="#scope">حدود المراجعة</a>
+  </nav>
+
+  <main>
+    <section id="summary">
+      <h2>الخلاصة التنفيذية</h2>
+      <div class="card">
+        <p><strong>King ليس متصفحاً عادياً يحتاج إلى إضافة وكيل من الصفر.</strong> المستودع يحتوي بالفعل على خادم MCP محلي، مجموعة أدوات واسعة للقراءة والتفاعل، محرك تنفيذ متسلسلاً، تصنيفاً للمخاطر وموافقات بشرية، ملف وكيل معزول، تسجيل/إعادة، وإدخالاً أصلياً للفأرة ولوحة المفاتيح.</p>
+        <p>الخطوة الصحيحة ليست إعادة بناء المنتج؛ بل إكمال «حلقة عمل الوكيل» الناقصة والتحقق منها: <strong>يرى الصفحة بوضوح، يختار الهدف بدقة، ينفّذ الفعل المناسب، يطلب الموافقة عند الأثر المهم، ويتوقف بوضوح عند الفشل.</strong> الخطة أدناه تبدأ بإثبات موثوقية النسخة الحالية، ثم توسّع قدرات التفاعل والإدراك على شرائح صغيرة.</p>
+      </div>
+      <div class="grid">
+        <div class="stat"><strong>45 أداة MCP</strong><span>عدد معلن في README؛ أداة معلومات وقراءة وتحكم وتصفح</span></div>
+        <div class="stat"><strong>45 / 44</strong><span>إجمالي تعريفات الأدوات / تعريفات browser_* في فحص المصدر</span></div>
+        <div class="stat"><strong>3 لغات</strong><span>واجهة en/ar/de؛ يلزم أن تبقى أي إضافة متوافقة مع RTL</span></div>
+        <div class="stat"><strong>تحكم بشري</strong><span>الموافقة الصريحة للأفعال الحساسة مبدأ معماري، لا خياراً تجميلياً</span></div>
+      </div>
+      <p class="callout caution"><strong>توصية الأولوية:</strong> لا تبدأ بميزات «استقلالية» أو تخفيف للموافقات. ابدأ بإعادة التحقق من سلوك الإرسال الحساس على البناء الحالي، ثم اختبر مساراً فعلياً متكاملاً مع مستخدم ووكيل، وبعدها اختر من ميزات التفاعل التالية ما يثبت الاستخدام الحاجة إليه.</p>
+    </section>
+
+    <section id="current">
+      <h2>ما يقدّمه المشروع اليوم</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>المجال</th><th>الموجود حالياً</th><th>أساس المعلومة</th></tr></thead>
+        <tbody>
+          <tr><td>المتصفح</td><td>تطبيق سطح مكتب Electron/Chromium مع واجهة React وTypeScript، تبويبات ومساحات عمل وتصفح فعلي عبر webview.</td><td><code>package.json</code>، <code>PRODUCT.md</code>، <code>src/</code></td></tr>
+          <tr><td>الاتصال بالوكلاء</td><td>MCP عبر Streamable HTTP وSSE، وجسر stdio؛ المصادقة برمز Bearer وخادم loopback.</td><td><code>electron/mcpServer.ts</code>، <code>electron/main/mcpStreamableHttp.ts</code>، README</td></tr>
+          <tr><td>إدراك الصفحة</td><td>قراءة الصفحة ولقطات شاشة وملخصات، ولقطة تفاعلية DOM بمراجع مثل <code>e12</code> وأسماء/أدوار تقريبية.</td><td><code>src/utils/elementSnapshot.ts</code>، أداة <code>browser_snapshot</code></td></tr>
+          <tr><td>الأفعال</td><td>تنقل، نقر، كتابة، مفاتيح، تمرير، تحويم، اختيار، إدارة تبويبات؛ النقر والكتابة والتمرير تستخدم إدخالاً أصلياً بدلاً من أحداث DOM مزيفة.</td><td><code>src/utils/trustedInput.ts</code>، <code>src/hooks/useBrowserAgentBridge.ts</code></td></tr>
+          <tr><td>السلامة والتحكم</td><td>محرك تنفيذ متسلسل، مهلة وإيقاف وإلغاء، وضعا موافقة متوازن/صارم، قواعد مواقع، تنقيح معلومات حساسة، كشف تحذيري لحقن التعليمات وسجل نشاط.</td><td><code>electron/main/executionEngine.ts</code>، <code>policyEngine.ts</code>، <code>approvalMode.ts</code></td></tr>
+          <tr><td>سير العمل</td><td>تسجيل وإعادة خطوات مختارة؛ كل إعادة تمر ببوابة الموافقة. ملف وكيل منفصل اختياري ودائم عند تفعيله، مع تحذير ومسح يدوي.</td><td><code>electron/main/recordings.ts</code>، <code>src/components/settings/McpSection.tsx</code></td></tr>
+          <tr><td>الاختبار والتوزيع</td><td>اختبارات Node، بناء Electron، اختبارات Playwright لنافذة فعلية؛ اختبارات macOS وElectron E2E في CI غير مانعة حالياً.</td><td><code>package.json</code>، <code>.github/workflows/ci.yml</code></td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted">المراجعة تتعامل مع هذه البنود بوصفها موجودة في الشيفرة/الوثائق، لا بوصفها مُثبتة على كل نظام تشغيل أو كل موقع حي.</p>
+    </section>
+
+    <section id="architecture">
+      <h2>البنية وحدود الثقة التي يجب الحفاظ عليها</h2>
+      <div class="card">
+        <ol>
+          <li><strong>العملية الرئيسية <code>electron/</code>:</strong> تملك النوافذ والجلسات وسياسات الثقة وIPC وMCP. كل معالج IPC مميّز يجب أن يتحقق من المرسل الموثوق.</li>
+          <li><strong>Preload:</strong> جسر مسمّى محدود بين الواجهة والعملية الرئيسية؛ لا تُمكّن Node داخل صفحات الويب ولا توسّع واجهة preload بلا ضرورة.</li>
+          <li><strong>الواجهة <code>src/</code>:</strong> تدير التبويبات وعرض webview وجسر الوكيل. محتوى المواقع غير موثوق ويجب ألا يتحول إلى تعليمات أو صلاحيات.</li>
+          <li><strong>MCP:</strong> يصف الأدوات ويمرر الطلبات إلى محرك التنفيذ ثم إلى التبويب. يجب أن تمر الإضافات الجديدة من التصنيف والموافقة والسجل، لا أن تستدعي صفحة الويب مباشرة.</li>
+        </ol>
+        <p>تؤكد مراجعة المصدر وجود <code>nodeIntegration: false</code> و<code>contextIsolation: true</code> و<code>sandbox: true</code> في النافذة، وفرض الضوابط نفسها على webview مع تحقق المصدر والبروتوكول والـ partition. هذه ضوابط قائمة ينبغي تعزيزها لا استبدالها.</p>
+      </div>
+    </section>
+
+    <section id="findings">
+      <h2>الفجوات والتحسينات المطلوبة</h2>
+      <p class="muted">الأولوية هنا ترتيب مقترح لتحقيق الهدف، لا ادعاء بأن كل نقص ثغرة أمنية. الزمن تقديري وغير مضمون.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>الأولوية</th><th>الفجوة</th><th>الأثر على وكيل الذكاء الاصطناعي</th><th>الحكم</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag risk">P0</span></td><td>التحقق الحالي من سلوك النماذج الحساسة بعد إصلاح إرسال POST الموثق تاريخياً.</td><td>الخطأ هنا يهدم الثقة في الموافقة، حتى لو كانت سياسة الشيفرة الحالية تتضمن علامات لنماذج POST ومفاتيح Enter.</td><td>الملاحظة القديمة في تقرير 28 أكتوبر لا تثبت خللاً حاضراً؛ يلزم إعادة الاختبار على بناء اليوم.</td></tr>
+          <tr><td><span class="tag warn">P1</span></td><td>تغطية التفاعل لا تشمل بعد أدوات الوكيل الخاصة برفع الملفات والسحب/الإفلات والنقر المزدوج/الأيمن والتعامل المنظم مع حوارات المتصفح.</td><td>تعجز الوكالة عن إكمال تدفقات شائعة مثل إرفاق ملف أو سياقات تعتمد قائمة سياق.</td><td>موثّق كمرحلة لم تبدأ في <code>plan.md</code>؛ بحث المصدر لم يجد أدوات MCP المنفذة لهذه الوظائف.</td></tr>
+          <tr><td><span class="tag warn">P1</span></td><td>لقطة العناصر مبنية على DOM للصفحة الحالية؛ لا يوجد دعم ظاهر في المسار الحالي لـ iframe وShadow DOM، ولا استهلاك لشجرة إمكانية الوصول الكاملة.</td><td>قد لا يرى الوكيل هدفاً موجوداً أو يخطئ في اسمه/دوره، خصوصاً في التطبيقات المركبة.</td><td>مؤكد من التنفيذ الحالي لـ <code>elementSnapshot.ts</code> وخطة WP10؛ قد تبقى محددات CSS حلاً بديلاً.</td></tr>
+          <tr><td><span class="tag warn">P1</span></td><td>النجاح في الصفحة العامة لا يثبت التوافق مع محررات غنية، مواقع الدخول الحقيقية، تدفقات متعددة الخطوات أو تغيّر DOM.</td><td>تجربة المستخدم قد تكون غير متسقة، وتسجيل/إعادة الخطوات قد يتوقف عند اختلاف الصفحة.</td><td>نقاط غير متحققة مذكورة في <code>plan.md</code> ودليل اختبار OpenCode.</td></tr>
+          <tr><td><span class="tag info">P2</span></td><td>أدلة البدء ومهارات الوكيل تحتاج مساراً قصيراً موحداً لكل عميل مدعوم ومعايير اختبار واضحة.</td><td>يصعب على مطور جديد اكتشاف إعداد MCP الصحيح، وحدود الأمان، وطريقة استخدام المراجع.</td><td>يوجد README ودليل OpenCode وقسم Driver في AGENTS؛ المهارة المخصصة للمستخدم النهائي ما زالت ضمن WP10.</td></tr>
+          <tr><td><span class="tag info">P2</span></td><td>ملفات تركيز كبيرة وبوابة CI غير مانعة على macOS وElectron E2E.</td><td>ترفع كلفة صيانة قدرات التصفح الحساسة وقد تمر regressions خاصة بالنظام بلا إيقاف الدمج.</td><td>حقائق بنيوية من الأحجام/إعداد CI؛ تقسيم تدريجي فقط، لا إعادة كتابة واسعة.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="card">
+        <h3>تصحيح مهم لمراجعة 28 أكتوبر</h3>
+        <p>الملف <code>docs/PROJECT_REVIEW_2026-10-28.html</code> يصف إرسال POST دون موافقة في اختبار حي، لكنه نفسه يذكر لاحقاً أن الإصلاح «أُصلح في الكود» وغير مُعاد اختباره. المصدر الحالي يضيف علامات <code>FORM_SUBMIT_MARKER</code> و<code>FORM_FIELD_MARKER</code> واختبارات تصنيف مرتبطة بها. لذلك أسجلها كـ <strong>تحقق انحدار مطلوب</strong>، لا كعيب مؤكد في النسخة الحالية.</p>
+        <p>كما أن التقرير السابق يذكر عدم دعم جلسة وكيل دائمة في موضع، بينما سجل التغيير والشيفرة الحالية يثبتان خياراً دائماً اختيارياً. اعتمدت الحالة الأحدث في المستودع ولم أنقل التناقض كفجوة.</p>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <h2>خطة التنفيذ المقترحة</h2>
+      <p class="callout">التقديرات تعبر عن نطاق نسبي للمطور، وليست وعداً زمنياً. يبدأ التنفيذ الفعلي باختيار أول شريحة، ولا يتضمن هذا التقرير تغيير الشيفرة أو إصدار نسخة.</p>
+
+      <article class="task">
+        <h3>المرحلة 0 — تثبيت خط الأساس والثقة بالسلوك (XS/S، قبل التوسعة)</h3>
+        <dl>
+          <dt>العمل</dt><dd>تشغيل اختبار الانحدار الحالي لإرسال النماذج ومفاتيح Enter/Space، ثم بناء التطبيق وتشغيله في نافذة فعلية؛ التحقق من الموافقة والرفض وعدم إرسال البيانات. اختبر أيضاً نموذج GET للبحث كي لا تُصنّف القراءة/البحث خطأً كإرسال حساس.</dd>
+          <dt>القبول</dt><dd>POST لا يُرسل قبل الموافقة؛ الرفض لا يرسل؛ الموافقة ترسل فقط ما عُرض للمستخدم؛ لا يظهر نص حساس في السجل أو تفاصيل الموافقة؛ نتائج الاختبار موثقة كاجتاز/فشل.</dd>
+          <dt>التحقق</dt><dd>اختبار السياسة المحدد، ثم <code>npm run build</code> و<code>npm run test:electron</code> حيث تسمح بيئة Windows/الشاشة. لا تعتمد على التقرير التاريخي بدلاً من هذا الاختبار.</dd>
+          <dt>الاعتماد</dt><dd>لا تعديل في سياسة الموافقة إلا بطلب صريح ومراجعة منفصلة؛ إن فشل الاختبار، أصلح السبب واكتب اختبار انحدار قبل المتابعة.</dd>
+        </dl>
+      </article>
+
+      <article class="task">
+        <h3>المرحلة 1 — تجربة وكيل واقعية قابلة للتكرار (S، أعلى قيمة منتجية)</h3>
+        <dl>
+          <dt>العمل</dt><dd>استخدم النسخة المبنية مع عميل MCP مدعوم، ونفذ سيناريوهات يومية غير حساسة: فتح صفحة عامة، العثور على رابط عبر snapshot، نقره، تعبئة نموذج محلي تجريبي، إيقاف الوكيل وتسليمه التحكم للمستخدم، ثم تسجيل/إعادة خطوة آمنة. سجّل خطوات الإعداد والأعطال يدوياً؛ لا تضف تحليلات.</dd>
+          <dt>القبول</dt><dd>إعداد عميل جديد خلال أقل من 5 دقائق كهدف مقترح؛ كل فعل ظاهر في سجل النشاط؛ Pause/Stop والتسليم البشري يعملون؛ لا تتجاوز قاعدة منع الوجهات الخاصة أو موافقة الإجراء الحساس.</dd>
+          <dt>التحقق</dt><dd>دليل OpenCode الحالي، اختبارات MCP الآلية، ثم تشغيل حي على Windows؛ وثّق اسم العميل والنقل والإصدار. اختبر Claude Code أو Codex فقط عند توفرهما ولا تدّع دعماً لم يُتحقق منه.</dd>
+          <dt>الاعتماد</dt><dd>نتائج هذه المرحلة تحدد أي أداة تفاعلية جديدة تستحق الأولوية؛ لا تنفذ قائمة ميزات لمجرد أنها ممكنة.</dd>
+        </dl>
+      </article>
+
+      <article class="task">
+        <h3>المرحلة 2 — إضافة قدرات التفاعل الناقصة كشرائح مستقلة (M، بالترتيب حسب الاستخدام)</h3>
+        <ol>
+          <li><strong>رفع ملف:</strong> أداة MCP منفصلة ومحددة الهدف، تعرض اسم الملف ومساره للمستخدم، لا تقبل مساراً خارج نطاق يسمح به المستخدم، وتطلب موافقة في كل عملية رفع. لا تخزن الملف ضمن سجل النشاط.</li>
+          <li><strong>النقرات والسحب:</strong> أضف double/right click ثم drag-and-drop عند ثبوت الحاجة؛ اجعل الهدف والنتيجة المتوقعة واضحين، واختبر الرفض إذا كان العنصر مغطى أو الصفحة تغيّرت.</li>
+          <li><strong>حوارات المتصفح:</strong> تعامل صراحة مع <code>alert</code>/<code>confirm</code>/<code>prompt</code>؛ لا توافق آلياً على الحوارات المؤثرة، واعرض محتواها وخياراتها للمستخدم.</li>
+        </ol>
+        <dl>
+          <dt>القبول</dt><dd>لكل أداة: schema ضيق، تصنيف سياسة، موافقة عند الأثر الخارجي/إخراج ملف، تسجيل منقح، اختبار وحدة، واختبار نافذة Electron واحدة على الأقل.</dd>
+          <dt>الملفات المحتملة</dt><dd><code>electron/mcpServer.ts</code>، <code>src/hooks/useBrowserAgentBridge.ts</code>، وحدة مساعدة في <code>electron/main/</code> أو <code>src/utils/</code>، preload/IPC عند الضرورة فقط، واختبارات <code>tests/</code>.</dd>
+          <dt>تنبيه</dt><dd>الرفع يتعامل مع ملف من جهاز المستخدم ومحتوى غير موثوق؛ يلزم فحص أمني للملف والمسار والموافقة قبل التنفيذ، وليس مجرد إضافة أداة.</dd>
+        </dl>
+      </article>
+
+      <article class="task">
+        <h3>المرحلة 3 — تحسين إدراك العناصر المركبة (M، بعد تحديد حالات الفشل)</h3>
+        <ol>
+          <li>حوّل إخفاقات المرحلة 1 إلى عينات اختبار ثابتة: iframe، Shadow DOM، أزرار بلا نص مرئي، عناصر متكررة، وتبدّل DOM بعد اللقطة.</li>
+          <li>وسّع snapshot تدريجياً لتدعم السياقات المركبة مع إظهار مصدر كل عنصر، وحدود ثابتة للحجم والوقت، ومنع خلط مرجع قديم بصفحة أو إطار مختلف.</li>
+          <li>قيّم شجرة إمكانية الوصول عبر CDP (مثل <code>Accessibility.getFullAXTree</code>) بوصفها مصدر إدراك إضافياً أو بديلاً؛ لا تستبدل DOM قبل مقارنة أسماء الأدوار والموثوقية والأداء.</li>
+        </ol>
+        <dl>
+          <dt>القبول</dt><dd>كل مرجع فريد ومحدد السياق وينتهي عند التنقل/لقطة جديدة؛ قيم المستخدم لا تُعاد في snapshot؛ بيانات الصفحة تمر عبر قواعد المحتوى غير الموثوق وكشف الحقن؛ الاختبارات تغطي iframe/Shadow DOM المتفق عليهما.</dd>
+          <dt>الملفات المحتملة</dt><dd><code>src/utils/elementSnapshot.ts</code>، <code>electron/main/elementRefs.ts</code>، جسر الوكيل، أدوات MCP، اختبارات مراجع العناصر والحقن.</dd>
+        </dl>
+      </article>
+
+      <article class="task">
+        <h3>المرحلة 4 — مهارات ووثائق تشغيل للوكيل (S، بعد استقرار الأدوات)</h3>
+        <ul>
+          <li>أنشئ مهارة استخدام King لوكلاء البرمجة من الإرشادات الرسمية في <code>AGENTS.md</code>، دون تكرار سياسة قديمة أو تعليم الوكيل تخمين المراجع.</li>
+          <li>وثّق إعداد كل نقل MCP بوضوح، وتمكين الأدوات المتوسطة/الحساسة، وسلوك الموافقات، وطريقة التوقف والتسليم، والأخطاء الشائعة.</li>
+          <li>اختبرها على عميلين متاحين، وسجل خطوات تحقق قابلة لإعادة التنفيذ في CI أو دليل يدوي؛ لا تضف عميل دعم معلناً بلا تحقق.</li>
+        </ul>
+        <dl>
+          <dt>القبول</dt><dd>يمكن لوكيل جديد استدعاء الأدوات وفق وصفها، استخدام snapshot/refs، عدم إعادة محاولة إجراء مرفوض، والتوقف عند طلب الموافقة؛ تعليمات المهارة لا تتعارض مع حدود AGENTS.md.</dd>
+          <dt>الملفات المحتملة</dt><dd>مهارة ضمن <code>.claude/skills/</code> حسب قواعد المشروع، <code>README.md</code>، وقد يلزم تحديث <code>AGENTS.md</code> إذا تغير السلوك فعلاً.</dd>
+        </dl>
+      </article>
+
+      <article class="task">
+        <h3>المرحلة 5 — الاعتمادية والصيانة (تدريجية، لا إعادة كتابة)</h3>
+        <ul>
+          <li>بعد نجاح متكرر على المنصة، اجعل فحوص macOS وElectron E2E مانعة للدمج بدلاً من <code>continue-on-error</code>، مع معالجة أعطال البنية التحتية لا تعطيل الاختبارات.</li>
+          <li>استخرج وحدات صغيرة من <code>electron/main.ts</code> و<code>electron/mcpServer.ts</code> عند لمس سلوكها، مع اختبارات سلوكية قبل/بعد كل استخراج.</li>
+          <li>راجع زمن تنفيذ الإجراءات، الإلغاء، تغيّر التبويب أثناء انتظار الموافقة، إغلاق التطبيق، وسجل النشاط للتأكد من أن الإجراء لا يستمر بصمت.</li>
+        </ul>
+        <dl>
+          <dt>القبول</dt><dd>كل شريحة تحافظ على سلوك قائم، نوعية الاختبار لا تقل، وقائمة CI تثبت الاختبار الفعلي على المنصات المعتمدة. لا مؤشرات أداء بلا قياس منشور.</dd>
+          <dt>الملفات المحتملة</dt><dd><code>.github/workflows/ci.yml</code>، وحدات <code>electron/main/</code> واختباراتها؛ يُحدّث التوثيق بالتوازي.</dd>
+        </dl>
+      </article>
+
+      <article class="task">
+        <h3>المرحلة 6 — التوزيع وتأكيد اتجاه المنتج (قرار منتج، ليست شرطاً للـ MVP)</h3>
+        <ul>
+          <li>اختبر التثبيت والتحديث والتوقيع على Windows وmacOS وLinux، ثم عالج العقبات الفعلية قبل توسيع قنوات التوزيع.</li>
+          <li>قرر أي الميزات الموروثة (مساعد محلي، VPN، مزامنة) تخدم منتج متصفح الوكلاء؛ لا تحذف شيئاً دون قرار صريح.</li>
+          <li>تحقق من الحاجة السوقية بمقابلات/تجارب استخدام، وقارن المنتج بخيارات MCP التي تعمل مع متصفحات أخرى قبل التزام طويل الأجل.</li>
+        </ul>
+        <p><span class="tag info">قرار اختياري</span> التوقيع، مديري الحزم، النطاق، والتدقيق الخارجي مهمة للثقة والتوزيع، لكنها لا تسبق إثبات الحلقة الأساسية للوكيل.</p>
+      </article>
+    </section>
+
+    <section id="acceptance">
+      <h2>تعريف الإنجاز للهدف</h2>
+      <div class="card">
+        <p>يمكن اعتبار النسخة «متصفحاً عملياً لوكالات الذكاء الاصطناعي» عندما تتحقق جميع النقاط التالية على إصدار محدد وبناء معلوم:</p>
+        <ul>
+          <li>وكيل متصل عبر MCP يستطيع استكشاف الصفحة واختيار عنصر معروف ثم تنفيذ إجراء مرئي قابل للتفسير.</li>
+          <li>العملاء المتحقق منهم موثقون، وأداة الإعداد تعمل من البداية للنهاية وفق النقل المعلن.</li>
+          <li>كل إجراء حساس يتطلب موافقة الإنسان، والرفض/الإيقاف/التسليم البشري يوقف التنفيذ ولا يُعاد الالتفاف عليه.</li>
+          <li>المحتوى الذي تقرؤه الوكالة يعامل كبيانات غير موثوقة، وتُخفى كلمات المرور والرموز من المخرجات والسجلات.</li>
+          <li>التفاعلات الأساسية والإضافية التي اختيرت من الاستخدام الفعلي تغطيها اختبارات وحدة واختبارات Electron مناسبة.</li>
+          <li>اختبارات التعريب والاتاحة والاتجاه RTL وWindows/macOS/Linux ملائمة لنطاق الدعم المعلن.</li>
+          <li>لا ادعاء بمعدل نجاح أو أمان أو أداء من دون مجموعة قياس وإجراء اختبار موثقين.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="risks">
+      <h2>المخاطر والقرارات الواجب حمايتها</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>الخطر</th><th>التخفيف المقترح</th><th>متى يلزم قرار المستخدم</th></tr></thead>
+        <tbody>
+          <tr><td>إرهاق الموافقات قد يدفع المستخدم لقبول كل شيء.</td><td>تحسين وصف العواقب وتقليل الإنذارات الكاذبة بالاختبار، لا جعل الحسّاس آمناً افتراضياً ولا تجميع الموافقات بصمت.</td><td>أي تعديل في قواعد السياسة أو منح صلاحيات أطول.</td></tr>
+          <tr><td>حقن التعليمات داخل محتوى الصفحة.</td><td>اعتبار الصفحة غير موثوقة، تنبيه معروف الحدود، إبقاء القرار على المستخدم واختبار أمثلة عدائية بلغات متعددة.</td><td>أي تغيير في نموذج الثقة أو سلوك الموافقة.</td></tr>
+          <tr><td>رفع الملفات أو بقاء تسجيل الدخول مفعلاً قد يعرّض بيانات المستخدم.</td><td>موافقة محددة لكل عملية رفع، عزل الملف الشخصي، إظهار الجلسة الدائمة بوضوح مع زر مسح وتحذير.</td><td>توسيع الحفظ أو تعطيل التأكيد.</td></tr>
+          <tr><td>تكاملات جديدة قد توسع الشبكة أو سطح الأسرار.</td><td>تفضيل MCP والمكتبات الموجودة؛ إذا أضيف مضيف شبكة جديد، وثّقه في README وCSP وفق قواعد المشروع.</td><td>إضافة خدمة خارجية/مفتاح API أو إرسال بيانات خارج الجهاز.</td></tr>
+          <tr><td>اتساع النطاق قبل وجود استخدام مثبت.</td><td>اختبارات شرائح قصيرة، وإعادة ترتيب قائمة الميزات بناء على حالات فشل فعلية.</td><td>حذف ميزات قائمة أو تغيير هدف المنتج/الإصدار/النشر.</td></tr>
+        </tbody>
+      </table></div>
+      <p class="callout caution">لا تتضمن الخطة خفض الموافقات أو تعديل نموذج IPC الموثوق أو تغيير تشفير المزامنة أو حذف ميزات أو إصدار/نشر نسخة. هذه الحدود جزء من تعليمات المشروع وتتطلب طلباً صريحاً عند المساس بها.</p>
+    </section>
+
+    <section id="scope">
+      <h2>نطاق المراجعة وما لم يُختبر</h2>
+      <div class="card">
+        <p><strong>ما راجعته:</strong> <code>AGENTS.md</code> و<code>PRODUCT.md</code> و<code>plan.md</code> و<code>README.md</code> و<code>package.json</code>، إعداد CI، وحدات MCP والسياسة ومحرك التنفيذ والسجل والتسجيل، مسار snapshot والإدخال الأصلي، إعدادات نافذة Electron وwebview، ومسودة المراجعة المؤرخة 28 أكتوبر.</p>
+        <p><strong>تحقق مباشر في هذه الجلسة:</strong> قراءة ملفات المصدر المذكورة؛ تأكيد النسخة المعلنة؛ مطابقة العدد المعلن لأدوات MCP (45)، ووجود 44 تعريفاً باسم <code>browser_*</code>؛ فحص status والفرع وسجل Git دون تغيير أي ملف سابق غير التقرير الجديد.</p>
+        <p><strong>لم أقم به:</strong> لم أشغّل التطبيق أو اختبارات البناء أو الاختبارات الكاملة، ولم أجرب موقعاً خارجياً أو مثبتاً أو تكاملاً حياً مع عميل MCP في هذه الجلسة. لم أجر تدقيقاً أمنياً شاملاً أو اختباراً مستقلاً لكل سياسة. تقديرات المدة والاختيارات الاستراتيجية آراء مقترحة وليست حقائق مقاسة.</p>
+        <p>كان في شجرة العمل تغييرات موجودة مسبقاً في <code>README.md</code> واختبارين، ومسودة HTML سابقة غير متتبعة. لم أعدّل تلك التغييرات ولم أستبدل المسودة؛ التقرير الحالي ملف جديد مستقل.</p>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <p>أُعدّ هذا التقرير من قراءة المستودع في 2026-10-30. هو تقييم وخطة عمل، وليس تدقيقاً أمنياً مستقلاً أو ضماناً لخلو البرنامج من العيوب.</p>
+    <p>الملف: <code>docs/AI_BROWSER_TRANSFORMATION_PLAN_2026-10-30.html</code></p>
+  </footer>
+</div>
+</body>
+</html>

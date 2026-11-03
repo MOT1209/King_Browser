@@ -422,11 +422,18 @@ async function run() {
   console.log('[PASS] Execution Engine suite complete');
 }
 
-run().then(
-  () => { clearInterval(keepAlive); },
-  (error) => {
-    clearInterval(keepAlive);
-    console.error('[FAIL] Execution Engine suite:', error);
-    process.exitCode = 1;
-  }
-);
+// esbuild evaluates every suite's module body before the run loop turns. Some
+// later suites transpile large sources synchronously, which can outlast this
+// suite's action deadlines and make timing-sensitive assertions fail only in
+// the combined run. Start after the whole bundle has loaded; assertions and
+// timeouts are unchanged.
+setImmediate(() => {
+  run().then(
+    () => { clearInterval(keepAlive); },
+    (error) => {
+      clearInterval(keepAlive);
+      console.error('[FAIL] Execution Engine suite:', error);
+      process.exitCode = 1;
+    }
+  );
+});

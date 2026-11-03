@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>King Browser - تقرير المراجعة الشاملة</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14181f;--mute:#586170;--line:#dde1e8;--acc:#2447d6;--ok:#13795b;--warn:#a15c00;--bad:#b42318;--okbg:#e4f5ee;--warnbg:#fdf0d9;--badbg:#fde8e6;--accbg:#e8edfc;--code:#eef0f4}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#171b23;--ink:#e8ebf0;--mute:#9aa4b2;--line:#2a303b;--acc:#7b97ff;--ok:#4cc79b;--warn:#f0b04a;--bad:#ff8a80;--okbg:#12302a;--warnbg:#33290f;--badbg:#3a1a18;--accbg:#1c2547;--code:#222733}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 "Segoe UI",Tahoma,"Noto Naskh Arabic",system-ui,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px 64px}
+header{padding:40px 0 24px;border-bottom:1px solid var(--line)}
+h1{font-size:30px;margin:0 0 6px}
+.sub{color:var(--mute);margin:0}
+nav{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 0;z-index:5;display:flex;gap:6px;flex-wrap:wrap}
+nav a{color:var(--acc);text-decoration:none;font-size:14px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card)}
+section{margin-top:40px}
+h2{font-size:22px;margin:0 0 14px;padding-inline-start:12px;border-inline-start:4px solid var(--acc)}
+h3{font-size:17px;margin:20px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat b{display:block;font-size:26px;direction:ltr;text-align:right}
+.stat span{color:var(--mute);font-size:14px}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:15px}
+th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--code);font-weight:600}
+tr:last-child td{border-bottom:0}
+.tw{overflow-x:auto}
+.tag{display:inline-block;font-size:12px;padding:1px 9px;border-radius:999px;font-weight:600;white-space:nowrap}
+.t-ok{background:var(--okbg);color:var(--ok)}
+.t-warn{background:var(--warnbg);color:var(--warn)}
+.t-bad{background:var(--badbg);color:var(--bad)}
+.t-acc{background:var(--accbg);color:var(--acc)}
+code{background:var(--code);padding:1px 6px;border-radius:5px;font:13px Consolas,monospace;direction:ltr;unicode-bidi:embed}
+ul{padding-inline-start:22px;margin:6px 0}
+li{margin:3px 0}
+.note{border-inline-start:4px solid var(--warn);background:var(--warnbg);padding:10px 14px;border-radius:8px;margin:12px 0}
+.phase{border-inline-start:4px solid var(--acc)}
+footer{margin-top:48px;color:var(--mute);font-size:14px;border-top:1px solid var(--line);padding-top:16px}
+@media print{nav{display:none}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>King Browser - تقرير المراجعة الشاملة</h1>
+  <p class="sub">الإصدار 0.0.9 (ما قبل الإصدار) - تاريخ المراجعة 2026-10-28 - الفرع main - آخر إيداع 7799752</p>
+</header>
+<nav>
+  <a href="#scope">نطاق المراجعة</a><a href="#what">ما هو المشروع</a><a href="#numbers">الأرقام</a><a href="#arch">البنية</a>
+  <a href="#runtime">اختبار التشغيل</a><a href="#security">الأمان</a><a href="#quality">الجودة والاختبارات</a><a href="#findings">الملاحظات</a>
+  <a href="#roadmap">خطة التحسين</a><a href="#unknown">غير المتحقق منه</a>
+</nav>
+
+<section id="scope">
+<h2>نطاق المراجعة وحدودها</h2>
+<div class="card">
+<p>هذه مراجعة قراءة للمستودع: الوثائق (<code>CLAUDE.md</code>, <code>AGENTS.md</code>, <code>PRODUCT.md</code>, <code>plan.md</code>, <code>README.md</code>, تقرير التدقيق الأمني بتاريخ 2026-10-05)، <code>package.json</code>، إعداد <code>eslint</code> و<code>ci.yml</code>، وإعدادات <code>webPreferences</code> والـ CSP، وأعداد الملفات والأسطر.</p>
+<p><span class="tag t-ok">نُفِّذ فعلاً</span> <code>tsc --noEmit</code> (خرج 0، بلا أخطاء)، <code>check:i18n</code> (405 مفتاحاً مكتملاً في en/ar/de)، <code>check:strings</code> (لا نصوص صلبة)، وتشغيل التطبيق واختباره عبر MCP (انظر قسم "اختبار التشغيل الفعلي").</p>
+<p><span class="tag t-warn">لم يكتمل</span> <code>npm run lint</code> و<code>npm test</code> أوقفهما النظام ثلاث مرات بسبب نفاد ذاكرة الجهاز (نحو 811 ميغابايت حرة من 8 غيغابايت)، وطُلب مني تركهما. أرقام الاختبارات (1300+ تأكيداً) وتحذيرات eslint (1165) أدناه <b>منقولة من <code>plan.md</code></b> ولم أتحقق منها. لم أقرأ كل ملف سطراً بسطر (المشروع نحو 82 ألف سطر)، فالملاحظات عن الأنماط الظاهرة لا عن تدقيق كامل. التطبيق شُغّل من حزم <code>dist-electron</code> المبنية في 27 أكتوبر وقد تسبق آخر إيداع.</p>
+<p>الوسوم: <span class="tag t-ok">حقيقة</span> قرأته في الكود أو الوثائق، <span class="tag t-acc">من الوثائق</span> ادعاء المشروع نفسه دون إعادة تحقق، <span class="tag t-warn">رأي</span> تقديري.</p>
+</div>
+</section>
+
+<section id="what">
+<h2>ما هو المشروع</h2>
+<div class="card">
+<p>متصفح سطح مكتب مفتوح المصدر (MIT) مبني على Electron 43 وReact 18 وTypeScript وVite، يسمح لوكيل برمجة (OpenCode، Claude Code، Cursor وغيرها) بقيادة متصفح حقيقي <b>مرئي</b> مع بقاء القرار بيد الإنسان. الميزة التنافسية المعلنة هي <b>التحكم البشري الدقيق</b>. المشروع مشتق من Nova Browser (انظر <code>docs/UPSTREAM.md</code> و<code>THIRD_PARTY_LICENSES.md</code>).</p>
+<ul>
+<li><b>خادم MCP محلي</b> على <code>127.0.0.1:3020</code> بنقل Streamable HTTP (<code>/mcp</code>) وSSE قديم، مع جسر stdio (<code>mcp-bridge</code>) ورمز Bearer. 45 أداة، منها 19 آمنة مفعّلة افتراضياً <span class="tag t-acc">من README</span>.</li>
+<li><b>بوابة موافقة</b>: محرك سياسات يصنّف كل نداء <code>safe</code> أو <code>sensitive</code>؛ الأدوات المجهولة والوجهات الغامضة تُعامل كحساسة؛ لا يوجد وضع يعطّل الموافقة. وضعان: متوازن وصارم.</li>
+<li><b>استهداف العناصر</b> بمراجع <code>e12</code> من <code>browser_snapshot</code> بدل محددات CSS.</li>
+<li><b>سجل نشاط</b> دائم قابل للتصدير، قواعد مواقع (اسأل/احظر)، كاشف حقن أوامر، ملف معزول للوكيل، تسجيل وإعادة.</li>
+<li><b>ميزات المتصفح</b>: تبويبات أفقية/عمودية، مساحات عمل، شاشة مقسومة، وضع قراءة، إضافات Chrome Web Store وCRX، حاجب إعلانات (Ghostery)، ثلاث لغات (en/ar/de).</li>
+<li><b>موروثات من Nova</b>: مساعد محلي WebGPU وWhisper، مزامنة مشفرة عبر Supabase، VPN. يعدّها <code>plan.md</code> سطح صيانة وهجوم زائداً (WP8).</li>
+<li><b>موقع تسويقي</b> منفصل في <code>website/</code> (Vite) وأفلام ترويجية Remotion في <code>video/</code>.</li>
+</ul>
+</div>
+</section>
+
+<section id="numbers">
+<h2>الأرقام</h2>
+<div class="grid">
+<div class="stat"><b>~82.6k</b><span>سطر TS/TSX (electron + src + tests + website/src)</span></div>
+<div class="stat"><b>127</b><span>إيداعاً في git</span></div>
+<div class="stat"><b>6,804</b><span>سطر في <code>electron/main.ts</code></span></div>
+<div class="stat"><b>114</b><span>ملف في <code>tests/</code> (115 استيراداً في runAll)</span></div>
+<div class="stat"><b>35</b><span>وحدة في <code>electron/main/</code></span></div>
+<div class="stat"><b>42 / 31 / 15 / 29</b><span>مكونات / hooks / خدمات / أدوات في <code>src/</code></span></div>
+<div class="stat"><b>~1300+</b><span>تأكيد اختبار ناجح <span class="tag t-acc">plan.md</span></span></div>
+<div class="stat"><b>1165</b><span>تحذير eslint، 0 أخطاء <span class="tag t-acc">plan.md</span></span></div>
+</div>
+<h3>أكبر الملفات</h3>
+<div class="tw"><table>
+<tr><th>الملف</th><th>الأسطر</th><th>ملاحظة</th></tr>
+<tr><td><code>electron/main.ts</code></td><td>6,804</td><td>نقطة الدخول + نوافذ + IPC (حوالي 77 معالج <code>ipcMain</code>) - ملف ضخم</td></tr>
+<tr><td><code>src/services/aiAgent.ts</code></td><td>3,535</td><td>41 استخدام <code>any</code></td></tr>
+<tr><td><code>src/services/syncService.ts</code></td><td>3,304</td><td>مزامنة مشفرة، حساس أمنياً</td></tr>
+<tr><td><code>src/App.tsx</code></td><td>2,168</td><td>مكوّن جذر كبير</td></tr>
+<tr><td><code>src/components/TopBar.tsx</code></td><td>2,023</td><td></td></tr>
+<tr><td><code>electron/mcpServer.ts</code></td><td>1,901</td><td>خادم MCP + مسارات</td></tr>
+<tr><td><code>src/components/SidebarTabs.tsx</code></td><td>1,664</td><td></td></tr>
+<tr><td><code>src/components/BrowserView.tsx</code></td><td>1,561</td><td></td></tr>
+<tr><td><code>src/hooks/useBrowserAgentBridge.ts</code></td><td>1,211</td><td>جسر الوكيل في الواجهة</td></tr>
+</table></div>
+</section>
+
+<section id="arch">
+<h2>البنية</h2>
+<div class="tw"><table>
+<tr><th>الطبقة</th><th>المسار</th><th>الدور</th></tr>
+<tr><td>العملية الرئيسية</td><td><code>electron/main.ts</code></td><td>نوافذ، دورة حياة webContents، معالجات IPC</td></tr>
+<tr><td>وحدات رئيسية بلا اعتماديات</td><td><code>electron/main/*.ts</code></td><td>policyEngine، approvalMode، siteRules، injectionDetector، activityLog، ipAddress (SSRF)، mcpProtocol، mcpStreamableHttp، elementRefs، executionEngine، recordings، crxInstaller، updateIntegrity وغيرها - قابلة للاختبار في Node العادي</td></tr>
+<tr><td>MCP</td><td><code>electron/mcpServer.ts</code>, <code>mcp-bridge.ts/.mjs</code></td><td>خادم loopback وجسر stdio. CI يتحقق أن <code>mcp-bridge.mjs</code> مطابق لمصدره</td></tr>
+<tr><td>الجسور</td><td><code>preload.ts</code>, <code>guest-preload.ts</code>, <code>webstore-preload.ts</code></td><td>مع <code>isTrustedSender</code> للتحقق من المرسل</td></tr>
+<tr><td>الواجهة</td><td><code>src/</code></td><td>React: components، hooks (واحد لكل شأن)، services، utils، locales</td></tr>
+<tr><td>الاختبارات</td><td><code>tests/</code>, <code>tests/e2e/tier1..5</code></td><td>تشغيل عبر <code>tests/runAll.ts</code> (ملف غير مستورد هناك لا يعمل)</td></tr>
+<tr><td>الموقع والفيديو</td><td><code>website/</code>, <code>video/</code></td><td>مستقلان، للموقع اختباراته</td></tr>
+</table></div>
+<p><span class="tag t-warn">رأي</span> التقسيم إلى وحدات صغيرة في <code>electron/main/</code> جيد ويسهّل الاختبار. العيب هو أن المنطق القديم ما زال مكدساً في <code>main.ts</code> وفي ملفات الواجهة الكبيرة.</p>
+</section>
+
+<section id="runtime">
+<h2>اختبار التشغيل الفعلي</h2>
+<div class="card">
+<p>شُغّل التطبيق (<code>electron .</code> على Windows 11) واختُبر عبر خادم MCP الخاص به بعد موافقة المستخدم على نافذة أول اتصال. كل ما يلي نُفِّذ ورُصدت نتيجته.</p>
+</div>
+<div class="tw"><table>
+<tr><th>الاختبار</th><th>النتيجة</th></tr>
+<tr><td>بدء التطبيق وإنشاء النافذة وخادم MCP على المنفذ 3020 ومانع الإعلانات</td><td><span class="tag t-ok">نجح</span></td></tr>
+<tr><td>أول اتصال MCP بلا موافقة المستخدم</td><td><span class="tag t-ok">رُفض كما يجب</span> (نافذة موافقة أصلية؛ ولم أتجاوزها)</td></tr>
+<tr><td><code>king_browser_info</code> و<code>browser_status</code> و<code>browser_list_tabs</code></td><td><span class="tag t-ok">نجح</span></td></tr>
+<tr><td>التنقل إلى <code>https://example.com</code>، <code>browser_read_page</code>، <code>browser_screenshot</code>، <code>browser_get_url</code></td><td><span class="tag t-ok">نجح</span> (النص متعدد اللغات يُقرأ صحيحاً، واللقطة تُرجع صورة)</td></tr>
+<tr><td><code>browser_snapshot</code> ثم <code>browser_click</code> بالمرجع <code>e1</code></td><td><span class="tag t-ok">نجح</span> (انتقل إلى iana.org)، وعمل <code>go_back</code></td></tr>
+<tr><td>تبويب جديد، سرد التبويبات، إغلاق تبويب بمعرّفه، تمرير</td><td><span class="tag t-ok">نجح</span> (إغلاق التبويب بلا <code>tabId</code> يُرجع خطأً واضحاً)</td></tr>
+<tr><td>التنقل إلى <code>127.0.0.1:3020</code> و<code>192.168.1.1</code> و<code>file:///...</code> و<code>javascript:</code></td><td><span class="tag t-ok">حُجبت كلها</span> (الرسالة: "destination is not a public address")</td></tr>
+<tr><td><code>browser_pause</code> ثم نداء إجراء ثم <code>browser_resume</code></td><td><span class="tag t-ok">نجح</span> (الإجراء رُفض أثناء الإيقاف بخطأ واضح، ويعمل <code>browser_status</code>)</td></tr>
+<tr><td>كتابة في حقل بنموذج حقيقي ثم الضغط على "Submit order" (httpbin.org/forms/post)</td><td><span class="tag t-bad">أُرسل النموذج بلا موافقة</span> (انظر الملاحظة 0 أدناه)</td></tr>
+<tr><td>كشف حقن الأوامر، أدوات حساسة معطّلة افتراضياً، نافذة الموافقة، سجل النشاط، وضع صارم، الملف المعزول، التسجيل والإعادة</td><td><span class="tag t-warn">لم تُختبر</span></td></tr>
+<tr><td>سجل بدء التطبيق</td><td><span class="tag t-warn">ملاحظة</span> رسالة <code>Network service crashed or was terminated, restarting service</code> ثم إعادة تشغيل تلقائية؛ وتحذيرات <code>punycode</code> و<code>url.parse()</code> المهجورة</td></tr>
+</table></div>
+<div class="note"><b>حالة الإصلاح:</b> <span class="tag t-ok">أُصلح في الكود</span> <span class="tag t-warn">لم يُودَع ولم يُعد اختباره في التطبيق الحي</span> السبب الجذري: <code>browser_click</code> يُصنَّف بمطابقة نص الزر فقط، و"Submit order" لا يطابق أي كلمة شراء أو إرسال، ولا شيء يفحص هل العنصر يرسل نموذجاً. الإصلاح (تشديد فقط): سكربت سياق الصفحة في <code>useBrowserAgentBridge.ts</code> يضيف العلامة <code>king:post-form-submit</code> لأي زر إرسال داخل نموذج <code>method="post"</code>، و<code>policyEngine.ts</code> يرفع النقر عليه إلى <code>consequential_form</code> أياً كان نص الزر. نماذج GET (البحث) تبقى آمنة. اختبار انحدار جديد في <code>tests/policy_engine.test.ts</code> (31 فحصاً ناجحاً)، واجتازت الملفات الوثيقة (<code>agent_browser_tools</code> 39، <code>agent_login</code> و<code>mcp_engine_wiring</code> و<code>mcp_lifecycle_regressions</code> و<code>mcp_single_approval_authority</code> و<code>agent_document_boundary</code> و<code>hook_architecture_hardening</code>)، و<code>tsc</code> اجتاز. <b>حدود:</b> لا يغطي نماذج تُرسل بـ <code>formmethod</code> على الزر أو بـ JavaScript أو بمفتاح Enter؛ ويجب إعادة التحقق على نسخة مبنية من جديد.</div>
+<div class="note"><b>الملاحظة 0 (أهم نتيجة في الاختبار):</b> نقر <code>browser_click</code> على زر "Submit order" في نموذج <code>httpbin.org/forms/post</code> بعد كتابة اسم في حقل أرسل طلب POST فعلاً (تأكدت من استجابة الخادم التي تعرض <code>custname: "King test"</code>) <b>دون نافذة موافقة</b>، وحالة المحرك لم تعرض موافقة معلّقة. البيانات المرسلة كانت تجريبية وغير حساسة. <code>AGENTS.md</code> يعدّ <code>consequential_form</code> و<code>purchase</code> من محفزات الموافقة، فإما أن كاشف النماذج المؤثرة لا يلتقط هذا النمط (نموذج بلا حقول مالية، وزر "Submit order")، أو أن الأداة كانت مفعّلة في وضع يتيح ذلك. <b>لم أحدد السبب</b>؛ يلزم فحص <code>policyEngine.ts</code> وتأكيد الإعدادات وتحويل هذا السيناريو إلى اختبار انحدار. أيضاً: رسالة الحجب لـ <code>file:</code> و<code>javascript:</code> ("not a public address") مضللة قليلاً.</div>
+</section>
+
+<section id="security">
+<h2>الأمان</h2>
+<h3>نقاط القوة</h3>
+<div class="card"><ul>
+<li><span class="tag t-ok">حقيقة</span> <code>nodeIntegration:false</code> و<code>contextIsolation:true</code> و<code>sandbox:true</code> في نوافذ التطبيق (<code>main.ts:517-520</code>)، ويُفرض الإعداد نفسه على webviews عند الإنشاء (<code>main.ts:3315-3318</code>).</li>
+<li><span class="tag t-ok">حقيقة</span> <code>isTrustedSender</code> مستخدم 84 مرة في <code>main.ts</code> مقابل نحو 77 معالج IPC.</li>
+<li><span class="tag t-ok">حقيقة</span> قاعدة صريحة: لا وضع يعطّل الموافقة؛ المجهول = حساس. وضع "مرن" حُذف عمداً.</li>
+<li><span class="tag t-ok">حقيقة</span> إخفاء القيم المكتوبة من السجل المحفوظ، وملف جديد غير متتبَّع <code>src/utils/urlRedaction.ts</code> يحجب قيم رموز الاستعلام في العناوين المعادة للوكيل.</li>
+<li><span class="tag t-ok">حقيقة</span> آخر إيداع يرفض نقاط نهاية الجسر غير الآمنة؛ تدقيق 2026-10-05 عالج سباقات إلغاء الموافقة وتأخيرها وانتهاء المهلة.</li>
+<li><span class="tag t-ok">حقيقة</span> صدق في الادعاءات: README يقول إنه لا يوجد تدقيق مستقل ولا مقارنة أداء، ونسبة كشف الحقن المقاسة 65% (13 من 20) على مجموعة خاصة.</li>
+</ul></div>
+<h3>مخاطر وملاحظات</h3>
+<div class="tw"><table>
+<tr><th>#</th><th>الملاحظة</th><th>الخطورة (رأي)</th><th>الدليل</th></tr>
+<tr><td>S1</td><td>سياسة CSP للواجهة تسمح بـ <code>'unsafe-inline'</code> و<code>'unsafe-eval'</code> في <code>script-src</code>، و<code>img-src</code> يسمح بأي <code>https://*</code> و<code>http://*</code>. أي XSS في الواجهة لا يوقفه CSP. <code>unsafe-eval</code> غالباً لازم لمكتبات الذكاء الاصطناعي المحلية (<code>wasm-unsafe-eval</code> وحده قد لا يكفي) - لم أتحقق.</td><td><span class="tag t-warn">متوسطة</span></td><td><code>index.html:8</code></td></tr>
+<tr><td>S2</td><td><code>webviewTag:true</code> مفعّل في النافذة الرئيسية. هذا ضروري لتصميم المتصفح الحالي لكنه سطح هجوم معروف في Electron؛ الحماية الكاملة تعتمد على فحص <code>will-attach-webview</code> الذي لم أراجعه.</td><td><span class="tag t-warn">متوسطة</span></td><td><code>main.ts:519</code>, <code>:3315</code></td></tr>
+<tr><td>S3</td><td>كاشف الحقن يلتقط 65% فقط. هو تنبيه لا حماية، والحماية الفعلية هي بوابة الموافقة، لكن تعب المستخدم من الموافقات (approval fatigue) يضعف هذه البوابة عملياً.</td><td><span class="tag t-warn">متوسطة</span></td><td><code>plan.md</code> WP6</td></tr>
+<tr><td>S4</td><td>لا تدقيق أمني مستقل، والمشروع يحمل مزامنة مشفرة وVPN موروثة. ادعاء "E2EE" مسموح فقط بعد تدقيق خارجي حسب <code>plan.md</code>.</td><td><span class="tag t-warn">متوسطة</span></td><td>README / plan WP7</td></tr>
+<tr><td>S5</td><td>التبعيات: <code>remotion</code> (أدوات الفيديو) فيها ثغرات معروفة مذكورة في <code>plan.md</code>، وهي في devDependencies فلا تُشحن. أما <code>jsdom</code> وexpress في dependencies فيجب إبقاؤها محدّثة.</td><td><span class="tag t-ok">منخفضة</span></td><td>plan.md 0.0.8</td></tr>
+<tr><td>S6</td><td>التوقيع: لا شهادات توقيع Apple/Windows بعد، فيظهر المثبّت "غير موثوق" لدى SmartScreen وGatekeeper. وفي NSIS الخيار <code>deleteAppDataOnUninstall:true</code> يحذف بيانات المستخدم عند إلغاء التثبيت - قرار منتج يجب أن يكون واعياً.</td><td><span class="tag t-warn">متوسطة</span></td><td><code>package.json</code> (nsis)</td></tr>
+<tr><td>S7</td><td>التطبيق ملتزم بتحديث Chromium الأمني كل بضعة أسابيع عبر ترقية Electron. تأخر ذلك = ثغرات متصفح معروفة. <code>electron: ^43.7.7</code> مثبّت بنطاق caret.</td><td><span class="tag t-warn">دائمة</span></td><td>plan.md WP9</td></tr>
+</table></div>
+</section>
+
+<section id="quality">
+<h2>الجودة والاختبارات و CI</h2>
+<div class="card"><ul>
+<li><span class="tag t-ok">حقيقة</span> CI على Linux يشغّل: tsc، eslint، فحص الترجمات والنصوص الصلبة، تطابق الجسر، بناء + اختبارات، بناء الموقع. وأعمال Windows وmacOS (macOS غير مانع حسب plan).</li>
+<li><span class="tag t-ok">حقيقة</span> منهج اختبار أولاً، مع اختبارات انحدار تسمّي الفشل الذي تمنعه، وفحص اكتمال الترجمة بين en/ar/de (حجم ar.json أكبر من en.json، يلزم التأكد من توازن المحتوى).</li>
+<li><span class="tag t-warn">رأي</span> الدين التقني الأوضح: 1165 تحذير eslint أغلبها <code>no-explicit-any</code> (918 حسب plan)، وملفات من 2000 إلى 6800 سطر، وعدد كبير من الاختبارات "التجريبية/الخصومية" (<code>m2_adversarial_empirical</code>, <code>challenger_m3...</code>) بأسماء غير واضحة المصدر.</li>
+<li><span class="tag t-warn">رأي</span> "اختبارات e2e" هنا تعمل في Node بمحاكيات؛ لا اختبار تلقائي لنافذة Electron حقيقية. plan.md نفسه يذكر أن مثبّت Windows وواجهة الإعدادات غير مجرّبين فعلياً.</li>
+</ul></div>
+<h3>حالة شجرة العمل وقت المراجعة</h3>
+<div class="card"><ul>
+<li><span class="tag t-warn">نظافة</span> ملفان <code>bash.exe.stackdump</code> (في الجذر وفي <code>website/</code>) ناتج انهيار Git Bash، ليسا من المشروع. يجب حذفهما وإضافة <code>*.stackdump</code> إلى <code>.gitignore</code>.</li>
+<li><span class="tag t-acc">لقطة بداية الجلسة</span> كانت هناك تعديلات غير مودعة في README والجسر واختبارات و<code>useBrowserAgentBridge.ts</code> وملفان جديدان (<code>urlRedaction.ts</code> واختباره). عند فحصي لاحقاً لم يظهر فرق في <code>useBrowserAgentBridge.ts</code> ويبدو أن بعضها أُودع في 7799752. أعد تشغيل <code>git status</code> قبل الاعتماد على هذا.</li>
+</ul></div>
+</section>
+
+<section id="findings">
+<h2>الملاحظات الرئيسية مرتبة بالأولوية</h2>
+<div class="tw"><table>
+<tr><th>#</th><th>الملاحظة</th><th>الأثر</th><th>الجهد</th></tr>
+<tr><td>0</td><td><b>أُرسل نموذج حقيقي بلا موافقة</b> عبر <code>browser_click</code> (قسم اختبار التشغيل). يجب فحص <code>policyEngine.ts</code> ومعرفة لماذا لم يُصنَّف <code>consequential_form</code>، ثم اختبار انحدار. يمس سياسة الموافقة فيحتاج موافقتك قبل أي تعديل.</td><td>عالٍ جداً (يضعف الوعد الأساسي للمنتج)</td><td>منخفض-متوسط</td></tr>
+<tr><td>1</td><td>لا استخدام فعلي موثّق للمنتج (WP1): المثبّت وواجهة الإعدادات والتكامل مع Codex غير مجرّبة. كل القرارات اللاحقة تعتمد على هذا.</td><td>عالٍ</td><td>منخفض</td></tr>
+<tr><td>2</td><td>حجم <code>main.ts</code> (6.8 ألف سطر) وملفات الواجهة الضخمة يرفع كلفة كل تعديل أمني ويصعّب مراجعة IPC.</td><td>عالٍ</td><td>متوسط-عالٍ (تدريجي)</td></tr>
+<tr><td>3</td><td>CSP متساهل وwebview مفعّل (S1, S2).</td><td>متوسط-عالٍ</td><td>متوسط</td></tr>
+<tr><td>4</td><td>ثقة التوزيع: لا توقيع، لا winget/Homebrew، لا دومين (WP7).</td><td>متوسط-عالٍ للتبني</td><td>مالي/إداري</td></tr>
+<tr><td>5</td><td>سطح موروث (VPN، WebGPU، مزامنة) يوسّع الصيانة والهجوم دون أن يخدم قصة التحكم البشري (WP8).</td><td>متوسط</td><td>منخفض (إخفاء) إلى متوسط (حذف)</td></tr>
+<tr><td>6</td><td>مخاطرة استراتيجية: بدائل مجانية (Playwright MCP, Chrome DevTools MCP) وعبء Chromium الدائم. الطلب على متصفح مستقل غير معروف.</td><td>استراتيجي</td><td>اختبار طلب</td></tr>
+<tr><td>7</td><td>تحذيرات eslint (1165) ونقص macOS مانع في CI.</td><td>متوسط</td><td>تدريجي</td></tr>
+<tr><td>8</td><td>نظافة المستودع: ملفات stackdump، وملفات حجم كبير للوسائط/الفيديو داخل نفس المستودع (<code>video/</code>) - تأكد أنها لا تضخّم النسخ.</td><td>منخفض</td><td>منخفض</td></tr>
+</table></div>
+</section>
+
+<section id="roadmap">
+<h2>خطة التحسين والتطوير</h2>
+<p class="sub">تتبنى هذه الخطة بنية <code>plan.md</code> (WP1-WP9) وتضيف ما ظهر في المراجعة. التقديرات رأي وليست التزاماً.</p>
+
+<div class="card phase"><h3>المرحلة 0 - هذا الأسبوع (نظافة وسلامة)</h3><ul>
+<li>حذف ملفي <code>bash.exe.stackdump</code> وإضافة <code>*.stackdump</code> إلى <code>.gitignore</code>.</li>
+<li><b>تحقيق ثغرة الموافقة (الملاحظة 0):</b> إعادة إنتاج إرسال النموذج بلا موافقة، قراءة <code>policyEngine.ts</code>، معرفة هل المشكلة في تصنيف النقر على زر إرسال أم في إعداد الأدوات، ثم اختبار انحدار يسمّي الفشل. التعديل نفسه بعد موافقتك.</li>
+<li>تشغيل <code>npm run lint</code> و<code>npm test</code> بعد تفريغ الذاكرة (أُوقفا في هذه المراجعة) وتسجيل الأرقام الحقيقية. <code>tsc</code> اجتاز فعلاً.</li>
+<li>فحص انهيار خدمة الشبكة عند البدء (<code>Network service crashed</code>) هل يتكرر ولماذا.</li>
+<li>إيداع أو إسقاط التعديلات المعلّقة (<code>urlRedaction.ts</code> واختباره) بإيداع واضح.</li>
+<li><b>معيار الإنجاز:</b> شجرة نظيفة وCI أخضر وأرقام مُقاسة محلياً.</li>
+</ul></div>
+
+<div class="card phase"><h3>المرحلة 1 - أسبوعان (الاستخدام الفعلي، WP1)</h3><ul>
+<li>تثبيت الإصدار على Windows، ربط OpenCode وClaude Code، تنفيذ مهام حقيقية، ورفض عمل حساس عمداً.</li>
+<li>تسجيل كل عطل كـ Issue، وتسجيل طريقة الاتصال المستعملة (Streamable HTTP أم stdio).</li>
+<li>قياس زمن الربط لمطوّر جديد. <b>الهدف:</b> أقل من 5 دقائق بلا مساعدة.</li>
+<li>قياس عدد الموافقات في المهمة الواحدة لاكتشاف إرهاق الموافقة (يغذي S3).</li>
+</ul></div>
+
+<div class="card phase"><h3>المرحلة 2 - 2 إلى 4 أسابيع (تشديد الأمان)</h3><ul>
+<li><b>مراجعة <code>will-attach-webview</code></b> وتأكيد إلغاء <code>preload</code> وفرض <code>sandbox</code> وحظر <code>nodeIntegration</code> على كل webview، مع اختبار انحدار (S2).</li>
+<li><b>تشديد CSP</b>: قياس ما الذي يحتاج فعلاً <code>unsafe-eval</code> و<code>unsafe-inline</code>؛ نقل السكربتات المضمّنة إلى ملفات، استخدام nonce/hash، وتقييد <code>img-src</code> لقائمة نطاقات معروفة حيثما أمكن (S1). مع تحديث جدول "Network connections" في README حسب قاعدة المشروع.</li>
+<li><b>رفع كشف الحقن</b> بتوسيع مجموعة WP6 (لغات، ترميز، نص مخفي) مع نشر الرقم الصادق، وإبقاء الموافقة هي الحماية الأساسية.</li>
+<li><b>تقليل إرهاق الموافقة</b> دون إضعاف البوابة: تجميع موافقات الخطوات المترابطة لنفس الموقع والغرض في موافقة واحدة ظاهرة، بموافقة صاحب المشروع لأن ذلك يمس سياسة الموافقة.</li>
+<li>تثبيت نطاق الإصدار لـ Electron في سياسة ترقية: مراجعة أسبوعية لإصدارات Electron الأمنية مع تذكير آلي (Dependabot أو مهمة مجدولة).</li>
+</ul></div>
+
+<div class="card phase"><h3>المرحلة 3 - 1 إلى 3 أشهر (الدين التقني، WP9)</h3><ul>
+<li>تقسيم <code>main.ts</code> تدريجياً: كل مرة يُلمس فيها قسم، تُستخرج وحدته إلى <code>electron/main/</code> مع اختبار (نوافذ، downloads، permissions، IPC لكل مجال في ملف). لا إعادة كتابة دفعة واحدة.</li>
+<li>تقسيم <code>App.tsx</code> و<code>TopBar.tsx</code> و<code>SidebarTabs.tsx</code> إلى hooks ومكونات فرعية حسب التزام "hook لكل شأن".</li>
+<li>خفض تحذيرات <code>any</code> بدءاً بالملفات الأمنية (<code>mcpServer.ts</code>, <code>syncService.ts</code>, <code>aiAgent.ts</code>) ثم رفع القاعدة إلى <code>error</code> فيها وحدها عبر override لكل مجلد.</li>
+<li>جعل اختبار macOS مانعاً في CI بعد استقراره.</li>
+<li>إضافة اختبار حقيقي لنافذة Electron (Playwright for Electron) لمسار واحد: تشغيل، اتصال MCP، طلب حساس، ظهور نافذة الموافقة، رفض.</li>
+<li>مراجعة أسماء الاختبارات "الخصومية/التجريبية" ودمجها أو توثيق غرضها.</li>
+</ul></div>
+
+<div class="card phase"><h3>المرحلة 4 - الاتجاه والمنتج (قرارك)</h3><ul>
+<li><b>WP8 تقليص السطح:</b> أبسط خطوة هي علامة "تجريبي" وإخفاء VPN والمساعد المحلي والمزامنة افتراضياً؛ الحذف الفعلي لاحقاً وبقرارك فقط.</li>
+<li><b>اختبار الطلب:</b> قبل الاستثمار أكثر، جرّب صيغة أخف: خادم MCP وسيط "طبقة موافقة" يعمل فوق Chrome موجود، وقارن الاهتمام. قد تُنقل النواة (policyEngine وsiteRules وactivityLog وinjectionDetector) إلى حزمة مستقلة قابلة لإعادة الاستخدام في الحالتين.</li>
+<li><b>WP7 الثقة:</b> توقيع (Windows: Azure Trusted Signing أو OV؛ Apple Developer)، winget وHomebrew cask، دومين للموقع، فيديو بصوت جديد (الحالي يقول "Nova").</li>
+<li><b>تدقيق أمني خارجي</b> قبل أي إعلان E2EE أو "آمن"؛ والتزام README الحالي بعدم الادعاء قبل ذلك.</li>
+<li><b>قرار NSIS:</b> هل <code>deleteAppDataOnUninstall</code> مقصود؟ الأفضل خيار صريح للمستخدم عند الإلغاء.</li>
+<li>إيراد محتمل لاحقاً فقط بعد وجود مستخدمين: ميزات فرق (سياسات مشتركة، تصدير سجل تدقيق، SSO) فوق نواة مفتوحة. تذكّر أن Vercel Hobby غير تجاري.</li>
+</ul></div>
+
+<h3>ترتيب مقترح</h3>
+<div class="tw"><table>
+<tr><th>الأولوية</th><th>العمل</th><th>المسؤول</th><th>المدة (رأي)</th></tr>
+<tr><td>1</td><td>المرحلة 0 + المرحلة 1 بالتوازي</td><td>أنت + أنا</td><td>أسبوعان</td></tr>
+<tr><td>2</td><td>فحص webview وتشديد CSP</td><td>أنا، بمراجعتك</td><td>أسبوع إلى أسبوعان</td></tr>
+<tr><td>3</td><td>توسيع اختبار الحقن + تقليل إرهاق الموافقة</td><td>أنا (الثاني بموافقتك على السياسة)</td><td>أسبوعان</td></tr>
+<tr><td>4</td><td>تقسيم main.ts وخفض any تدريجياً</td><td>أنا، مع كل لمس</td><td>مستمر</td></tr>
+<tr><td>5</td><td>توقيع وتوزيع وقرار WP8 واختبار الطلب</td><td>أنت</td><td>حسب هدفك</td></tr>
+</table></div>
+<div class="note">قاعدة المشروع: لا تغيير في سياسة الموافقة أو نموذج ثقة IPC أو صيغة تشفير المزامنة أو سير عمل الإصدار دون طلبك الصريح، ولا رفع للإصدار بلا قرار. بنود المرحلة 2 التي تمس هذه الأمور تحتاج موافقتك أولاً.</div>
+</section>
+
+<section id="unknown">
+<h2>ما لم أتحقق منه</h2>
+<div class="card"><ul>
+<li>نجاح <code>eslint</code> و<code>npm test</code> الآن (أُوقفا بنفاد الذاكرة؛ الأرقام منقولة من plan.md).</li>
+<li>واجهة التطبيق نفسها (الإعدادات، صفحة التبويب الجديد، الأوضاع، RTL)، والمثبّت، وأنظمة غير Windows. اختُبرت فقط أدوات MCP.</li>
+<li>سبب عدم طلب الموافقة عند إرسال النموذج (الملاحظة 0).</li>
+<li>محتوى <code>will-attach-webview</code> وبقية معالجات الأذونات وحدود مجلدات الملفات (لم تُقرأ).</li>
+<li>سياسة RLS الحية في Supabase (plan.md نفسه يقول إنها بلا بيئة اختبار).</li>
+<li>الطلب السوقي، وأداء الصفحات مقارنة بمتصفحات أخرى (لم يُقس ولا يدّعيه README).</li>
+<li>وجود ثغرات في التبعيات اليوم (لم أشغّل <code>npm audit</code>).</li>
+</ul></div>
+</section>
+
+<footer>أُعدّ بقراءة المستودع في 2026-10-28. لا يحل محل تدقيق أمني مستقل. الملف: <code>docs/PROJECT_REVIEW_2026-10-28.html</code></footer>
+</div>
+</body>
+</html>

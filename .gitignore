@@ -19,6 +19,12 @@ release-files/
 .env.*
 !.env.example
 
+# Local MCP client config (holds the MCP bearer token); never commit
+.mcp.json
+
+# Local audit scratch scripts (they embed the MCP bearer token); never commit
+.audit-*
+
 # Logs and runtime databases
 *.log
 npm-debug.log*
