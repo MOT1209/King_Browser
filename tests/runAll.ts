@@ -134,6 +134,7 @@ import './ax_snapshot.test';
 import './url_redaction.test';
 import './trusted_input.test';
 import './approval_mode.test';
+import './update_check_pref.test';
 import './injection_corpus.test';
 import './agent_profile_settings.test';
 import './recordings.test';

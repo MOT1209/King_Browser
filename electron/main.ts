@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { createTrustedSenderPolicy } from './security/trustedSender';
 import { appendCrashLog as writeCrashLog } from './main/crashLog';
 import { isLocalOrIntranetHost } from './main/hostPolicy';
+import { createUpdateCheckPrefStore } from './main/updateCheckPref';
 import { isExtensionAllowedInIncognito, setExtensionIncognitoAccess, hasExtensionIncognitoAccess } from './main/incognitoExtensions';
 import { openPageSourceViewer as createPageSourceViewer } from './windows/sourceViewer';
 import { isSafeSubframeNavigation } from './main/windowOpenPolicy';
@@ -2360,6 +2361,19 @@ app.whenReady().then(async () => {
     return await checkForUpdatesInternal();
   });
 
+  // Whether the background update check (startup + every 4 hours) runs. The
+  // manual check above always works; this only gates the automatic contact with
+  // api.github.com.
+  const updateCheckPref = createUpdateCheckPrefStore(path.join(app.getPath('userData'), 'update_check_pref.json'));
+  ipcMain.handle('get-auto-update-check', (event) => {
+    if (!isTrustedSender(event)) return true;
+    return updateCheckPref.get();
+  });
+  ipcMain.handle('set-auto-update-check', (event, enabled: unknown) => {
+    if (!isTrustedSender(event)) return updateCheckPref.get();
+    return updateCheckPref.set(enabled);
+  });
+
   ipcMain.handle('get-update-info', (event) => {
     if (!isTrustedSender(event)) return null;
     return latestReleaseDownloadInfo;
@@ -2859,12 +2873,14 @@ app.whenReady().then(async () => {
 
   // Wait 15 seconds before background update check on startup to not slow down initialization
   const startupTimer = setTimeout(() => {
+    if (!updateCheckPref.get()) return;
     checkForUpdatesInternal().catch(err => console.error("[Updater] Startup background check error:", err));
   }, 15000);
   startupTimer.unref?.();
 
   // Periodically check for updates every 4 hours
   const updateInterval = setInterval(() => {
+    if (!updateCheckPref.get()) return;
     checkForUpdatesInternal().catch(err => console.error("[Updater] Periodic background check error:", err));
   }, 4 * 60 * 60 * 1000);
   updateInterval.unref?.();

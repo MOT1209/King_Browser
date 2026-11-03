@@ -247,6 +247,8 @@ export interface ElectronAPI {
   } | null>;
   getChangelogReleases: (forceRefresh?: boolean) => Promise<any[] | null>;
   checkForUpdates: () => Promise<{ success: boolean; version?: string; error?: string }>;
+  getAutoUpdateCheck: () => Promise<boolean>;
+  setAutoUpdateCheck: (enabled: boolean) => Promise<boolean>;
   getUpdateInfo: () => Promise<ElectronUpdateInfo | null>;
   downloadUpdate: (url?: string) => Promise<{ success: boolean; filePath?: string; version?: string; error?: string }>;
   installUpdate: () => Promise<{ success: boolean; error?: string }>;

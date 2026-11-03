@@ -9,7 +9,41 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
 }
 
-export const UpdateWidget = () => {
+const AutoCheckToggle = () => {
+  const { l } = useTranslation();
+  const [enabled, setEnabled] = React.useState(true);
+  React.useEffect(() => {
+    const api = (window as any).electronAPI;
+    api?.getAutoUpdateCheck?.().then((v: unknown) => setEnabled(v !== false)).catch(() => {});
+  }, []);
+  const toggle = async (next: boolean) => {
+    setEnabled(next);
+    const api = (window as any).electronAPI;
+    try {
+      const saved = await api?.setAutoUpdateCheck?.(next);
+      if (typeof saved === 'boolean') setEnabled(saved);
+    } catch { /* keep the local state; main keeps its last saved choice */ }
+  };
+  return (
+    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+      <input type="checkbox" checked={enabled} onChange={e => toggle(e.target.checked)} className="accent-blue-600" />
+      {l({
+        en: 'Check for updates automatically (contacts github.com at start and every 4 hours)',
+        ar: 'البحث عن التحديثات تلقائياً (يتصل بـ github.com عند البدء وكل 4 ساعات)',
+        de: 'Automatisch nach Updates suchen (kontaktiert github.com beim Start und alle 4 Stunden)'
+      })}
+    </label>
+  );
+};
+
+export const UpdateWidget = () => (
+  <div className="flex flex-col items-end gap-2">
+    <UpdateStatus />
+    <AutoCheckToggle />
+  </div>
+);
+
+const UpdateStatus = () => {
   const { l } = useTranslation();
   const [status, setStatus] = React.useState<'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'up-to-date' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = React.useState('');

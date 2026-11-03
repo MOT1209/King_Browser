@@ -14,10 +14,13 @@ Free code signing on Windows provided by [SignPath.io](https://about.signpath.io
 
 | Role | Who | Responsibility |
 | :--- | :--- | :--- |
+| Authors | [MOT1209](https://github.com/MOT1209) | Write the source code and build scripts. Some changes are written with AI coding agents (see below); the Author is the human who submits them. |
 | Committers and reviewers | [MOT1209](https://github.com/MOT1209) | May merge changes into `main`. Every change reaches `main` through a pull request that passes the required CI checks. |
 | Approvers | [MOT1209](https://github.com/MOT1209) | Approve each signing request in SignPath before a release is signed. |
 
 Some changes are written with the help of AI coding agents (the pull request and the commit trailer say so). These changes go through the same pull request, CI and approval steps as any other change, and a human with the role above decides whether they are merged and whether a build is signed.
+
+The project currently has one maintainer, who holds all three roles. There is no second person to review the maintainer's own changes; the safeguards are the required CI checks and the manual approval of every signing request. Changes from other contributors are reviewed by the maintainer before they are merged.
 
 Everyone with a role in this table uses multi-factor authentication on GitHub and on SignPath.
 
@@ -32,7 +35,7 @@ The rolling `nightly` pre-release is not signed.
 
 ## Privacy
 
-King Browser is a web browser, so it connects to the sites you open. Apart from that, it contacts only the services listed under [README: Network connections](README.md#network-connections), each at the moment the table describes. It ships no analytics or crash-reporting SDK. Some of those connections happen without an action from you: the update check (GitHub), ad-block filter list downloads, interface fonts and the new-tab wallpaper. Others run only when you use the feature or turn it on: search suggestions while typing, page translation, local model downloads, King Sync and your own custom MCP tools.
+King Browser is a web browser, so it connects to the sites you open. Apart from that, it contacts only the services listed under [README: Network connections](README.md#network-connections), each at the moment the table describes. It ships no analytics or crash-reporting SDK. Some of those connections happen without an action from you: the update check (GitHub), ad-block filter list downloads, interface fonts and the new-tab wallpaper. The automatic update check can be switched off in Settings (the "Check for updates automatically" option); the "Check for Updates" button still works when it is off. Whether the other automatic connections can be switched off, and whether the installer discloses them, has not been verified for this draft. Others run only when you use the feature or turn it on: search suggestions while typing, page translation, local model downloads, King Sync and your own custom MCP tools.
 
 ## Reporting a problem
 

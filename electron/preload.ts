@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSystemVersions: () => ipcRenderer.invoke('get-system-versions'),
   getChangelogReleases: (forceRefresh?: boolean) => ipcRenderer.invoke('get-changelog-releases', forceRefresh),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  getAutoUpdateCheck: () => ipcRenderer.invoke('get-auto-update-check'),
+  setAutoUpdateCheck: (enabled: boolean) => ipcRenderer.invoke('set-auto-update-check', enabled),
   getUpdateInfo: () => ipcRenderer.invoke('get-update-info'),
   downloadUpdate: (url?: string) => ipcRenderer.invoke('download-update', url),
   installUpdate: () => ipcRenderer.invoke('install-update'),
