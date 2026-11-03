@@ -1488,7 +1488,12 @@ export class BrowserMCPServer {
         : canonicalTool === 'browser_press_key' ? ':focus' : undefined;
       const context = await requestPolicyContext(this.mainWindow, selector);
       pageContext = context
-        ? { currentUrl: context.url, elementText: context.elementText }
+        ? {
+            currentUrl: context.url,
+            elementText: context.elementText,
+            // A selector that matched nothing describable is unreadable context, not an empty page.
+            ...(selector && !context.elementText?.trim() ? { contextUnavailable: true } : {})
+          }
         : { contextUnavailable: true };
     }
     // Pin the sign-in to the page the human is shown in the approval. The

@@ -568,8 +568,17 @@ async function run() {
     pageContext = { url: 'https://shop.example.com/checkout', elementText: 'Continue' };
     await clickNeedsApproval('checkout page');
 
+    pageContext = { url: 'https://example.com/form', elementText: 'Submit order submit king:form-submission' };
+    await clickNeedsApproval('POST form submission');
+
     pageContext = null;
     await clickNeedsApproval('unreadable context');
+
+    // Regression: the renderer used to return an empty description when the
+    // selector matched no element. Treating that as readable context allowed
+    // an unclassified consequential action to reach the page without approval.
+    pageContext = { url: 'https://example.com/blog', elementText: '' };
+    await clickNeedsApproval('unreadable target description');
 
     pageContext = { url: 'https://example.com/blog', elementText: 'Read more' };
     const dialogsBefore = dialogCalls;

@@ -86,7 +86,11 @@ async function run() {
 
   const call = async (id: string, tool: string, args: Record<string, unknown>) => {
     request(id, tool, args, Date.now() + 15000);
-    for (let i = 0; i < 100 && !responses.some(([rid]) => rid === id); i++) {
+    // The engine-approved action runs on the next turn. Under the full combined
+    // suite the event loop can be busy for seconds, so allow the whole action
+    // window instead of a 500ms budget that made this test flaky.
+    const waitUntil = Date.now() + 15000;
+    while (!responses.some(([rid]) => rid === id) && Date.now() < waitUntil) {
       await new Promise(resolve => setTimeout(resolve, 5));
     }
     const response = responses.find(([rid]) => rid === id);
@@ -99,7 +103,11 @@ async function run() {
   };
 
   const clicked = await call('click', 'browser_click', { selector: '#btn-3' });
-  assert.equal(clicked, 'Successfully clicked element.', 'an engine-approved MCP click must run without a second renderer approval');
+  assert.equal(
+    clicked,
+    'Successfully clicked element.',
+    `an engine-approved MCP click must run without a second renderer approval (got ${JSON.stringify(clicked)}, clicks=${clicks})`
+  );
   assert.equal(clicks, 1);
   console.log('[PASS] [Single-Approval] engine-approved MCP actions are not re-queued for renderer approval');
 
@@ -112,4 +120,9 @@ async function run() {
   console.log('[PASS] [Single-Approval] renderer describes the page and target element for the approval policy');
 }
 
-run().catch(error => { console.error('[FAIL] Single approval authority:', error); process.exitCode = 1; });
+// See execution_engine.test.ts: start only after every module in the combined
+// bundle has loaded, so a synchronous import of a later suite cannot consume
+// this action's execution window before the click reaches the page.
+setImmediate(() => {
+  run().catch(error => { console.error('[FAIL] Single approval authority:', error); process.exitCode = 1; });
+});

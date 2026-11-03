@@ -221,6 +221,8 @@ curl -s -H "Authorization: Bearer $MCP_TOKEN" http://127.0.0.1:3020/tools
 
 Tab-targeted navigation lives on the dedicated tab tools: page tools act on the active tab only. Of the 13 additional tools, `browser_request_approval` takes `action` plus optional `tool` and `details`; the other twelve take no parameters.
 
+URLs returned to an MCP client are redacted before they leave the renderer. In `browser_get_url`, `browser_list_tabs`, `browser_navigate`, `browser_new_tab`, `browser_duplicate_tab`, `browser_snapshot` and the `links` array of `browser_read_page`, the value of a credential-shaped query or fragment parameter (`token`, `access_token`, `key`, `signature`, `session`, `password`, and similar) becomes `[redacted]`; the parameter name and every other parameter stay as written. Console messages get the same treatment for absolute URLs. Page text is returned verbatim: reading the page is the feature. This protects the common case of a signed URL in a page or tab list, not page content that prints a secret in prose.
+
 ---
 
 ### Connecting External AI Agents
@@ -249,6 +251,8 @@ King Browser exposes its tools through a local MCP server (`127.0.0.1`, bearer-t
    - **Installed app**: `resources/mcp-bridge.cjs` in the install directory (Windows: `%LOCALAPPDATA%\Programs\King Browser\resources\mcp-bridge.cjs`; macOS: `/Applications/King Browser.app/Contents/Resources/mcp-bridge.cjs`). The **OpenCode** and **Copy** buttons fill this in for you.
    - **Source checkout**: `/ABSOLUTE_PATH_TO_KING_BROWSER/mcp-bridge.mjs` after `npm run build:electron`.
    In JSON on Windows, escape backslashes (`C:\\path\\to\\mcp-bridge.cjs`) or use forward slashes.
+
+By default the bridge connects to `http://127.0.0.1:<MCP_PORT>/sse`. If you set `MCP_SSE_URL`, it must be an `http(s)` URL with no embedded username or password, and a plain `http:` endpoint must be loopback (`127.0.0.1`, `localhost`, `::1`). The bridge refuses to send the bearer token in cleartext to any other host; use `https://` for a remote endpoint.
 
 #### OpenCode
 
@@ -421,6 +425,9 @@ Known limits: browser-driving tools (click, type, navigate) were exercised only 
 | Symptom | Likely cause |
 |---|---|
 | `Set a valid MCP_TOKEN…` | The variable is missing or not in the allowed format. Copy the token from King settings again. |
+| `MCP_SSE_URL refuses to send the bearer token in cleartext…` | The override uses `http:` for a non-loopback host. Use `https://` (the bridge never lowers the token to plaintext off-machine). |
+| `MCP_SSE_URL must use http or https…` | The override uses another scheme (for example `file:` or `ftp:`). Point it at the King `/sse` endpoint. |
+| `MCP_SSE_URL must not embed credentials…` | The override contains `user:password@`. Remove it and supply the token through `MCP_TOKEN`. |
 | `Cannot POST /sse` (HTTP 404) | A remote MCP entry points at the SSE URL. Remote (Streamable HTTP) clients must use `http://127.0.0.1:3020/mcp`; stdio clients use the bridge. |
 | HTTP 401 on `/mcp` | Missing or wrong `Authorization: Bearer <token>`; the token also changes when you rotate it in King settings. |
 | HTTP 403 on `/mcp` | The request carried a foreign `Origin` or a `Host` other than `localhost`, `127.0.0.1` or `[::1]` (DNS rebinding protection). Connect through the loopback address. |
