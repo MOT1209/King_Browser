@@ -70,7 +70,7 @@ King has no telemetry endpoint, but these built-in features contact third-party 
 
 | Feature | Service | When |
 | :--- | :--- | :--- |
-| Update check & release notes | `api.github.com`, `github.com` | Shortly after start and every 4 hours |
+| Update check & release notes | `api.github.com`, `github.com` | Shortly after start and every 4 hours; the automatic check can be turned off in Settings, the manual check button always works |
 | Search suggestions | `suggestqueries.google.com` (or the selected engine) | While typing in the omnibox |
 | New-tab wallpapers | `images.unsplash.com`, `api.unsplash.com`, `www.bing.com` | When an Unsplash wallpaper or the daily Bing wallpaper is shown |
 | Page translation | `translate.googleapis.com` | When the user translates a page |
