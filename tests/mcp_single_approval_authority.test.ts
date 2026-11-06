@@ -127,8 +127,8 @@ async function run() {
 }
 
 // See execution_engine.test.ts: start only after every module in the combined
-// bundle has loaded, so a synchronous import of a later suite cannot consume
-// this action's execution window before the click reaches the page.
+// bundle has loaded, so loading the later suites cannot consume this action's
+// execution window before the click reaches the page.
 setImmediate(() => {
   run().catch(error => { console.error('[FAIL] Single approval authority:', error); process.exitCode = 1; });
 });

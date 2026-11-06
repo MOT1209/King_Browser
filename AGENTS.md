@@ -65,6 +65,7 @@ Run before pushing: `npm run verify`. When you touched `electron/`, also `npm ru
 - `tests/runAll.ts` imports every Node test file (`node:assert`, one file per concern, plus `tests/e2e/tier1..5`). A file that is not imported there does not run.
 - `tests/electron/` is the one exception: Playwright specs that need the real Electron binary and a display, run by `npm run test:electron`.
 - Regression tests name the failure they prevent and must fail without the fix.
+- All Node suites share one event loop. `tests/event_loop_watchdog.ts` fails the run when one suite blocks it for more than 7.5 s; keep large synchronous work (huge buffers, sync crypto) out of suites.
 
 ### Workflow
 

@@ -114,12 +114,16 @@ console.log("[PASS] [Hacker-Defense-7] Standard fileURLToPath cross-platform res
   const REAL_ZIP: Buffer = await JSZip()
     .file("manifest.json", '{"name":"t","version":"1.0.0","manifest_version":3}')
     .generateAsync({ type: "nodebuffer" });
-  const buildCrx3 = (headerSize: number, magic = "Cr24", version = 3): Buffer => {
+  // headerSize is what the header declares; paddingBytes is what the file
+  // really holds. They differ for the out-of-range case: allocating the declared
+  // 4 GiB froze the event loop for about 16 s and needed that much memory, which
+  // broke the timing of every other suite running in the combined bundle.
+  const buildCrx3 = (headerSize: number, magic = "Cr24", version = 3, paddingBytes = headerSize): Buffer => {
     const buf = Buffer.concat([
       Buffer.from(magic, "ascii"),
       (() => { const v = Buffer.alloc(4); v.writeUInt32LE(version, 0); return v; })(),
       (() => { const h = Buffer.alloc(4); h.writeUInt32LE(headerSize >>> 0, 0); return h; })(),
-      Buffer.alloc(headerSize),
+      Buffer.alloc(paddingBytes),
       REAL_ZIP
     ]);
     return buf;
@@ -145,8 +149,8 @@ console.log("[PASS] [Hacker-Defense-7] Standard fileURLToPath cross-platform res
     "an unknown CRX version must be refused"
   );
   await assert.rejects(
-    () => loadSafeCrxZip(buildCrx3(0xffffff00), fs.mkdtempSync(path.join(os.tmpdir(), "adv-crx3-"))),
-    /offset|out of bounds|CRX|zip/i,
+    () => loadSafeCrxZip(buildCrx3(0xffffff00, "Cr24", 3, 16), fs.mkdtempSync(path.join(os.tmpdir(), "adv-crx3-"))),
+    /out of bounds/i,
     "an out-of-range CRX3 headerSize must be refused before any slicing"
   );
 

@@ -9,6 +9,7 @@ description: "Writing unit tests for King Browser with the existing node:assert 
 - `npm test` runs `pretest` (`scripts/ensure-build-artifacts.cjs` builds `dist/` and `dist-electron/` only if missing), then esbuild bundles `tests/runAll.ts` into `dist-test/runAll.cjs` and runs it in plain Node. No Electron binary is needed.
 - Test files use `node:assert/strict` at module top level and print `[PASS]` lines; they run in import order inside ONE process. A file not imported in `tests/runAll.ts` never runs.
 - React/DOM tests create jsdom globals themselves (see `tests/agent_control_panel.test.ts`, `tests/jsdom_suite_lock.ts`); suites that swap globals are ordered deliberately at the end of `runAll.ts`.
+- Suites share one event loop, so synchronous work in one delays every other suite's timers. `tests/event_loop_watchdog.ts` (first import in `runAll.ts`) fails the run when the loop is blocked for more than 7.5 s after loading. To test a size limit, declare the size in the header instead of allocating it (a 4 GiB `Buffer.alloc` once froze the run for 16 s).
 - No Vitest/Jest: a second runner was evaluated and rejected (`docs/engineering/agent-tooling.md`).
 
 ## Writing a test
