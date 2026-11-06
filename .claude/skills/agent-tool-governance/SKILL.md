@@ -20,6 +20,7 @@ The approval gate cannot be weakened. No mode disables approval for sensitive ac
 - Changes may only make the gate stricter unless the owner explicitly asks otherwise.
 - An action that was rejected must not be retried, rephrased or split by the agent code path.
 - Approval summaries show what will happen in user terms and never include secrets.
+- Page context for click, type, select and press_key comes from `requestPolicyContext` (`electron/main/mcpBridge.ts`). An empty element description, or press_key with nothing focused, is `contextUnavailable` and needs approval. A selector the agent gave that matches nothing (`found: false`) is refused in `mcpServer.ts` before the dialog: nothing runs, so no approval is skipped. Tests: `mcp_engine_wiring`, `mcp_single_approval_authority`.
 
 ## Verify
 `npm test` (`policy_engine`, `approval_mode`, `site_rules`, `injection_detector`, `injection_corpus`, `execution_engine`, `engine_ipc`, `engine_takeover`, `mcp_single_approval_authority`, `approval_details`, `approval_attention`, `activity_log`).

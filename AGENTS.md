@@ -219,7 +219,8 @@ The policy engine (`electron/main/policyEngine.ts`) classifies each call as `saf
 - **strict**: every action needs approval except `king_browser_info`, `browser_status`, `browser_list_tabs`, `browser_get_url`, `browser_wait`.
 - There is no looser mode. The setting lives in the main process, so a synced device cannot change it.
 - Site rules can force "ask" or "block" for a host. Blocked hosts are not reachable by the agent.
-- Unknown tools, an unreadable page context or an ambiguous destination are treated as `sensitive`.
+- Unknown tools, an unreadable page context or an ambiguous destination are treated as `sensitive`. A target with no readable description, and `browser_press_key` with nothing focused (the key lands on the page, where site shortcuts can delete or send), count as unreadable context.
+- A selector or ref that matches no element is refused with `Element not found` before any approval, and nothing runs. Snapshot again instead of retrying.
 
 ### Untrusted content
 
