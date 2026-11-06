@@ -422,11 +422,11 @@ async function run() {
   console.log('[PASS] Execution Engine suite complete');
 }
 
-// esbuild evaluates every suite's module body before the run loop turns. Some
-// later suites transpile large sources synchronously, which can outlast this
-// suite's action deadlines and make timing-sensitive assertions fail only in
-// the combined run. Start after the whole bundle has loaded; assertions and
-// timeouts are unchanged.
+// esbuild evaluates every suite's module body before the run loop turns, which
+// takes several seconds of synchronous work in the combined run and can eat
+// into this suite's action deadlines. Start after the whole bundle has loaded;
+// assertions and timeouts are unchanged. Blocks after loading are bounded by
+// tests/event_loop_watchdog.ts.
 setImmediate(() => {
   run().then(
     () => { clearInterval(keepAlive); },

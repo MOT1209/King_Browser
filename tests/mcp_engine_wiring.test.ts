@@ -28,7 +28,7 @@ async function run() {
   let releaseRenderer: (() => void) | null = null;
   let rejectRenderer: ((err: Error) => void) | null = null;
   // What the renderer reports for the active page; null = context unreadable.
-  let pageContext: { url: string; elementText: string } | null = { url: 'https://example.com/', elementText: '' };
+  let pageContext: { url: string; elementText: string; found?: boolean } | null = { url: 'https://example.com/', elementText: '' };
   let rendererPageText: string | null = null;
   let snapshotText: string | null = null;
   const contextRequests: Array<string | undefined> = [];
@@ -579,6 +579,30 @@ async function run() {
     // an unclassified consequential action to reach the page without approval.
     pageContext = { url: 'https://example.com/blog', elementText: '' };
     await clickNeedsApproval('unreadable target description');
+
+    // A key with nothing focused lands on the page itself, where site
+    // shortcuts can delete or send; it is gated like an unreadable target.
+    {
+      pageContext = { url: 'https://mail.example.com/', elementText: '', found: false };
+      dialogResponse = 1;
+      const dialogsBefore = dialogCalls;
+      const forwardedBefore = forwarded.length;
+      await assert.rejects(server.executeTool('browser_press_key', { key: '#' }), /./, 'unfocused key press must need approval');
+      assert.equal(contextRequests[contextRequests.length - 1], ':focus', 'press_key is described by the focused element');
+      assert.equal(dialogCalls, dialogsBefore + 1, 'unfocused key press: approval dialog shown');
+      assert.equal(forwarded.length, forwardedBefore, 'unfocused key press: rejected key never reaches the page');
+    }
+
+    // Regression: a selector that matched no element asked the human to approve
+    // a click that could only fail. It now fails before the dialog; nothing runs.
+    {
+      pageContext = { url: 'https://example.com/blog', elementText: '', found: false };
+      const dialogsBefore = dialogCalls;
+      const forwardedBefore = forwarded.length;
+      await assert.rejects(server.executeTool('browser_click', { selector: '#missing' }), /Element not found: #missing/, 'missing element is reported');
+      assert.equal(dialogCalls, dialogsBefore, 'missing element: no approval dialog for an action that cannot run');
+      assert.equal(forwarded.length, forwardedBefore, 'missing element: nothing reaches the page');
+    }
 
     pageContext = { url: 'https://example.com/blog', elementText: 'Read more' };
     const dialogsBefore = dialogCalls;

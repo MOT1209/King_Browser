@@ -169,6 +169,8 @@ export interface PolicyPageContext {
   url: string;
   /** Present when a selector was given and the element could be described. */
   elementText?: string;
+  /** False when a selector was given and it matched no element on the page. */
+  found?: false;
 }
 
 const MAX_POLICY_ELEMENT_TEXT = 300;
@@ -183,9 +185,10 @@ export async function requestPolicyContext(win: BrowserWindow | null, selector?:
   try {
     const reply = await requestRendererMcpAction(win, MCP_POLICY_CONTEXT_ACTION, selector ? { selector } : {});
     if (!reply || typeof reply !== 'object') return null;
-    const { url, elementText } = reply as { url?: unknown; elementText?: unknown };
+    const { url, elementText, found } = reply as { url?: unknown; elementText?: unknown; found?: unknown };
     if (typeof url !== 'string' || !url) return null;
     if (!selector) return { url };
+    if (found === false) return { url, elementText: '', found: false };
     if (typeof elementText !== 'string') return null;
     return { url, elementText: elementText.slice(0, MAX_POLICY_ELEMENT_TEXT) };
   } catch (_) {

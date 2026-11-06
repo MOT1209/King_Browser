@@ -42,6 +42,8 @@ async function run() {
       window: { location: { href: url }, innerWidth: 800, innerHeight: 600 },
       document: {
         querySelector: (selector: string) => selector === '#btn-3' ? button : null,
+        // No shadow roots or frames: the deep query's fallback finds nothing.
+        querySelectorAll: () => [],
         elementFromPoint: () => button
       }
     })
@@ -117,12 +119,16 @@ async function run() {
   assert.equal(clicks, 1, 'describing an element never clicks it');
   const noSelector = await call('ctx-url', mcpActionTiming.MCP_POLICY_CONTEXT_ACTION, {});
   assert.equal(JSON.stringify(noSelector), JSON.stringify({ url }), 'without a selector only the URL is reported');
+  // A selector that matches nothing is reported as such, not as an element
+  // with an empty description, so main can refuse it without an approval.
+  const missing = await call('ctx-missing', mcpActionTiming.MCP_POLICY_CONTEXT_ACTION, { selector: '#gone' });
+  assert.equal(JSON.stringify(missing), JSON.stringify({ url, found: false }), `a missing element is reported as not found (got ${JSON.stringify(missing)})`);
   console.log('[PASS] [Single-Approval] renderer describes the page and target element for the approval policy');
 }
 
 // See execution_engine.test.ts: start only after every module in the combined
-// bundle has loaded, so a synchronous import of a later suite cannot consume
-// this action's execution window before the click reaches the page.
+// bundle has loaded, so loading the later suites cannot consume this action's
+// execution window before the click reaches the page.
 setImmediate(() => {
   run().catch(error => { console.error('[FAIL] Single approval authority:', error); process.exitCode = 1; });
 });

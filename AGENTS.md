@@ -65,6 +65,7 @@ Run before pushing: `npm run verify`. When you touched `electron/`, also `npm ru
 - `tests/runAll.ts` imports every Node test file (`node:assert`, one file per concern, plus `tests/e2e/tier1..5`). A file that is not imported there does not run.
 - `tests/electron/` is the one exception: Playwright specs that need the real Electron binary and a display, run by `npm run test:electron`.
 - Regression tests name the failure they prevent and must fail without the fix.
+- All Node suites share one event loop. `tests/event_loop_watchdog.ts` fails the run when one suite blocks it for more than 7.5 s; keep large synchronous work (huge buffers, sync crypto) out of suites.
 
 ### Workflow
 
@@ -219,7 +220,8 @@ The policy engine (`electron/main/policyEngine.ts`) classifies each call as `saf
 - **strict**: every action needs approval except `king_browser_info`, `browser_status`, `browser_list_tabs`, `browser_get_url`, `browser_wait`.
 - There is no looser mode. The setting lives in the main process, so a synced device cannot change it.
 - Site rules can force "ask" or "block" for a host. Blocked hosts are not reachable by the agent.
-- Unknown tools, an unreadable page context or an ambiguous destination are treated as `sensitive`.
+- Unknown tools, an unreadable page context or an ambiguous destination are treated as `sensitive`. A target with no readable description, and `browser_press_key` with nothing focused (the key lands on the page, where site shortcuts can delete or send), count as unreadable context.
+- A selector or ref that matches no element is refused with `Element not found` before any approval, and nothing runs. Snapshot again instead of retrying.
 
 ### Untrusted content
 

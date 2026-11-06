@@ -8,6 +8,8 @@ process.on('uncaughtException', (err) => {
 });
 
 console.log('Executing all test suites...');
+// First on purpose: it fails the run when one suite blocks the shared event loop.
+import './event_loop_watchdog';
 import './e2e/tier1_feature_coverage.test';
 import './e2e/tier2_boundary_corner.test';
 import './e2e/tier3_cross_feature.test';

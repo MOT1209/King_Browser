@@ -595,7 +595,7 @@ export function useBrowserAgentBridge({
           const elementText = await activeWebview.executeJavaScript(`
             (() => {
               const el = __kingQuery(${JSON.stringify(safeArgs.selector)});
-              if (!el) return '';
+              if (!el) return null;
               const type = (el.getAttribute('type') || '').toLowerCase();
               const isButton = el.tagName === 'BUTTON' || ['submit', 'button', 'reset'].includes(type);
               const labels = el.labels ? Array.from(el.labels).map(label => label.innerText) : [];
@@ -615,6 +615,8 @@ export function useBrowserAgentBridge({
               return parts.filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().slice(0, 300);
             })()
           `);
+          // null: the selector matched nothing, which main reports without asking for approval.
+          if (elementText === null) return { url, found: false };
           if (typeof elementText !== 'string') throw new Error('Element could not be described');
           return { url, elementText };
         }

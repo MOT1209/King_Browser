@@ -1487,6 +1487,13 @@ export class BrowserMCPServer {
         ? args.selector
         : canonicalTool === 'browser_press_key' ? ':focus' : undefined;
       const context = await requestPolicyContext(this.mainWindow, selector);
+      // The agent named an element that is not on the page: the action could
+      // only fail, so report it instead of asking the human to approve it.
+      // Nothing runs. A key with nothing focused (no selector given) still
+      // lands on the page, so it falls through to the fail-closed path below.
+      if (context?.found === false && selector === args.selector) {
+        throw new Error(`Element not found: ${selector}. Nothing was done. Refs are cleared by navigation and by every new snapshot; take a new browser_snapshot or check the selector.`);
+      }
       pageContext = context
         ? {
             currentUrl: context.url,
