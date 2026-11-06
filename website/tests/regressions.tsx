@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client'
 import App, { initialLanguage, platforms, VERSION } from '../src/App'
 import { copy, languages } from '../src/content'
 import pkg from '../../package.json'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 /** Expand electron-builder's ${version}/${arch}/${ext} for the arch and extension a download link names. */
@@ -17,16 +17,21 @@ function expectedNames(template: string, ext: string) {
 function assertDownloadNamesMatchBuildConfig() {
   const b = pkg.build as any
   const templates: Record<string, string[]> = {
-    exe: [b.nsis.artifactName, b.win.artifactName],
+    exe: [b.nsis.artifactName, b.win.artifactName, b.portable?.artifactName].filter(Boolean),
     dmg: [b.mac.artifactName],
     AppImage: [b.linux.artifactName],
     deb: [b.linux.artifactName],
   }
+  // Version-free copies the release workflow publishes next to the versioned files
+  // (cp "$setup" King-Browser-Setup-x64.exe): a link may name one of those instead.
+  const releaseWorkflow = readFileSync(join(process.cwd(), '..', '.github/workflows/release.yml'), 'utf8')
+  const stableCopies = [...releaseWorkflow.matchAll(/cp "\$\w+" (King-Browser-[\w.-]+)/g)].map(m => m[1])
+  assert.ok(stableCopies.length > 0, 'release workflow still publishes version-free copies')
   assert.equal(VERSION, pkg.version, 'Website version comes from package.json')
   for (const platform of platforms) {
     for (const choice of platform.choices) {
       const ext = choice.type.replace('.', '')
-      const ok = templates[ext].some(t => expectedNames(t, ext).includes(choice.file))
+      const ok = stableCopies.includes(choice.file) || templates[ext].some(t => expectedNames(t, ext).includes(choice.file))
       assert.ok(ok, `Download file ${choice.file} matches no artifactName in package.json`)
     }
   }
@@ -108,6 +113,7 @@ async function run() {
   assert.ok(document.querySelector('.unsigned-note'), 'Unsigned-build install help must be visible')
   const downloadLinks = [...document.querySelectorAll('.download-file')]
   assert.equal(downloadLinks.length, 2, 'Windows platform must offer both Setup and Portable choices')
+  assert.ok(downloadLinks[1].getAttribute('href')?.endsWith('/King-Browser-Portable-x64.exe'), 'the Portable link points at the file named Portable, never the old versioned name')
   await click(document.getElementById('platform-tab-1'))
   assert.equal(document.getElementById('platform-tab-1')?.textContent, 'macOS')
   await click(document.getElementById('platform-tab-2'))

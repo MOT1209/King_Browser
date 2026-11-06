@@ -168,7 +168,7 @@ jobs:
         working-directory: release-files
         run: |
           setup=$(ls King-Browser-Setup-*-x64.exe 2>/dev/null | head -n 1 || true)
-          portable=$(ls King-Browser-*-x64.exe 2>/dev/null | grep -v -- '-Setup-' | head -n 1 || true)
+          portable=$(ls King-Browser-Portable-*-x64.exe 2>/dev/null | head -n 1 || true)
           if [ -n "$setup" ]; then cp "$setup" King-Browser-Setup-x64.exe; fi
           if [ -n "$portable" ]; then cp "$portable" King-Browser-Portable-x64.exe; fi
           ls -la

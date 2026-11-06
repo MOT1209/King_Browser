@@ -561,7 +561,7 @@ Project website: <https://king-browser.vercel.app> (deployed from `website/` on 
 
 Installers are available from [GitHub Releases](https://github.com/MOT1209/King_Browser/releases):
 - **macOS**: `King-Browser-arm64.dmg` (Apple Silicon) or `King-Browser-x64.dmg` (Intel)
-- **Windows**: `King-Browser-Setup-<version>-x64.exe` (64-bit NSIS Installer). `King-Browser-<version>-x64.exe` without `Setup` is the portable build: it runs without installing and creates no shortcuts.
+- **Windows**: `King-Browser-Setup-<version>-x64.exe` (64-bit NSIS Installer). `King-Browser-Portable-<version>-x64.exe` is the portable build: it runs without installing and creates no shortcuts (releases up to v0.0.11 named it `King-Browser-<version>-x64.exe`).
 - **Linux**: `King-Browser-x86_64.AppImage` or `King-Browser-amd64.deb`
 
 **After installing on Windows:** the Setup installer installs for the current user into `%LOCALAPPDATA%\Programs\King Browser` and creates Desktop and Start menu shortcuts named *King Browser*. Launching it again while it is still running brings back its window, or opens a new one if it has none. If a shortcut or taskbar entry shows the Electron atom instead of the crown, unpin that entry, start King Browser from the Start menu and pin it again; if the atom remains, run `ie4uinit.exe -show` to refresh the Windows icon cache. Builds before this fix shared their Windows app ID with development runs (`npm run dev`), which can leave the atom icon associated with the installed app.

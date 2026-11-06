@@ -49,7 +49,7 @@ function prune(files: string[], remote: string[]): { deleted: string[]; status: 
   return { deleted: fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).sort() : [], status };
 }
 
-const current = ['King-Browser-0.0.10-x64.exe', 'King-Browser-Setup-x64.exe', 'latest.yml', 'SHA256SUMS.txt'];
+const current = ['King-Browser-Portable-0.0.12-x64.exe', 'King-Browser-Setup-x64.exe', 'latest.yml', 'SHA256SUMS.txt'];
 const stale = ['King-Browser-0.0.9-x64.exe', 'King-Browser-Setup-0.0.9-x64.exe', 'King-Browser-0.0.8-x64.zip'];
 const result = prune(current, [...current, ...stale]);
 assert.equal(result.status, 0);

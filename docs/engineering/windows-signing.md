@@ -17,7 +17,7 @@ Facts below marked "verified" were read from this repository. SignPath's own eli
 | CI | typecheck, lint, tests on Linux, Windows and macOS, Electron smoke, production dependency audit, CodeQL; actions pinned to commit SHAs |
 | Build | `.github/workflows/release.yml`, Windows job `pack:win` on a GitHub-hosted runner |
 | Privacy | No analytics or crash-reporting SDK; outbound connections listed in README "Network connections" |
-| Artifacts to sign | NSIS installer and portable `.exe` (`King-Browser-<version>-x64.exe`); the `.zip` is not an executable signature target |
+| Artifacts to sign | NSIS installer and portable `.exe` (`King-Browser-Portable-<version>-x64.exe`); the `.zip` is not an executable signature target |
 
 ## Points to weigh before applying
 
