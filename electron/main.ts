@@ -148,7 +148,8 @@ export { isLocalOrIntranetHost } from './main/hostPolicy';
 import { enforceModelCacheBudget, MAX_MODEL_CACHE_FILE_BYTES } from './main/modelCacheQuota.js';
 import { isAgentNavigationHostPublic } from './main/agentNavigationGuard.js';
 import { registerAgentCdpHandlers, watchPageDialogs } from './main/agentCdp.js';
-import { shouldReloadAfterRendererGone, markQuitting } from './main/rendererRecovery.js';
+import { shouldReloadAfterRendererGone, markQuitting, isQuitting } from './main/rendererRecovery.js';
+import { decideSecondInstance } from './main/secondInstance.js';
 import { assessUpdateIntegrity } from './main/updateIntegrity.js';
 
 /**
@@ -278,7 +279,10 @@ if (process.platform === 'darwin') {
 }
 
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.kingbrowser.app');
+  // The packaged ID equals build.appId, which the installer's shortcuts carry.
+  // Development runs are electron.exe (the Electron atom icon); sharing the ID
+  // made Windows show that icon for the installed app's taskbar entry.
+  app.setAppUserModelId(app.isPackaged ? 'com.kingbrowser.app' : 'com.kingbrowser.app.dev');
 }
 
 if (process.platform === 'linux') {
@@ -1326,17 +1330,30 @@ app.on('open-url', (event, url) => {
   }
 });
 
-// Security: When a second instance is launched, focus the existing window and safely route any valid URL
+// Security: When a second instance is launched, show a window and safely route any valid URL.
+// The process can outlive its window, so a launch that finds none opens a new one
+// instead of being swallowed (see electron/main/secondInstance.ts).
 app.on('second-instance', (_event, commandLine) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
-
-    const possibleUrl = commandLine.find(arg => isValidDeepLinkUrl(arg));
+  const possibleUrl = commandLine.find(arg => isValidDeepLinkUrl(arg))?.trim();
+  const action = decideSecondInstance({
+    hasLiveWindow: Boolean(mainWindow && !mainWindow.isDestroyed()),
+    isMinimized: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isMinimized()),
+    appReady: app.isReady(),
+    quitting: isQuitting()
+  });
+  if (action === 'ignore') return;
+  if (action === 'create') {
+    createWindow();
+    // Best effort: the new renderer can only take the URL once it has loaded.
     if (possibleUrl) {
-      sendToMainWindow('new-tab', possibleUrl.trim());
+      mainWindow?.webContents.once('did-finish-load', () => sendToMainWindow('new-tab', possibleUrl));
     }
+    return;
   }
+  if (!mainWindow) return;
+  if (action === 'restore-focus') mainWindow.restore();
+  mainWindow.focus();
+  if (possibleUrl) sendToMainWindow('new-tab', possibleUrl);
 });
 
 function cleanStaleUpdateArtifacts(): void {

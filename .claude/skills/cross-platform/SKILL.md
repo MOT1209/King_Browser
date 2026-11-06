@@ -12,6 +12,7 @@ description: "Windows, macOS and Linux differences in King Browser: paths and ca
 - Window chrome: frameless title bar, `-webkit-app-region` drag areas, `src/hooks/useTitlebarInsets.ts` reserves space for native window controls (Window Controls Overlay geometry differs per OS).
 - Shortcuts: `ControlOrMeta`; macOS menu roles differ (`electron/main/shortcutAccelerators.ts`, `tests/menu_accelerators.test.ts`).
 - Updates: auto-update only on Windows installer builds; manual on Linux, macOS and portable (`isManualUpdateOnly` in `main.ts`).
+- Windows app identity: `app.setAppUserModelId` uses `build.appId` (`com.kingbrowser.app`) only when packaged and `com.kingbrowser.app.dev` in development, so `electron.exe` (atom icon) never claims the installed app's taskbar identity. Second launches go through `electron/main/secondInstance.ts`: a process left without a window opens a new one instead of swallowing the launch (`tests/second_instance.test.ts`).
 - Packaging: `package.json` `build` (NSIS/portable/zip on Windows, dmg/zip x64+arm64 on macOS with hardened runtime, AppImage/deb on Linux), fuses applied after pack.
 
 ## Workflow
