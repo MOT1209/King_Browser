@@ -174,6 +174,7 @@ import './agent_instructions_consistency.test';
 import './setup_agent_skills.test';
 import './release_nightly_cleanup.test';
 import './second_instance.test';
+import './windows_artifact_names.test';
 
 // Very last on purpose. This behaviour-level auth suite (register, login,
 // logout, restore and cross-account isolation driven through the real service

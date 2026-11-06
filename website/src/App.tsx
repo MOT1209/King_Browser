@@ -9,13 +9,14 @@ const REPO = 'https://github.com/MOT1209/King_Browser'
 /**
  * Single source of truth: Windows installers carry the package.json version in their file names.
  * Releases also publish version-free copies (King-Browser-Setup-x64.exe, King-Browser-Portable-x64.exe;
- * see the release workflow); once the latest release has them, link those instead.
+ * see the release workflow); once the latest release has them, link those instead. The portable link
+ * already uses its version-free copy: its versioned name changed to King-Browser-Portable-<version>-x64.exe.
  */
 export const VERSION = pkg.version
 const RELEASE = `${REPO}/releases/latest/download/`
 // Windows first and selected by default: it is the platform released first.
 export const platforms = [
-  { name: 'Windows', icon: Monitor, choices: [{ name: 'Setup · x64', file: `King-Browser-Setup-${VERSION}-x64.exe`, type: '.exe' }, { name: 'Portable · x64', file: `King-Browser-${VERSION}-x64.exe`, type: '.exe' }] },
+  { name: 'Windows', icon: Monitor, choices: [{ name: 'Setup · x64', file: `King-Browser-Setup-${VERSION}-x64.exe`, type: '.exe' }, { name: 'Portable · x64', file: 'King-Browser-Portable-x64.exe', type: '.exe' }] },
   { name: 'macOS', icon: Command, choices: [{ name: 'Apple Silicon', file: 'King-Browser-arm64.dmg', type: '.dmg' }, { name: 'Intel', file: 'King-Browser-x64.dmg', type: '.dmg' }] },
   { name: 'Linux', icon: Terminal, choices: [{ name: 'AppImage · x64', file: 'King-Browser-x86_64.AppImage', type: '.AppImage' }, { name: 'Debian / Ubuntu', file: 'King-Browser-amd64.deb', type: '.deb' }] },
 ]
