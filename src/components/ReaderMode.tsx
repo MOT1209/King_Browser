@@ -1160,7 +1160,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] opacity-70 font-medium truncate max-w-[140px]">
-                      {selectedVoiceName || (isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda' : 'Samantha') : l({ en: 'Natural Voice', ar: 'صوت طبيعي', de: 'Natürliche Stimme' }))}
+                      {selectedVoiceName || (isMac ? getMacDefaultVoice(effectiveLanguage) : l({ en: 'Natural Voice', ar: 'صوت طبيعي', de: 'Natürliche Stimme' }))}
                     </span>
                     <button
                       onClick={changeSpeechRate}

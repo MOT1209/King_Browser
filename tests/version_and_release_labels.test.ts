@@ -62,5 +62,10 @@ console.log('\n--- Version and Release Labels Test Suite ---');
   } finally {
     setLanguage(previous);
   }
+  // The player row picked its own default (Samantha unless Turkish) instead of
+  // asking getMacDefaultVoice, so it disagreed with the voice that spoke.
+  const reader = fs.readFileSync(path.join(__dirname, '..', 'src', 'components', 'ReaderMode.tsx'), 'utf8');
+  assert.ok(!/startsWith\('tr'\)\s*\?\s*'Yelda'/.test(reader),
+    'ReaderMode.tsx picks no default macOS voice by hand; it asks getMacDefaultVoice');
   console.log('[PASS] Reader voice label — names the voice actually used, translated suffix');
 }
