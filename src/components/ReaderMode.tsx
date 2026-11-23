@@ -551,6 +551,12 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
   const readerSessionIdRef = useRef(0);
 
   const effectiveLanguage = selectedLanguage === 'auto' ? detectedLang : selectedLanguage;
+  // speakSentence chains itself from timers and TTS callbacks, so it runs with
+  // the closure of the render that started playback. Language and voice are
+  // read from this ref instead, so a change made mid-read applies from the next
+  // sentence on (the label already shows the new voice).
+  const speechVoiceRef = useRef({ language: effectiveLanguage, voiceName: selectedVoiceName });
+  speechVoiceRef.current = { language: effectiveLanguage, voiceName: selectedVoiceName };
 
   const speakSentence = async (index: number, rate: number = speechRate, targetSentences: string[] = sentences, sessionId: number = readerSessionIdRef.current) => {
     if (!isPlayingRef.current || sessionId !== readerSessionIdRef.current || index >= targetSentences.length) {
@@ -565,12 +571,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
     const currentSentence = targetSentences[index];
     setCurrentSentenceIndex(index);
+    const { language: speechLanguage, voiceName: speechVoiceName } = speechVoiceRef.current;
 
     // Check if macOS native TTS is available
     if (typeof window !== 'undefined' && window.electronAPI?.nativeTtsSpeak) {
-      const voice = selectedVoiceName || getMacDefaultVoice(effectiveLanguage);
+      const voice = speechVoiceName || getMacDefaultVoice(speechLanguage);
       try {
-        const res = await window.electronAPI.nativeTtsSpeak(currentSentence, voice, rate, effectiveLanguage);
+        const res = await window.electronAPI.nativeTtsSpeak(currentSentence, voice, rate, speechLanguage);
         if (!isPlayingRef.current || sessionId !== readerSessionIdRef.current) return;
         if (res && res.success) {
           const next = index + 1;
@@ -598,17 +605,17 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(currentSentence);
-      utterance.lang = effectiveLanguage;
+      utterance.lang = speechLanguage;
       utterance.rate = rate;
       utterance.pitch = 1.0;
 
       const voices = window.speechSynthesis.getVoices();
       let chosenVoice: SpeechSynthesisVoice | null = null;
-      if (selectedVoiceName) {
-        chosenVoice = voices.find(v => v.name.includes(selectedVoiceName) || v.voiceURI === selectedVoiceName) || null;
+      if (speechVoiceName) {
+        chosenVoice = voices.find(v => v.name.includes(speechVoiceName) || v.voiceURI === speechVoiceName) || null;
       }
       if (!chosenVoice) {
-        chosenVoice = getBestVoice(voices, effectiveLanguage);
+        chosenVoice = getBestVoice(voices, speechLanguage);
       }
       if (chosenVoice) utterance.voice = chosenVoice;
 
@@ -1155,7 +1162,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                       {isPlaying ? l({ en: 'Reading Aloud', ar: 'جارٍ القراءة', de: 'Wird vorgelesen' }) : l({ en: 'Paused', ar: 'متوقف مؤقتاً', de: 'Pausiert' })}
                     </span>
                     <span className="opacity-60 text-[11px]">
-                      ({currentSentenceIndex + 1} / {sentences.length} sentences)
+                      ({l({ en: '{current} / {total} sentences', ar: '{current} / {total} جمل', de: '{current} / {total} Sätze' }, { current: currentSentenceIndex + 1, total: sentences.length })})
                     </span>
                   </div>
                   <div className="flex items-center gap-2">

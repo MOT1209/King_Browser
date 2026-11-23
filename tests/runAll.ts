@@ -153,6 +153,7 @@ import './runtime_error_fixes.test';
 import './website_login_fixes.test';
 // Renders the §10 control panel in jsdom with its own window/document globals.
 import './agent_control_panel.test';
+import './reader_voice_follows_language.test';
 // Static guards: every IPC handler under electron/, the shipped CSP, agent skills.
 import './ipc_sender_guard_coverage.test';
 import './csp_parity.test';
