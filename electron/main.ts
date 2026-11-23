@@ -151,6 +151,7 @@ import { registerAgentCdpHandlers, watchPageDialogs } from './main/agentCdp.js';
 import { shouldReloadAfterRendererGone, markQuitting, isQuitting } from './main/rendererRecovery.js';
 import { decideSecondInstance } from './main/secondInstance.js';
 import { assessUpdateIntegrity } from './main/updateIntegrity.js';
+import { releaseNameText, releaseNotesText } from './main/updateInfoText.js';
 
 /**
  * Validates URLs for context-menu media saving and address copying.
@@ -2323,15 +2324,15 @@ app.whenReady().then(async () => {
       version: info.version || '',
       downloadUrl: '',
       assetName: '',
-      releaseNotes: (info as any)?.releaseNotes || '',
-      releaseName: (info as any)?.releaseName || `v${info.version}`
+      releaseNotes: releaseNotesText(info?.releaseNotes),
+      releaseName: releaseNameText(info)
     };
     sendToMainWindow('update-available', {
       version: info.version,
       releaseDate: info.releaseDate,
       isManual: false,
-      releaseNotes: (info as any)?.releaseNotes || '',
-      releaseName: (info as any)?.releaseName || `v${info.version}`
+      releaseNotes: releaseNotesText(info?.releaseNotes),
+      releaseName: releaseNameText(info)
     });
   });
 
@@ -2482,8 +2483,8 @@ app.whenReady().then(async () => {
 
     // Attempt official autoUpdater download engine first
     try {
-      if (autoUpdater && typeof (autoUpdater as any).downloadUpdate === 'function') {
-        const dlPromise = (autoUpdater as any).downloadUpdate();
+      if (autoUpdater && typeof autoUpdater.downloadUpdate === 'function') {
+        const dlPromise = autoUpdater.downloadUpdate();
         if (dlPromise && typeof dlPromise.then === 'function') {
           await dlPromise;
           return {

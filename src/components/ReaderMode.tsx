@@ -6,7 +6,7 @@ import { Readability } from '@mozilla/readability';
 import { detectLanguage, getBestVoice, getMacDefaultVoice, splitIntoSentences, NativeVoiceInfo, tts } from '../services/tts';
 import { safeBase64 as safeBase64Util } from '../utils/securityUtils';
 import { generateId } from '../utils/idGenerator';
-import { getLocale } from '../services/i18n';
+import { getLocale, l as localize } from '../services/i18n';
 import { useTitlebarInsets } from '../hooks/useTitlebarInsets';
 import { useTranslation } from '../services/i18n';
 
@@ -24,6 +24,18 @@ export interface HighlightData {
 }
 
 export const READER_HIGHLIGHT_INJECT_DELAY_MS = 100;
+
+/**
+ * Label for the default macOS voice. It names the voice the reader actually
+ * speaks with (getMacDefaultVoice, the same call the speak path uses), so a
+ * German article shows Anna rather than Samantha, and the suffix is translated.
+ */
+export function macDefaultVoiceLabel(language: string): string {
+  return localize(
+    { en: '{name} (Apple natural voice)', ar: '{name} (صوت Apple الطبيعي)', de: '{name} (natürliche Apple-Stimme)' },
+    { name: getMacDefaultVoice(language) }
+  );
+}
 
 export function highlightsStorageKey(url: string): string {
   return 'reader_highlights_' + safeBase64(url);
@@ -1036,7 +1048,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                           }`}
                         >
                           <option value="">
-                            {isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda (Apple Natural)' : 'Samantha (Apple Natural)') : l({ en: 'Best Natural Voice', ar: 'أفضل صوت طبيعي', de: 'Beste natürliche Stimme' })}
+                            {isMac ? macDefaultVoiceLabel(effectiveLanguage) : l({ en: 'Best Natural Voice', ar: 'أفضل صوت طبيعي', de: 'Beste natürliche Stimme' })}
                           </option>
 
                           {activeNativeVoices.length > 0 && (
@@ -1099,7 +1111,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   </span>
                   <span className="flex items-center gap-1 text-cyan-400 font-medium">
                     <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Natural Voice' : 'macOS Samantha Natural Voice') : l({ en: 'Natural Human Voice', ar: 'صوت بشري طبيعي', de: 'Natürliche Stimme' })}
+                    {isMac ? macDefaultVoiceLabel(effectiveLanguage) : l({ en: 'Natural Human Voice', ar: 'صوت بشري طبيعي', de: 'Natürliche Stimme' })}
                   </span>
                 </div>
 
@@ -1148,7 +1160,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] opacity-70 font-medium truncate max-w-[140px]">
-                      {selectedVoiceName || (isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda' : 'Samantha') : l({ en: 'Natural Voice', ar: 'صوت طبيعي', de: 'Natürliche Stimme' }))}
+                      {selectedVoiceName || (isMac ? getMacDefaultVoice(effectiveLanguage) : l({ en: 'Natural Voice', ar: 'صوت طبيعي', de: 'Natürliche Stimme' }))}
                     </span>
                     <button
                       onClick={changeSpeechRate}

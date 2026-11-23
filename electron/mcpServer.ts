@@ -15,6 +15,7 @@ import { resolveElementRef } from './main/elementRefs.js';
 import { handleJsonRpcMessage, type McpProtocolHandlers } from './main/mcpProtocol.js';
 import { formatToolError } from './main/mcpContent.js';
 import { createStreamableHttpHandlers, isLocalOrigin, type McpHttpSession } from './main/mcpStreamableHttp.js';
+import { resolveAppVersion } from './main/appVersion.js';
 import { Recorder, RECORDABLE_TOOLS, createRecordingStore, replaySteps, type Recording, type RecordingStore, type ReplayReport } from './main/recordings.js';
 import { createApprovalModeStore, strictModeRequiresApproval, type ApprovalMode, type ApprovalModeStore } from './main/approvalMode.js';
 import { detectPromptInjection, injectionWarning } from './main/injectionDetector.js';
@@ -1764,7 +1765,7 @@ export class BrowserMCPServer {
   /** What the transport-independent protocol layer needs from this server. */
   private protocolHandlers(): McpProtocolHandlers {
     return {
-      get serverVersion() { return electronApp?.getVersion?.() || '1.5.0'; },
+      get serverVersion() { return resolveAppVersion(() => electronApp?.getVersion?.()); },
       listTools: () => this.visibleTools(),
       callTool: (name, args) => this.executeToolForClient(name, args as Record<string, any>)
     };
@@ -1815,7 +1816,7 @@ export class BrowserMCPServer {
         // Authenticated: return detailed info, build string included. Read the
         // version only on this branch so an unauthenticated probe never causes
         // it to be computed at all.
-        const appVersion = electronApp?.getVersion?.() || '1.5.0';
+        const appVersion = resolveAppVersion(() => electronApp?.getVersion?.());
         res.json({
           status: 'ok',
           server: 'king-browser-mcp',
